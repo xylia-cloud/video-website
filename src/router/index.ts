@@ -7,10 +7,14 @@ import TagsView from '../views/TagsView.vue'
 import TagDetailsView from '../views/TagDetailsView.vue'
 import VideoDetailView from '../views/VideoDetailView.vue'
 import RechargeView from '../views/RechargeView.vue'
+import VipRechargeView from '../views/VipRechargeView.vue'
+import WithdrawView from '../views/WithdrawView.vue'
 import EditProfileView from '../views/EditProfileView.vue'
 import ShareFriendsView from '../views/ShareFriendsView.vue'
 import WalletView from '../views/WalletView.vue'
+import AccountDetailsView from '../views/AccountDetailsView.vue'
 import RechargeRecordView from '../views/RechargeRecordView.vue'
+import WithdrawRecordView from '../views/WithdrawRecordView.vue'
 import BankCardView from '../views/BankCardView.vue'
 import FootprintView from '../views/FootprintView.vue'
 import SettingsView from '../views/SettingsView.vue'
@@ -19,6 +23,10 @@ import RegisterView from '../views/RegisterView.vue'
 import SearchView from '../views/SearchView.vue'
 import AboutUsView from '../views/AboutUsView.vue'
 import PrivacyPolicyView from '../views/PrivacyPolicyView.vue'
+import GameRecordView from '../views/GameRecordView.vue'
+import FollowListView from '../views/FollowListView.vue'
+import CollectionView from '../views/CollectionView.vue'
+import WatchHistoryView from '../views/WatchHistoryView.vue'
 
 const router = createRouter({
   history: createWebHashHistory(import.meta.env.BASE_URL),
@@ -33,20 +41,20 @@ const router = createRouter({
       name: 'register',
       component: RegisterView,
       props: (route) => {
-        console.log('注册路由Props:', route.query);
-        
+        console.log('注册路由Props:', route.query)
+
         // 获取根URL的查询参数
-        const rootParams = new URLSearchParams(window.location.search);
-        const rootInvite = rootParams.get('invite');
-        
+        const rootParams = new URLSearchParams(window.location.search)
+        const rootInvite = rootParams.get('invite')
+
         // 如果路由查询参数中有invite，优先使用；否则尝试从根URL获取
-        const invite = route.query.invite || rootInvite || '';
-        
+        const invite = route.query.invite || rootInvite || ''
+
         return {
           invite,
-          redirect: route.query.redirect || '/'
-        };
-      }
+          redirect: route.query.redirect || '/',
+        }
+      },
     },
     {
       path: '/',
@@ -62,6 +70,11 @@ const router = createRouter({
       path: '/game',
       name: 'game',
       component: GameView,
+    },
+    {
+      path: '/game-record',
+      name: 'gameRecord',
+      component: GameRecordView,
     },
     {
       path: '/live',
@@ -89,8 +102,8 @@ const router = createRouter({
       component: VideoDetailView,
       props: (route) => ({
         ...route.params,
-        invite: route.query.invite
-      })
+        invite: route.query.invite,
+      }),
     },
     {
       path: '/recharge',
@@ -98,14 +111,24 @@ const router = createRouter({
       component: RechargeView,
     },
     {
+      path: '/vip-recharge',
+      name: 'vipRecharge',
+      component: VipRechargeView,
+    },
+    {
+      path: '/withdraw',
+      name: 'withdraw',
+      component: WithdrawView,
+    },
+    {
       path: '/points-record',
       name: 'points-record',
-      component: () => import('../views/PointsRecordView.vue')
+      component: () => import('../views/PointsRecordView.vue'),
     },
     {
       path: '/points-details',
       name: 'points-details',
-      component: () => import('../views/PointsDetailsView.vue')
+      component: () => import('../views/PointsDetailsView.vue'),
     },
     {
       path: '/edit-profile',
@@ -126,6 +149,11 @@ const router = createRouter({
       path: '/recharge-record',
       name: 'rechargeRecord',
       component: RechargeRecordView,
+    },
+    {
+      path: '/withdraw-record',
+      name: 'withdrawRecord',
+      component: WithdrawRecordView,
     },
     {
       path: '/bank-card',
@@ -151,6 +179,26 @@ const router = createRouter({
       path: '/privacy-policy',
       name: 'privacyPolicy',
       component: PrivacyPolicyView,
+    },
+    {
+      path: '/follow-list',
+      name: 'followList',
+      component: FollowListView,
+    },
+    {
+      path: '/collection',
+      name: 'collection',
+      component: CollectionView,
+    },
+    {
+      path: '/watch-history',
+      name: 'watchHistory',
+      component: WatchHistoryView,
+    },
+    {
+      path: '/account-details',
+      name: 'accountDetails',
+      component: AccountDetailsView,
     },
   ],
 })

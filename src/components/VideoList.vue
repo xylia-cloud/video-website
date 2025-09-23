@@ -42,15 +42,15 @@ function formatTime(timeStr: string): string {
   try {
     const date = new Date(timeStr);
     if (isNaN(date.getTime())) return timeStr;
-    
+
     // 获取年、月、日
     const year = date.getFullYear();
     const month = date.getMonth() + 1;
     const day = date.getDate();
-    
+
     // 当前年份
     const currentYear = new Date().getFullYear();
-    
+
     // 如果是未来日期，或者是模拟数据（比如2025年），直接显示日期
     if (year > currentYear) {
       // 当前日期 (在API环境中是2025-05-19)
@@ -58,48 +58,48 @@ function formatTime(timeStr: string): string {
       const todayDay = today.getDate();
       const todayMonth = today.getMonth() + 1;
       const todayYear = today.getFullYear();
-      
+
       // 如果是今天（相同年月日）
       if (year === todayYear && month === todayMonth && day === todayDay) {
         return '今天';
       }
-      
+
       // 如果是昨天（日期差1天）
       if (year === todayYear && month === todayMonth && day === todayDay - 1) {
         return '昨天';
       }
-      
+
       // 如果是前天（日期差2天）
       if (year === todayYear && month === todayMonth && day === todayDay - 2) {
         return '前天';
       }
-      
+
       // 其他日期显示月-日
       return `${month}-${day}`;
     }
-    
+
     // 当前日期
     const today = new Date();
-    
+
     // 如果是今天（相同年月日）
     if (date.toDateString() === today.toDateString()) {
       return '今天';
     }
-    
+
     // 昨天
     const yesterday = new Date(today);
     yesterday.setDate(yesterday.getDate() - 1);
     if (date.toDateString() === yesterday.toDateString()) {
       return '昨天';
     }
-    
+
     // 前天
     const dayBeforeYesterday = new Date(today);
     dayBeforeYesterday.setDate(dayBeforeYesterday.getDate() - 2);
     if (date.toDateString() === dayBeforeYesterday.toDateString()) {
       return '前天';
     }
-    
+
     // 其他日期，格式化为 MM-DD 或 YYYY-MM-DD
     if (year === currentYear) {
       return `${month}-${day}`; // 同一年只显示月-日
@@ -125,7 +125,7 @@ const handleVideoClick = (videoId: number) => {
   const scrollPosition = window.scrollY || document.documentElement.scrollTop;
   sessionStorage.setItem('homeScrollPosition', scrollPosition.toString());
   console.log(`视频点击前保存滚动位置: ${scrollPosition}`);
-  
+
   // 跳转到视频详情页
   router.push(`/video/${videoId}?from=${props.returnPath}`);
 };
@@ -136,29 +136,19 @@ const handleVideoClick = (videoId: number) => {
     <!-- 循环所有项目，根据isAd属性区分普通视频和广告 -->
     <template v-for="(item, index) in videos" :key="index">
       <!-- 普通视频项 -->
-      <div 
-        v-if="!item.isAd && !item.link"
-        class="video-item"
-        @click="handleVideoClick(item.id || index + 1)"
-      >
+      <div v-if="!item.isAd && !item.link" class="video-item" @click="handleVideoClick(item.id || index + 1)">
         <div class="video-cover">
-          <img 
-            :src="item.coverUrl" 
-            alt="Video Cover" 
-            loading="lazy" 
-            @error="(e) => {
-              console.error('图片加载失败:', item.coverUrl, e);
-              const target = e.target as HTMLImageElement;
-              if (target) {
-                target.style.background = '#333';
-                target.style.display = 'flex';
-                target.style.alignItems = 'center';
-                target.style.justifyContent = 'center';
-                target.alt = '图片加载失败';
-              }
-            }"
-            @load="() => console.log('图片加载成功:', item.coverUrl)"
-          />
+          <img :src="item.coverUrl" alt="Video Cover" loading="lazy" @error="(e) => {
+            console.error('图片加载失败:', item.coverUrl, e);
+            const target = e.target as HTMLImageElement;
+            if (target) {
+              target.style.background = '#333';
+              target.style.display = 'flex';
+              target.style.alignItems = 'center';
+              target.style.justifyContent = 'center';
+              target.alt = '图片加载失败';
+            }
+          }" @load="() => console.log('图片加载成功:', item.coverUrl)" />
           <div class="video-badge" v-if="item.isVip">{{ item.points || '付费' }}</div>
           <div class="video-badge free" v-else>限免</div>
           <div class="video-duration" v-if="item.duration">{{ item.duration }}</div>
@@ -171,11 +161,7 @@ const handleVideoClick = (videoId: number) => {
       </div>
 
       <!-- 广告项 -->
-      <div 
-        v-else
-        class="video-item ad-item"
-        @click="handleAdClick(item)"
-      >
+      <div v-else class="video-item ad-item" @click="handleAdClick(item)">
         <div class="video-cover">
           <img :src="item.coverUrl" alt="Ad Cover" loading="lazy" />
           <!-- <div class="video-badge ad">广告</div> -->
@@ -206,7 +192,8 @@ const handleVideoClick = (videoId: number) => {
   cursor: pointer;
   width: 100%;
   box-sizing: border-box;
-  min-width: 0; /* 防止内容溢出 */
+  min-width: 0;
+  /* 防止内容溢出 */
 }
 
 .video-cover {
@@ -215,8 +202,10 @@ const handleVideoClick = (videoId: number) => {
   overflow: hidden;
   margin-bottom: 6px;
   width: 100%;
-  aspect-ratio: 16 / 9; /* 固定宽高比 */
-  background-color: #333; /* 占位背景 */
+  aspect-ratio: 16 / 9;
+  /* 固定宽高比 */
+  background-color: #333;
+  /* 占位背景 */
 }
 
 .video-cover img {
@@ -322,11 +311,11 @@ const handleVideoClick = (videoId: number) => {
     grid-template-columns: repeat(2, 1fr);
     gap: 8px;
   }
-  
+
   .video-title {
     font-size: 11px;
   }
-  
+
   .video-info {
     font-size: 9px;
   }
@@ -338,4 +327,4 @@ const handleVideoClick = (videoId: number) => {
     gap: 6px;
   }
 }
-</style> 
+</style>

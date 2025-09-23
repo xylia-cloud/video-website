@@ -41,43 +41,43 @@ const fetchTagVideos = async (page = 1) => {
   } else {
     isLoadingMore.value = true;
   }
-  
+
   hasError.value = false;
   errorMessage.value = '';
-  
+
   try {
     // 如果没有标签名称，无法请求
     if (!tagName.value) {
       throw new Error('标签名称不能为空');
     }
-    
+
     // 构建请求参数
     const formData = new FormData();
     formData.append('tag_name', tagName.value);
     formData.append('limit', String(DEFAULT_PAGE_SIZE));
     formData.append('page', String(page));
-    
+
     console.log('获取标签视频，参数:', {
       tag_name: tagName.value,
       limit: DEFAULT_PAGE_SIZE,
       page: page
     });
-    
+
     // 发起POST请求
-    const response = await fetch(`${API_PREFIX}/index.php/ajax/tagvod.html`, {
+    const response = await fetch(`${BASE_URL}/index.php/ajax/tagvod.html`, {
       method: 'POST',
       body: formData,
       headers: createAuthHeaders()
     });
-    
+
     if (!response.ok) {
       const errorText = await response.text();
       throw new Error(`HTTP error! Status: ${response.status}, Response: ${errorText}`);
     }
-    
+
     const result = await response.json();
     console.log('标签视频数据:', result);
-    
+
     // 更新页码信息
     if (result.page) {
       currentPage.value = parseInt(result.page);
@@ -85,13 +85,13 @@ const fetchTagVideos = async (page = 1) => {
     if (result.pagecount) {
       totalPages.value = parseInt(result.pagecount);
     }
-    
+
     // 检查是否还有更多数据
     hasMoreVideos.value = currentPage.value < totalPages.value;
-    
+
     // 处理API返回的数据
     let apiData = [];
-    
+
     // 适应不同的数据结构
     if (result.data && result.data.list) {
       // 新的数据结构 { data: { list: [...] } }
@@ -103,7 +103,7 @@ const fetchTagVideos = async (page = 1) => {
       // 另一种结构 { list: [...] }
       apiData = result.list;
     }
-    
+
     // 映射字段
     const processedData = apiData.map((item: any) => {
       // 处理封面图片URL
@@ -121,12 +121,12 @@ const fetchTagVideos = async (page = 1) => {
       } else {
         coverUrl = '';
       }
-      
+
       // 判断是否付费内容
       const pointsPlay = item.vod_points_play !== undefined ? Number(item.vod_points_play) : 0;
       const isVip = pointsPlay > 0;
       const isFree = !isVip;
-      
+
       return {
         id: item.id || item.vod_id || 0,
         coverUrl: coverUrl,
@@ -139,7 +139,7 @@ const fetchTagVideos = async (page = 1) => {
         points: isVip ? pointsPlay + '积分' : ''
       };
     });
-    
+
     // 判断是加载更多还是第一页
     if (page > 1) {
       // 加载更多，将新数据追加到现有数据后面
@@ -148,15 +148,15 @@ const fetchTagVideos = async (page = 1) => {
       // 第一页，直接替换数据
       videoData.value = processedData;
     }
-    
+
     // 自动增加页码，为下次加载做准备
     currentPage.value = page;
-    
+
     console.log('处理后的视频数据:', videoData.value);
   } catch (error: any) {
     console.error('获取标签视频失败:', error);
     hasError.value = true;
-    
+
     // 显示明确的错误信息
     if (error.message) {
       errorMessage.value = error.message;
@@ -173,7 +173,7 @@ const checkScrollBottom = () => {
   if (isLoading.value || isLoadingMore.value || !hasMoreVideos.value || hasError.value) {
     return;
   }
-  
+
   // 获取滚动位置
   const scrollTop = window.scrollY || document.documentElement.scrollTop;
   // 获取视口高度
@@ -205,7 +205,7 @@ onMounted(() => {
   console.log('标签详情页面挂载，标签名称:', tagName.value);
   if (tagName.value) {
     fetchTagVideos(1);
-    
+
     // 添加滚动监听
     window.addEventListener('scroll', checkScrollBottom);
   } else {
@@ -239,29 +239,29 @@ onBeforeUnmount(() => {
         <van-loading type="spinner" color="#ff9500" />
         <div class="loading-text">加载中...</div>
       </div>
-      
+
       <!-- 错误状态 -->
       <div v-else-if="hasError" class="error-state">
         <van-icon name="warning-o" size="24" color="#ff9500" />
         <div class="error-text">加载失败，请稍后再试</div>
         <div v-if="errorMessage" class="error-detail">{{ errorMessage }}</div>
       </div>
-      
+
       <!-- 视频列表 -->
       <VideoList v-else-if="videoData.length > 0" :videos="videoData" returnPath="/tags" />
-      
+
       <!-- 无数据状态 -->
       <div v-else class="empty-state">
         <van-icon name="info-o" size="24" color="#999" />
         <div class="empty-text">暂无相关视频</div>
       </div>
-      
+
       <!-- 加载中状态 -->
       <div v-if="isLoadingMore" class="loading-more">
         <van-loading type="spinner" size="20" color="#ff9500" />
         <span>正在加载更多...</span>
       </div>
-      
+
       <!-- 已全部加载 -->
       <div v-if="videoData.length > 0 && !hasMoreVideos && !isLoading && !isLoadingMore" class="all-loaded">
         已经到底了~
@@ -411,7 +411,7 @@ onBeforeUnmount(() => {
 .tabbar-icon {
   width: 24px;
   height: 24px;
-  
+
 }
 
 .nav-item.active,
@@ -422,4 +422,4 @@ onBeforeUnmount(() => {
 .nav-text {
   font-size: 12px;
 }
-</style> 
+</style>

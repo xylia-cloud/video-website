@@ -50,7 +50,7 @@ const isVideoFloating = ref(false);
 const videoContainerRef = ref<HTMLElement | null>(null);
 
 // HLS实例
-let hls = ref<Hls | null>(null);
+const hls = ref<Hls | null>(null);
 // 视频元素引用
 const videoEl = ref<HTMLVideoElement | null>(null);
 
@@ -85,13 +85,13 @@ const userPoints = computed(() => {
 // 判断是否免费视频
 const isFreeVideo = computed(() => {
   if (!videoDetail.value) return true; // 默认视为免费
-  
+
   // 如果存在付费字段且值大于0，则为付费视频
   if (videoDetail.value.vod_points_play !== undefined && videoDetail.value.vod_points_play !== null) {
     const pointsValue = Number(videoDetail.value.vod_points_play);
     return isNaN(pointsValue) || pointsValue <= 0;
   }
-  
+
   // 无付费字段，视为免费
   return true;
 });
@@ -99,17 +99,17 @@ const isFreeVideo = computed(() => {
 // 判断视频标签类型
 const videoTagType = computed(() => {
   if (!videoDetail.value) return 'limited'; // 默认限免
-  
+
   // 已购买/已观看的付费视频
   if (!isFreeVideo.value && isWatched.value) {
     return 'purchased';
   }
-  
+
   // 未购买的付费视频
   if (!isFreeVideo.value) {
     return 'pay';
   }
-  
+
   // 免费视频
   return 'limited';
 });
@@ -136,22 +136,22 @@ const parseUrlInviteCode = () => {
   // 获取完整URL
   const fullUrl = window.location.href;
   console.log('开始解析URL邀请码，完整URL:', fullUrl);
-  
+
   // 尝试正则匹配invite参数
   // 这个正则会匹配 invite=xxxx 格式，无论它在哈希前还是哈希后
   const inviteRegex = /[?&]invite=([^&#]*)/;
   const match = fullUrl.match(inviteRegex);
-  
+
   if (match && match[1]) {
     const extractedInvite = decodeURIComponent(match[1]);
     console.log('正则匹配到的邀请码:', extractedInvite);
-    
+
     // 存储到localStorage以便后续使用
     localStorage.setItem('inviteCode', extractedInvite);
-    
+
     return extractedInvite;
   }
-  
+
   return '';
 };
 
@@ -163,14 +163,14 @@ const inviteCode = computed(() => {
     console.log('从路由查询参数获取邀请码:', routeInvite);
     return routeInvite;
   }
-  
+
   // 如果都没有找到，从localStorage尝试获取
   const storedInvite = localStorage.getItem('inviteCode');
   if (storedInvite) {
     console.log('从localStorage获取邀请码:', storedInvite);
     return storedInvite;
   }
-  
+
   return '';
 });
 
@@ -183,19 +183,19 @@ const isFromShare = computed(() => {
 const getCurrentShareUrl = () => {
   // 获取当前用户的邀请码
   const userRecCode = userInfo.value?.rec_code || '';
-  
+
   // 构建带邀请码的URL
   const currentUrl = window.location.href;
   const urlObj = new URL(currentUrl);
-  
+
   // 清除已有的invite参数
   urlObj.searchParams.delete('invite');
-  
+
   // 添加新的invite参数
   if (userRecCode) {
     urlObj.searchParams.append('invite', userRecCode);
   }
-  
+
   return urlObj.toString();
 };
 
@@ -225,13 +225,13 @@ const checkSafetyTipStatus = () => {
 const showAuthenticationModal = (defaultTab = 'login') => {
   // 设置默认显示的选项卡
   authActiveTab.value = defaultTab;
-  
+
   // 如果是注册选项卡，检查是否有邀请码
   if (defaultTab === 'register') {
     // 从各种可能的来源获取邀请码
     const urlInviteCode = parseUrlInviteCode(); // 先尝试从URL中解析
     const computedInviteCode = inviteCode.value; // 使用计算属性的值
-    
+
     // 优先使用直接从URL解析的邀请码
     if (urlInviteCode) {
       registerInviteCode.value = urlInviteCode;
@@ -241,7 +241,7 @@ const showAuthenticationModal = (defaultTab = 'login') => {
       console.log('从计算属性填充邀请码:', computedInviteCode);
     }
   }
-  
+
   // 显示弹窗
   showAuthModal.value = true;
 };
@@ -249,13 +249,13 @@ const showAuthenticationModal = (defaultTab = 'login') => {
 // 关闭安全提示弹窗
 const closeSafetyTip = (doNotRemind = false) => {
   showSafetyTip.value = false;
-  
+
   // 如果用户选择"不再提醒"，则保存到localStorage
   if (doNotRemind) {
     localStorage.setItem('videoSafetyTipDoNotRemind', 'true');
     console.log('用户已选择不再显示安全提示');
   }
-  
+
   // 关闭弹窗后继续播放流程
   continuePlay();
 };
@@ -264,13 +264,13 @@ const closeSafetyTip = (doNotRemind = false) => {
 const switchAuthTab = (tab: string) => {
   authActiveTab.value = tab;
   authErrorMsg.value = ''; // 切换时清空错误信息
-  
+
   // 如果切换到注册选项卡，尝试填充邀请码
   if (tab === 'register' && !registerInviteCode.value) {
     // 从各种可能的来源获取邀请码
     const urlInviteCode = parseUrlInviteCode(); // 先尝试从URL中解析
     const computedInviteCode = inviteCode.value; // 使用计算属性的值
-    
+
     // 优先使用直接从URL解析的邀请码
     if (urlInviteCode) {
       registerInviteCode.value = urlInviteCode;
@@ -302,19 +302,19 @@ const handleLogin = async () => {
     authErrorMsg.value = '用户名和密码不能为空';
     return;
   }
-  
+
   isAuthLoading.value = true;
   authErrorMsg.value = '';
-  
+
   try {
     // 假设有一个login API
     const result = await userLogin({
       user_name: loginUsername.value,
       user_pwd: loginPassword.value
     });
-    
+
     console.log('登录结果:', result);
-    
+
     if (result && result.code === 1) {
       // 登录成功
       showToast({
@@ -324,10 +324,10 @@ const handleLogin = async () => {
         className: 'custom-toast-success',
         icon: 'success',
       });
-      
+
       // 关闭弹窗
       closeAuthModal();
-      
+
       // 获取用户信息并开始播放视频
       await fetchUserInfo();
       playVideo();
@@ -350,29 +350,30 @@ const handleRegister = async () => {
     authErrorMsg.value = '请填写完整注册信息';
     return;
   }
-  
+
   if (registerPassword.value !== registerConfirmPassword.value) {
     authErrorMsg.value = '两次输入的密码不一致';
     return;
   }
-  
+
   isAuthLoading.value = true;
   authErrorMsg.value = '';
-  
+
   try {
     // 获取邀请码（优先使用表单中填写的邀请码）
     const inviteCodeValue = registerInviteCode.value || '';
-    
+
     // 调用注册API
     const result = await registerUser({
-      user_name: registerUsername.value,
-      user_pwd: registerPassword.value,
-      user_pwd2: registerConfirmPassword.value,
-      invite_code: inviteCodeValue
+      country_code: 86, // 固定为86
+      user_login: registerUsername.value,
+      user_pass: registerPassword.value,
+      user_pass2: registerConfirmPassword.value,
+      rec_code: inviteCodeValue || undefined
     });
-    
+
     console.log('注册结果:', result);
-    
+
     if (result && result.code === 1 && result.data) {
       // 注册成功，自动保存用户信息（相当于自动登录）
       const userData = {
@@ -386,10 +387,10 @@ const handleRegister = async () => {
         user_nick_name: result.data.user_nick_name,
         rec_code: result.data.rec_code
       };
-      
+
       // 保存用户信息到本地存储
       setUserInfo(userData);
-      
+
       // 显示成功提示
       showToast({
         message: '注册成功',
@@ -398,10 +399,10 @@ const handleRegister = async () => {
         className: 'custom-toast-success',
         icon: 'success',
       });
-      
+
       // 关闭弹窗
       closeAuthModal();
-      
+
       // 延迟一下再播放视频，确保用户能看到成功提示
       setTimeout(async () => {
         // 获取最新的用户信息
@@ -428,16 +429,16 @@ watch(
     if (newId) {
       console.log('视频ID变化:', newId);
       videoId.value = newId as string;
-      
+
       // 重置播放状态
       isPlaying.value = false;
-      
+
       // 清理HLS实例
       if (hls.value) {
         hls.value.destroy();
         hls.value = null;
       }
-      
+
       // 重新获取视频详情
       fetchVideoDetailData();
     }
@@ -449,7 +450,7 @@ const getCoverUrl = (url?: string) => {
   if (!url) {
     return '';
   }
-  
+
   if (url.startsWith('http')) {
     return url;
   } else if (url.startsWith('/')) {
@@ -466,22 +467,22 @@ const setupVideoSource = (src: string) => {
     hls.value.destroy();
     hls.value = null;
   }
-  
+
   // 检查视频元素是否存在
   if (!videoEl.value) {
     console.error('视频元素不存在');
     return;
   }
-  
+
   console.log('设置视频源:', src);
-  
+
   // 确保URL是绝对路径
   let videoUrl = src;
   if (!videoUrl.startsWith('http') && !videoUrl.startsWith('/')) {
     // 如果是相对路径，添加BASE_URL
     videoUrl = `${BASE_URL}/${videoUrl}`;
   }
-  
+
   // 检查URL是否包含localhost，这通常表示相对路径被错误地解析
   if (videoUrl.includes('localhost') && !src.includes('localhost')) {
     console.warn('检测到可能的URL解析问题，尝试修正URL', src);
@@ -492,27 +493,27 @@ const setupVideoSource = (src: string) => {
       videoUrl = `${BASE_URL}/${src}`;
     }
   }
-  
+
   console.log('最终视频URL:', videoUrl);
-  
+
   // 重置播放状态
   isVideoPlayed.value = false;
-  
+
   // 设置iOS防止自动全屏的属性
   videoEl.value.setAttribute('playsinline', 'true');
   videoEl.value.setAttribute('webkit-playsinline', 'true');
   videoEl.value.setAttribute('x5-playsinline', 'true');
   videoEl.value.setAttribute('x5-video-player-type', 'h5');
   videoEl.value.setAttribute('x5-video-player-fullscreen', 'false');
-  
+
   // 添加视频事件监听
   videoEl.value.addEventListener('play', handleVideoPlay);
   videoEl.value.addEventListener('ended', handleVideoEnded);
-  
+
   // 判断是否是m3u8格式
   if (videoUrl.includes('.m3u8')) {
     console.log('检测到m3u8格式，使用HLS播放');
-    
+
     // 检查浏览器是否原生支持HLS
     if (videoEl.value.canPlayType('application/vnd.apple.mpegurl')) {
       console.log('浏览器原生支持HLS，直接播放');
@@ -528,28 +529,28 @@ const setupVideoSource = (src: string) => {
         maxBufferSize: 60 * 1000 * 1000, // 60MB
         maxBufferHole: 0.5,
         // 增加请求超时时间
-        xhrSetup: function(xhr) {
+        xhrSetup: function (xhr) {
           xhr.timeout = 10000; // 10秒超时
         }
       });
       hls.value = newHls;
-      
+
       // 先添加错误处理程序
       newHls.on(Hls.Events.ERROR, (event, data) => {
         console.error('HLS播放错误:', data);
         if (data.fatal) {
-          switch(data.type) {
+          switch (data.type) {
             case Hls.ErrorTypes.NETWORK_ERROR:
               console.error('致命网络错误');
-              
+
               // 检查错误响应是否包含HTML内容
-              if (data.response && data.response.data && 
-                  typeof data.response.data === 'string' && 
-                  data.response.data.includes('<!DOCTYPE html>')) {
+              if (data.response && data.response.data &&
+                typeof data.response.data === 'string' &&
+                data.response.data.includes('<!DOCTYPE html>')) {
                 console.error('服务器返回了HTML内容而不是视频流，URL可能有误');
                 hasError.value = true;
                 errorMessage.value = '视频资源不可用或地址错误，请稍后再试';
-                
+
                 // 尝试显示更具体的错误信息
                 const serverMessage = '服务器返回了网页而不是视频内容';
                 errorMessage.value = serverMessage;
@@ -575,12 +576,12 @@ const setupVideoSource = (src: string) => {
           console.warn('HLS非致命错误:', data);
         }
       });
-      
+
       // 加载视频源
       try {
         newHls.loadSource(videoUrl);
         newHls.attachMedia(videoEl.value);
-        
+
         newHls.on(Hls.Events.MANIFEST_PARSED, () => {
           console.log('HLS清单解析完成，开始播放');
           videoEl.value?.play().catch((e: Error) => {
@@ -612,16 +613,16 @@ const handleVideoPlay = () => {
   if (!isVideoPlayed.value) {
     isVideoPlayed.value = true;
     updatePlayCount();
-    
+
     // 记录播放历史
     recordWatchHistory();
-    
+
     // 如果是付费视频且之前未观看，则更新用户信息
     if (isNeedPay.value && pointsNeeded.value > 0) {
       console.log('付费视频播放开始，将在播放后更新用户积分信息');
       // 设置已观看状态，防止重复扣费
       isWatched.value = true;
-      
+
       // 延迟更新用户积分信息，确保后端扣费已完成
       setTimeout(async () => {
         await getUserRealTimeInfo();
@@ -642,25 +643,25 @@ const getUserRealTimeInfo = async () => {
     console.log('用户未登录，无法获取实时信息');
     return null;
   }
-  
+
   // 防止重复请求
   if (isLoadingUserInfo.value) {
     console.log('已有一个获取用户信息的请求正在进行中');
     return null;
   }
-  
+
   isLoadingUserInfo.value = true;
-  
+
   try {
     // 发起POST请求获取实时用户信息
     const result = await fetchUserDatas({});
     console.log('获取用户实时信息结果:', result);
-    
+
     // 处理API响应，根据提供的数据结构
     if (result && result.code === 1 && result.data) {
       // API返回包含user_points的完整用户数据
       userInfo.value = result.data;
-      
+
       // 更新本地存储的用户信息
       const currentUserInfo = getUserInfo();
       if (currentUserInfo) {
@@ -675,7 +676,7 @@ const getUserRealTimeInfo = async () => {
         };
         setUserInfo(updatedUserInfo);
       }
-      
+
       console.log('更新用户实时积分:', result.data.user_points);
       return result.data;
     } else {
@@ -707,35 +708,35 @@ const playVideo = async () => {
   // 先判断是否是免费视频
   if (isFreeVideo.value) {
     // 免费视频流程
-    
+
     // 检查是否需要显示安全提示
     if (checkSafetyTipStatus()) {
       // 显示安全提示弹窗
       showSafetyTip.value = true;
       return;
     }
-    
+
     // 继续播放流程
     continuePlay();
     return;
   }
-  
+
   // 如果是付费视频且用户已登录
   if (!isFreeVideo.value && isLoggedIn()) {
     // 继续正常付费流程
-    
+
     // 检查是否需要显示安全提示
     if (checkSafetyTipStatus()) {
       // 显示安全提示弹窗
       showSafetyTip.value = true;
       return;
     }
-    
+
     // 继续播放流程
     continuePlay();
     return;
   }
-  
+
   // 如果是付费视频且未登录，直接显示登录/注册弹窗
   // 默认显示登录选项卡，如果是从分享链接进入，则显示注册选项卡
   const defaultTab = isFromShare.value ? 'register' : 'login';
@@ -747,7 +748,7 @@ const continuePlay = async () => {
   // 获取用户最新积分信息
   console.log('正在获取用户最新积分信息...');
   const latestUserInfo = await getUserRealTimeInfo();
-  
+
   // 根据is_watched字段判断是否需要扣费
   // is_watched为1表示已观看，直接播放
   if (isWatched.value) {
@@ -756,17 +757,17 @@ const continuePlay = async () => {
     startVideoPlayback();
     return;
   }
-  
+
   // 未观看过，检查是否需要付费
   if (isNeedPay.value && pointsNeeded.value > 0) {
     // 付费视频，需要弹窗确认扣费
     console.log('付费视频且未观看，弹窗确认扣费');
-    
+
     // 获取当前积分余额（优先使用最新获取的实时数据）
-    const currentPoints = latestUserInfo?.user_points !== undefined 
-      ? latestUserInfo.user_points 
+    const currentPoints = latestUserInfo?.user_points !== undefined
+      ? latestUserInfo.user_points
       : userPoints.value;
-    
+
     // 检查积分余额
     if (currentPoints < pointsNeeded.value) {
       showDialog({
@@ -784,7 +785,7 @@ const continuePlay = async () => {
       });
       return;
     }
-    
+
     // 积分足够，弹窗确认扣费
     showDialog({
       title: '付费确认',
@@ -811,10 +812,10 @@ const continuePlay = async () => {
 const deductPointsAndPlay = () => {
   // 直接播放视频，由后端处理扣费
   startVideoPlayback();
-  
+
   // 记录视频已经播放，用于防止重复扣费
   isWatched.value = true;
-  
+
   // 视频开始播放后，延迟更新用户积分信息，确保扣费已完成
   setTimeout(async () => {
     await getUserRealTimeInfo();
@@ -829,7 +830,7 @@ const startVideoPlayback = () => {
   hasError.value = false;
   errorMessage.value = '';
   isPlaying.value = true;
-  
+
   // 异步设置视频源，确保DOM已更新
   setTimeout(() => {
     setupVideoSource(videoSrc.value);
@@ -839,18 +840,18 @@ const startVideoPlayback = () => {
 // 添加更新播放次数的方法
 const updatePlayCount = async () => {
   if (!videoDetail.value || !videoDetail.value.vod_id) return;
-  
+
   try {
     const params = {
       mid: 1, // 影片类型为1
       id: videoDetail.value.vod_id,
       type: 'update' // 更新播放次数
     };
-    
+
     console.log('正在更新播放次数...');
     const result = await updateVideoHits(params);
     console.log('播放次数更新结果:', result);
-    
+
     // 如果API返回新的播放次数，可以更新界面显示
     if (result && result.data && result.data.hits) {
       // 更新UI上的播放次数
@@ -867,7 +868,7 @@ const updatePlayCount = async () => {
 // 记录播放历史
 const recordWatchHistory = async () => {
   if (!videoDetail.value || !videoDetail.value.vod_id) return;
-  
+
   try {
     const params = {
       mid: 1, // 影片类型为1
@@ -875,11 +876,11 @@ const recordWatchHistory = async () => {
       type: 1, // 1表示浏览记录
       ac: 'set' // 设置记录
     };
-    
+
     console.log('正在记录播放历史...');
     const result = await updateUserLog(params);
     console.log('记录播放历史结果:', result);
-    
+
     if (result && result.code === 1) {
       console.log('播放历史记录成功');
     } else {
@@ -896,26 +897,26 @@ const fetchVideoDetailData = async () => {
   isLoading.value = true;
   hasError.value = false;
   errorMessage.value = '';
-  
+
   // 重置点赞状态
   isDigged.value = false;
   isDiggLoading.value = false;
-  
+
   // 重置收藏状态
   isCollected.value = false;
   isCollectLoading.value = false;
-  
+
   // 重置付费状态
   isNeedPay.value = false;
   pointsNeeded.value = 0;
-  
+
   try {
     // 获取用户实时信息
     await getUserRealTimeInfo();
-    
+
     const result = await fetchVideoDetail(videoId.value);
     console.log('视频详情数据:', result);
-    
+
     // 检查是否需要登录
     if (result.code === 0 && result.msg === "请先登录") {
       showDialog({
@@ -934,19 +935,19 @@ const fetchVideoDetailData = async () => {
       });
       return;
     }
-    
+
     if (result.code === 1 && result.data) {
       videoDetail.value = result.data;
-      
+
       // 打印所有视频信息用于调试
       console.log('视频完整信息:', JSON.stringify(result.data));
-      
+
       // 设置视频播放地址
       if (result.data.vod_play_url) {
         // 尝试解析视频播放URL
         const playUrl = result.data.vod_play_url;
         console.log('原始播放地址:', playUrl);
-        
+
         // 验证URL是否有效
         if (!playUrl || playUrl === 'undefined' || playUrl === 'null') {
           console.error('视频播放地址无效');
@@ -954,7 +955,7 @@ const fetchVideoDetailData = async () => {
           errorMessage.value = '视频源不可用，请稍后再试';
           return;
         }
-        
+
         // 确保URL是有效的，使用直接提供的链接
         videoSrc.value = playUrl;
         console.log('设置最终播放地址:', videoSrc.value);
@@ -963,12 +964,12 @@ const fetchVideoDetailData = async () => {
         hasError.value = true;
         errorMessage.value = '视频源不可用，请稍后再试';
       }
-      
+
       // 检查是否付费视频
       if (result.data.vod_points_play !== undefined && result.data.vod_points_play !== null) {
         // 确保转换为数字，处理字符串、数字等各种情况
         const pointsValue = Number(result.data.vod_points_play);
-        
+
         if (!isNaN(pointsValue) && pointsValue > 0) {
           isNeedPay.value = true;
           pointsNeeded.value = pointsValue;
@@ -985,28 +986,28 @@ const fetchVideoDetailData = async () => {
         pointsNeeded.value = 0;
         console.log('检测到免费视频(无积分字段)');
       }
-      
+
       // 检查用户是否已观看过此视频
       if (result.data.is_watched !== undefined) {
         isWatched.value = result.data.is_watched === 1;
         console.log('用户观看状态:', isWatched.value ? '已观看' : '未观看');
       }
-      
+
       // 检查用户是否已点赞（如果API返回了该信息）
       if (result.data.user_digg === 1) {
         isDigged.value = true;
       }
-      
+
       // 检查用户是否已收藏（如果API返回了该信息）
       if (result.data.user_collect === 1) {
         isCollected.value = true;
       }
-      
+
       // 视频详情加载完成后，再获取推荐视频
       setTimeout(() => {
         fetchRecommendVideosData();
       }, 300);
-      
+
       // 滚动到页面顶部
       window.scrollTo({ top: 0, behavior: 'smooth' });
     } else {
@@ -1030,25 +1031,25 @@ const fetchRecommendVideosData = async (refresh = false) => {
     } else {
       isRecommendLoading.value = true;
     }
-    
+
     // 清空现有推荐视频数据
     recommendVideos.value = [];
-    
+
     // 构建参数，传递当前视频ID和分类ID
     const params = {
       id: videoId.value,
       page: 1, // 固定为第1页，每次获取新的推荐
       type_id: videoDetail.value?.type_id || 1
     };
-    
+
     console.log('猜你喜欢请求参数:', params);
     console.log('当前视频type_id:', videoDetail.value?.type_id);
-    
+
     // 使用详情页推荐接口
     const result = await fetchDetailRecommend(params);
-    
+
     console.log('详情页推荐接口返回数据:', JSON.stringify(result));
-    
+
     // 检查不同的返回结构
     let videoList = [];
     if (result && result.data && Array.isArray(result.data)) {
@@ -1069,10 +1070,10 @@ const fetchRecommendVideosData = async (refresh = false) => {
       videoList = result.filter((item: any) => typeof item === 'object' && item !== null);
       console.log('使用直接数组结构，原始长度:', result.length, '过滤后长度:', videoList.length);
     }
-    
+
     console.log('过滤后的视频列表长度:', videoList.length);
     console.log('过滤后的视频列表前3项:', videoList.slice(0, 3));
-    
+
     if (videoList.length > 0) {
       // 转换API返回的数据格式为VideoItem[]格式
       const videos = videoList.map((item: any) => {
@@ -1080,7 +1081,7 @@ const fetchRecommendVideosData = async (refresh = false) => {
         const isVip = item.vod_points_play > 0;
         const isFree = item.vod_points_play === 0 || !item.vod_points_play;
         const pointsPlay = item.vod_points_play !== undefined ? Number(item.vod_points_play) : 0;
-        
+
         const videoItem = {
           id: item.vod_id || item.id,
           coverUrl: getCoverUrl(item.vod_pic),
@@ -1092,42 +1093,42 @@ const fetchRecommendVideosData = async (refresh = false) => {
           time: item.vod_pubdate || item.vod_time || '',
           points: isVip ? pointsPlay + '积分' : ''
         };
-        
+
         // 调试封面URL问题
         console.log(`视频 ${videoItem.title} 的封面URL:`, videoItem.coverUrl);
-        
+
         return videoItem;
       });
-              
-        console.log('转换后的推荐视频数据:', videos.length, '个视频');
-        
-        // 处理视频列表并插入广告
-        let processedVideos = [...videos];
-        
-        // 限制视频数量为10条（包含广告）
-        if (processedVideos.length > 10) {
-          processedVideos = processedVideos.slice(0, 10);
-        }
-        
-        // 只有有广告数据时才插入广告
-        if (listAds.value.length > 0) {
-          const adsToUse = listAds.value.slice(0, 3);
-          
-          // 在特定位置插入广告
-          for (let i = 0; i < Math.min(adPositions.value.length, adsToUse.length); i++) {
-            const position = adPositions.value[i];
-            // 确保位置在有效范围内
-            if (processedVideos.length >= position) {
-              processedVideos.splice(position, 0, adsToUse[i]);
-            }
+
+      console.log('转换后的推荐视频数据:', videos.length, '个视频');
+
+      // 处理视频列表并插入广告
+      let processedVideos = [...videos];
+
+      // 限制视频数量为10条（包含广告）
+      if (processedVideos.length > 10) {
+        processedVideos = processedVideos.slice(0, 10);
+      }
+
+      // 只有有广告数据时才插入广告
+      if (listAds.value.length > 0) {
+        const adsToUse = listAds.value.slice(0, 3);
+
+        // 在特定位置插入广告
+        for (let i = 0; i < Math.min(adPositions.value.length, adsToUse.length); i++) {
+          const position = adPositions.value[i];
+          // 确保位置在有效范围内
+          if (processedVideos.length >= position) {
+            processedVideos.splice(position, 0, adsToUse[i]);
           }
         }
-        
-        // 直接替换推荐视频数据
-        recommendVideos.value = processedVideos;
+      }
+
+      // 直接替换推荐视频数据
+      recommendVideos.value = processedVideos;
     } else {
       console.error('推荐视频数据格式错误或为空:', result);
-      
+
       // 如果没有数据，使用测试数据
       if (recommendVideos.value.length === 0) {
         // 从服务器获取数据失败，创建测试数据
@@ -1214,13 +1215,13 @@ const fetchRecommendVideosData = async (refresh = false) => {
             vod_pubdate: "2025-04-10 14:25:33"
           }
         ];
-        
+
         // 创建视频列表
         recommendVideos.value = testVideos.map(item => {
           // 根据固定规则生成测试数据
           const isVip = false; // 测试数据全部设为免费
           const isFree = true;
-          
+
           return {
             id: item.vod_id,
             coverUrl: getCoverUrl(item.vod_pic),
@@ -1249,7 +1250,7 @@ const refreshRecommends = () => {
   if (isRefreshingRecommends.value) {
     return;
   }
-  
+
   console.log('换一批推荐视频');
   fetchRecommendVideosData(true);
 };
@@ -1273,11 +1274,11 @@ const shareVideo = () => {
     });
     return;
   }
-  
+
   // 获取分享链接
   const shareUrl = getCurrentShareUrl();
   console.log('生成的分享链接:', shareUrl);
-  
+
   // 直接复制链接到剪贴板
   try {
     // 创建临时输入框
@@ -1285,11 +1286,11 @@ const shareVideo = () => {
     tempInput.value = shareUrl;
     document.body.appendChild(tempInput);
     tempInput.select();
-    
+
     // 复制到剪贴板
     const successful = document.execCommand('copy');
     document.body.removeChild(tempInput);
-    
+
     if (successful) {
       showToast({
         message: '复制成功',
@@ -1304,7 +1305,7 @@ const shareVideo = () => {
     }
   } catch (err) {
     console.error('传统复制方法失败，尝试clipboard API:', err);
-    
+
     // 尝试使用现代的clipboard API
     if (navigator.clipboard && navigator.clipboard.writeText) {
       navigator.clipboard.writeText(shareUrl)
@@ -1353,19 +1354,19 @@ const goBack = () => {
   if (isPlaying.value) {
     console.log('停止播放视频并返回上一页');
     isPlaying.value = false;
-    
+
     // 清理视频资源
     if (videoEl.value) {
       videoEl.value.pause();
       videoEl.value.src = '';
     }
-    
+
     if (hls.value) {
       hls.value.destroy();
       hls.value = null;
     }
   }
-  
+
   // 使用浏览器的历史记录返回上一页
   console.log('返回上一页');
   router.back();
@@ -1374,9 +1375,9 @@ const goBack = () => {
 // 处理滚动事件
 const handleScroll = () => {
   if (!videoContainerRef.value || !isPlaying.value) return;
-  
+
   const scrollY = window.scrollY || document.documentElement.scrollTop;
-  
+
   // 当滚动超过一定距离时，启用浮动模式
   if (scrollY > 100) {
     isVideoFloating.value = true;
@@ -1397,7 +1398,7 @@ const handleDigg = async () => {
     });
     return;
   }
-  
+
   if (!videoDetail.value || !videoDetail.value.vod_id) {
     showToast({
       message: '获取视频信息失败',
@@ -1408,20 +1409,20 @@ const handleDigg = async () => {
     });
     return;
   }
-  
+
   try {
     isDiggLoading.value = true;
-    
+
     const params = {
       mid: 1, // 影片模型ID为1
       id: videoDetail.value.vod_id,
       type: 'up' // 点赞操作
     };
-    
+
     console.log('正在进行点赞操作...');
     const result = await updateVideoDigg(params);
     console.log('点赞结果:', result);
-    
+
     if (result && result.code === 1) {
       isDigged.value = true;
       showToast({
@@ -1431,7 +1432,7 @@ const handleDigg = async () => {
         className: 'custom-toast-success',
         icon: 'checked',
       });
-      
+
       // 如果API返回新的点赞数，更新UI显示
       if (result.data && result.data.up) {
         if (videoDetail.value) {
@@ -1470,7 +1471,7 @@ const handleCollect = async () => {
   if (isCollectLoading.value) {
     return;
   }
-  
+
   if (!videoDetail.value || !videoDetail.value.vod_id) {
     showToast({
       message: '获取视频信息失败',
@@ -1481,10 +1482,10 @@ const handleCollect = async () => {
     });
     return;
   }
-  
+
   try {
     isCollectLoading.value = true;
-    
+
     const action = isCollected.value ? 'del' : 'set';
     const params = {
       mid: 1, // 影片模型ID为1
@@ -1492,11 +1493,11 @@ const handleCollect = async () => {
       type: 2, // 2表示收藏
       ac: action // set添加收藏，del取消收藏
     };
-    
+
     console.log(`正在${isCollected.value ? '取消' : '添加'}收藏...`);
     const result = await updateUserLog(params);
     console.log('收藏操作结果:', result);
-    
+
     if (result && result.code === 1) {
       isCollected.value = !isCollected.value;
       showToast({
@@ -1506,7 +1507,7 @@ const handleCollect = async () => {
         className: isCollected.value ? 'custom-toast-success' : 'custom-toast-info',
         icon: isCollected.value ? 'success' : 'info',
       });
-    } else if (result && result.code === 1002) { 
+    } else if (result && result.code === 1002) {
       // 假设1002是需要登录的错误码
       showDialog({
         title: '提示',
@@ -1548,14 +1549,14 @@ const fetchUserInfo = async () => {
     console.log('用户未登录');
     return;
   }
-  
+
   // 首先从本地获取用户信息
   const info = getUserInfo();
   if (info) {
     userInfo.value = info;
     console.log('视频详情页获取本地用户信息:', info);
   }
-  
+
   // 获取实时用户信息
   await getUserRealTimeInfo();
 };
@@ -1572,13 +1573,13 @@ onBeforeUnmount(() => {
     hls.value.destroy();
     hls.value = null;
   }
-  
+
   // 移除视频事件监听
   if (videoEl.value) {
     videoEl.value.removeEventListener('play', handleVideoPlay);
     videoEl.value.removeEventListener('ended', handleVideoEnded);
   }
-  
+
   // 移除滚动事件监听
   window.removeEventListener('scroll', handleScroll);
 });
@@ -1589,18 +1590,18 @@ onMounted(() => {
   if (urlInviteCode) {
     console.log('组件挂载时从URL成功解析到邀请码:', urlInviteCode);
   }
-  
+
   // 打印URL相关信息用于调试
   console.log('完整URL:', window.location.href);
   console.log('URL查询部分:', window.location.search);
   console.log('URL哈希部分:', window.location.hash);
   console.log('路由查询参数:', route.query);
   console.log('计算得到的邀请码:', inviteCode.value);
-  
+
   fetchVideoDetailData();
   fetchUserInfo();
   fetchListAds(); // 获取广告数据
-  
+
   // 添加滚动事件监听
   window.addEventListener('scroll', handleScroll);
 });
@@ -1619,9 +1620,9 @@ const fetchListAds = async () => {
       ad_pos: 4, // 详情页推荐位置
       ad_type: 2  // 单图类型
     });
-    
+
     console.log('获取详情页列表广告数据:', result);
-    
+
     // 处理API返回的广告数据
     if (result && result.code === 1 && result.data && Array.isArray(result.data) && result.data.length > 0) {
       // 将API返回的广告数据转换为VideoItem格式
@@ -1636,11 +1637,11 @@ const fetchListAds = async () => {
           link: item.ad_url || '',
           isAd: true
         };
-        
+
         console.log('处理后的详情页列表广告项:', adItem);
         return adItem;
       });
-      
+
       // 更新列表广告数据
       console.log('更新详情页列表广告数据:', apiAds);
       listAds.value = apiAds;
@@ -1657,11 +1658,11 @@ const fetchListAds = async () => {
 // 处理广告图片路径
 const processAdImageUrl = (imgPath: string) => {
   console.log('原始广告图片路径:', imgPath);
-  
+
   if (!imgPath) return '';
-  
+
   let imageUrl = '';
-  
+
   // 处理图片URL
   if (imgPath.startsWith('/')) {
     imageUrl = `${BASE_URL}${imgPath}`;
@@ -1670,7 +1671,7 @@ const processAdImageUrl = (imgPath: string) => {
   } else {
     imageUrl = `${BASE_URL}/${imgPath}`;
   }
-  
+
   console.log('处理后的图片路径:', imageUrl);
   return imageUrl;
 };
@@ -1678,9 +1679,9 @@ const processAdImageUrl = (imgPath: string) => {
 // 处理广告点击
 const handleAdClick = (ad: ListAd) => {
   if (!ad.link) return;
-  
+
   console.log(`广告点击: ${ad.title}, 链接: ${ad.link}`);
-  
+
   // 如果是内部链接，使用路由跳转
   if (ad.link.startsWith('/')) {
     router.push(ad.link);
@@ -1712,104 +1713,61 @@ const handleAdClick = (ad: ListAd) => {
       <div class="auth-modal">
         <!-- 选项卡头部，移到最上面 -->
         <div class="auth-tabs">
-          <div 
-            class="auth-tab" 
-            :class="{ 'auth-tab-active': authActiveTab === 'login' }" 
-            @click="switchAuthTab('login')"
-          >
+          <div class="auth-tab" :class="{ 'auth-tab-active': authActiveTab === 'login' }"
+            @click="switchAuthTab('login')">
             登录
           </div>
-          <div 
-            class="auth-tab" 
-            :class="{ 'auth-tab-active': authActiveTab === 'register' }" 
-            @click="switchAuthTab('register')"
-          >
+          <div class="auth-tab" :class="{ 'auth-tab-active': authActiveTab === 'register' }"
+            @click="switchAuthTab('register')">
             注册
           </div>
         </div>
-        
+
         <!-- 登录表单 -->
         <div v-if="authActiveTab === 'login'" class="auth-content">
           <div class="auth-form">
             <div class="form-group">
               <label>用户名</label>
-              <input 
-                type="text" 
-                v-model="loginUsername" 
-                placeholder="请输入用户名"
-                :disabled="isAuthLoading"
-              />
+              <input type="text" v-model="loginUsername" placeholder="请输入用户名" :disabled="isAuthLoading" />
             </div>
             <div class="form-group">
               <label>密码</label>
-              <input 
-                type="password" 
-                v-model="loginPassword" 
-                placeholder="请输入密码"
-                :disabled="isAuthLoading"
-              />
+              <input type="password" v-model="loginPassword" placeholder="请输入密码" :disabled="isAuthLoading" />
             </div>
             <div v-if="authErrorMsg" class="auth-error">{{ authErrorMsg }}</div>
-            <button 
-              class="auth-submit-btn" 
-              @click="handleLogin" 
-              :disabled="isAuthLoading"
-            >
+            <button class="auth-submit-btn" @click="handleLogin" :disabled="isAuthLoading">
               {{ isAuthLoading ? '登录中...' : '登录' }}
             </button>
           </div>
         </div>
-        
+
         <!-- 注册表单 -->
         <div v-else-if="authActiveTab === 'register'" class="auth-content">
           <div class="auth-form">
             <div class="form-group">
               <label>用户名</label>
-              <input 
-                type="text" 
-                v-model="registerUsername" 
-                placeholder="请输入用户名"
-                :disabled="isAuthLoading"
-              />
+              <input type="text" v-model="registerUsername" placeholder="请输入用户名" :disabled="isAuthLoading" />
             </div>
             <div class="form-group">
               <label>密码</label>
-              <input 
-                type="password" 
-                v-model="registerPassword" 
-                placeholder="请输入密码"
-                :disabled="isAuthLoading"
-              />
+              <input type="password" v-model="registerPassword" placeholder="请输入密码" :disabled="isAuthLoading" />
             </div>
             <div class="form-group">
               <label>确认密码</label>
-              <input 
-                type="password" 
-                v-model="registerConfirmPassword" 
-                placeholder="请再次输入密码"
-                :disabled="isAuthLoading"
-              />
+              <input type="password" v-model="registerConfirmPassword" placeholder="请再次输入密码"
+                :disabled="isAuthLoading" />
             </div>
             <div class="form-group">
               <label>邀请码</label>
-              <input 
-                type="text" 
-                v-model="registerInviteCode" 
-                placeholder="请输入邀请码(选填)"
-                :disabled="isAuthLoading"
-              />
+              <input type="text" v-model="registerInviteCode" placeholder="请输入邀请码(选填)" :disabled="isAuthLoading" />
             </div>
             <div v-if="authErrorMsg" class="auth-error">{{ authErrorMsg }}</div>
-            <button 
-              class="auth-submit-btn" 
-              @click="handleRegister" 
-              :disabled="isAuthLoading"
-            >
+            <button class="auth-submit-btn" @click="handleRegister" :disabled="isAuthLoading">
               {{ isAuthLoading ? '注册中...' : '注册' }}
             </button>
           </div>
         </div>
-        
+
         <!-- 关闭按钮，移到底部 -->
         <div class="auth-modal-footer">
           <button class="auth-close-btn" @click="closeAuthModal">关闭</button>
@@ -1839,10 +1797,7 @@ const handleAdClick = (ad: ListAd) => {
 
     <template v-else-if="videoDetail">
       <!-- 视频播放器 - 始终显示，根据状态控制是否显示封面或播放器 -->
-      <div 
-        ref="videoContainerRef"
-        :class="['video-container', { 'video-floating': isVideoFloating && isPlaying }]"
-      >
+      <div ref="videoContainerRef" :class="['video-container', { 'video-floating': isVideoFloating && isPlaying }]">
         <!-- 视频播放器 -->
         <template v-if="isPlaying">
           <div v-if="hasError" class="play-error">
@@ -1850,30 +1805,19 @@ const handleAdClick = (ad: ListAd) => {
             <div class="error-msg">{{ errorMessage || '视频播放失败' }}</div>
             <div class="retry-btn" @click="playVideo">重试</div>
           </div>
-          <video 
-            v-else
-            ref="videoEl"
-            controls 
-            autoplay 
-            playsinline
-            webkit-playsinline
-            x5-playsinline
-            x5-video-player-type="h5"
-            x5-video-player-fullscreen="false"
-            class="video-player" 
-            @error="(e) => {console.error('视频加载错误:', e); hasError = true; errorMessage = '视频加载失败，播放地址可能无效'; }"
-            @play="handleVideoPlay"
-            @ended="handleVideoEnded"
-          >
+          <video v-else ref="videoEl" controls autoplay playsinline webkit-playsinline x5-playsinline
+            x5-video-player-type="h5" x5-video-player-fullscreen="false" class="video-player"
+            @error="(e) => { console.error('视频加载错误:', e); hasError = true; errorMessage = '视频加载失败，播放地址可能无效'; }"
+            @play="handleVideoPlay" @ended="handleVideoEnded">
             您的浏览器不支持 HTML5 视频播放
           </video>
-          
+
           <!-- 浮动状态下的关闭按钮 -->
           <div v-if="isVideoFloating" class="floating-close" @click="isPlaying = false">
             <Icon name="cross" size="20" color="#fff" />
           </div>
         </template>
-        
+
         <!-- 视频封面 -->
         <div v-else class="main-video-cover">
           <img :src="getCoverUrl(videoDetail.vod_pic)" alt="视频封面" />
@@ -1885,10 +1829,10 @@ const handleAdClick = (ad: ListAd) => {
           </div>
         </div>
       </div>
-      
+
       <!-- 浮动状态下的占位元素 -->
       <div v-if="isVideoFloating && isPlaying" class="video-placeholder"></div>
-      
+
       <!-- 视频内容详情 -->
       <div class="video-main">
         <!-- 观看限制提示 -->
@@ -1899,7 +1843,7 @@ const handleAdClick = (ad: ListAd) => {
           <div class="share-btn" @click="shareVideo" v-if="isLoggedIn()">分享获取</div>
           <div class="share-btn" @click="goToLogin" v-else>登录</div>
         </div>
-        
+
         <!-- 视频标题和信息 -->
         <h1 class="main-video-title">{{ videoDetail.vod_name }}</h1>
         <div class="video-meta-tag">
@@ -1910,7 +1854,7 @@ const handleAdClick = (ad: ListAd) => {
           <div class="meta-views">{{ videoDetail.vod_hits }}次播放</div>
           <div class="meta-date">{{ videoDetail.vod_pubdate }}</div>
         </div>
-        
+
         <!-- 操作按钮 -->
         <div class="action-buttons">
           <div class="action-btn" @click="handleDigg" :class="{ 'active': isDigged }">
@@ -1931,7 +1875,7 @@ const handleAdClick = (ad: ListAd) => {
           </div>
         </div>
       </div>
-      
+
       <!-- 推荐视频 -->
       <div class="recommended-section">
         <!-- 相关推荐标题 -->
@@ -1940,7 +1884,7 @@ const handleAdClick = (ad: ListAd) => {
           <div class="section-label">猜你喜欢</div>
           <div class="section-line"></div>
         </div>
-        
+
         <div v-if="isRecommendLoading" class="loading-state">
           <Loading type="spinner" color="#ff9500" />
           <div class="loading-text">加载中...</div>
@@ -1952,18 +1896,11 @@ const handleAdClick = (ad: ListAd) => {
         </div>
         <template v-else-if="recommendVideos.length > 0">
           <VideoList :videos="recommendVideos" return-path="/" />
-          
+
           <!-- 换一批按钮 -->
-          <div class="refresh-btn-container">
-            <button 
-              class="refresh-btn" 
-              @click="refreshRecommends"
-              :disabled="isRefreshingRecommends"
-            >
-              <Icon v-if="isRefreshingRecommends" name="loading" size="16" />
-              <Icon v-else name="replay" size="16" />
-              <span>{{ isRefreshingRecommends ? '换一批中...' : '换一批' }}</span>
-            </button>
+          <div class="refresh-btn" @click="refreshRecommends">
+            <Icon name="replay" />
+            <span>换一批</span>
           </div>
         </template>
         <div v-else class="empty-recommend">暂无推荐视频</div>
@@ -2307,7 +2244,8 @@ const handleAdClick = (ad: ListAd) => {
 
 .meta-tag.purchased {
   color: #fff;
-  background-color: #4CAF50; /* 绿色表示已购买 */
+  background-color: #4CAF50;
+  /* 绿色表示已购买 */
 }
 
 .meta-views {
@@ -2367,53 +2305,19 @@ const handleAdClick = (ad: ListAd) => {
   font-size: 14px;
 }
 
-/* 换一批按钮容器 */
-.refresh-btn-container {
-  display: flex;
-  justify-content: center;
-  margin: 20px 0 10px 0;
-  padding: 0 15px;
-}
-
 /* 换一批按钮 */
 .refresh-btn {
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 8px;
-  background: linear-gradient(90deg, #ff9500, #ff6d00);
-  color: #fff;
-  border: none;
-  border-radius: 25px;
-  padding: 12px 24px;
-  font-size: 15px;
-  font-weight: bold;
-  cursor: pointer;
-  transition: all 0.3s ease;
-  box-shadow: 0 4px 15px rgba(255, 149, 0, 0.3);
-  min-width: 120px;
-}
-
-.refresh-btn:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 6px 20px rgba(255, 149, 0, 0.4);
-}
-
-.refresh-btn:active {
-  transform: translateY(1px);
-  box-shadow: 0 2px 10px rgba(255, 149, 0, 0.3);
-}
-
-.refresh-btn:disabled {
-  background: linear-gradient(90deg, #9e9e9e, #616161);
-  cursor: not-allowed;
-  box-shadow: none;
-  transform: none;
+  color: #ff9500;
+  font-size: 14px;
+  padding: 10px 0;
+  margin-bottom: 15px;
 }
 
 .refresh-btn span {
-  font-size: 15px;
-  font-weight: bold;
+  margin-left: 5px;
 }
 
 /* 底部导航 */
@@ -2441,7 +2345,7 @@ const handleAdClick = (ad: ListAd) => {
 .tabbar-icon {
   width: 24px;
   height: 24px;
-  
+
 }
 
 .nav-text {
@@ -2557,8 +2461,13 @@ const handleAdClick = (ad: ListAd) => {
 }
 
 @keyframes fadeIn {
-  from { opacity: 0; }
-  to { opacity: 1; }
+  from {
+    opacity: 0;
+  }
+
+  to {
+    opacity: 1;
+  }
 }
 
 .auth-modal {
@@ -2576,8 +2485,15 @@ const handleAdClick = (ad: ListAd) => {
 }
 
 @keyframes slideUp {
-  from { transform: translateY(30px); opacity: 0; }
-  to { transform: translateY(0); opacity: 1; }
+  from {
+    transform: translateY(30px);
+    opacity: 0;
+  }
+
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
 }
 
 /* 移除原来的关闭按钮样式 */
@@ -2699,9 +2615,26 @@ const handleAdClick = (ad: ListAd) => {
 }
 
 @keyframes shake {
-  0%, 100% { transform: translateX(0); }
-  10%, 30%, 50%, 70%, 90% { transform: translateX(-5px); }
-  20%, 40%, 60%, 80% { transform: translateX(5px); }
+
+  0%,
+  100% {
+    transform: translateX(0);
+  }
+
+  10%,
+  30%,
+  50%,
+  70%,
+  90% {
+    transform: translateX(-5px);
+  }
+
+  20%,
+  40%,
+  60%,
+  80% {
+    transform: translateX(5px);
+  }
 }
 
 .auth-submit-btn {
@@ -2760,4 +2693,4 @@ const handleAdClick = (ad: ListAd) => {
   left: 0;
   color: #ff9500;
 }
-</style> 
+</style>

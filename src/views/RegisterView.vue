@@ -2,8 +2,7 @@
 import { ref, onMounted, defineProps } from 'vue';
 import { useRouter, useRoute } from 'vue-router';
 import { Icon as VanIcon, showDialog, showLoadingToast, closeToast } from 'vant';
-import { registerUser, setUserInfo, type UserInfo } from '@/api/fetch-api';
-import bgImage from '@/assets/img/img-live.jpg';
+import { registerUser, userLogin, setUserInfo } from '@/api/fetch-api';
 
 // 接收路由参数
 const props = defineProps({
@@ -37,7 +36,7 @@ const handleRegister = async () => {
     });
     return;
   }
-  
+
   if (!password.value) {
     showDialog({
       title: '提示',
@@ -47,7 +46,7 @@ const handleRegister = async () => {
     });
     return;
   }
-  
+
   if (password.value !== confirmPassword.value) {
     showDialog({
       title: '提示',
@@ -57,66 +56,110 @@ const handleRegister = async () => {
     });
     return;
   }
-  
+
   // 构建注册参数
   interface RegisterParams {
-    user_name: string;
-    user_pwd: string;
-    user_pwd2: string;
-    invite_code: string;
-    [key: string]: string | undefined;
+    country_code: number;
+    user_login: string;
+    user_pass: string;
+    user_pass2: string;
+    rec_code?: string;
+    [key: string]: string | number | undefined;
   }
-  
+
   const params: RegisterParams = {
-    user_name: userName.value,
-    user_pwd: password.value,
-    user_pwd2: confirmPassword.value,
-    invite_code: inviteCode.value
+    country_code: 86, // 固定为86
+    user_login: userName.value,
+    user_pass: password.value,
+    user_pass2: confirmPassword.value,
+    rec_code: inviteCode.value || undefined
   };
-  
+
   try {
     showLoadingToast({
       message: '正在注册...',
       forbidClick: true,
     });
-    
+
     console.log('注册参数：', params);
     // 调用注册API
     const result = await registerUser(params);
-    
+
     closeToast();
-    
-    if (result && result.code === 1 && result.data) {
-      // 注册成功，直接使用返回的TOKEN数据进行自动登录
-      const userInfo: UserInfo = {
-        user_id: result.data.user_id,
-        user_name: result.data.user_name,
-        token: result.data.token,
-        user_portrait: result.data.user_portrait,
-        user_points: result.data.user_points,
-        group_id: result.data.group_id,
-        group_name: result.data.group_name,
-        user_nick_name: result.data.user_nick_name,
-        rec_code: result.data.rec_code
-      };
-      
-      // 保存用户信息到本地存储
-      setUserInfo(userInfo);
-      
-      // 获取重定向路径，如果有的话
-      const redirectPath = props.redirect || route.query.redirect as string || '/';
-      
-      // 显示成功提示并跳转
-      showDialog({
-        title: '注册成功',
-        message: `注册成功！${result.data.user_points ? `获得${result.data.user_points}积分` : ''}`,
-        confirmButtonText: '确定',
-        confirmButtonColor: '#ff9500'
-      }).then(() => {
-        // 跳转到重定向页面或首页
-        console.log('注册成功，跳转到:', redirectPath);
-        router.push(redirectPath);
-      });
+
+    if (result && result.code === 1) {
+      // 注册成功，新接口不返回完整用户信息，需要自动登录
+      console.log('注册成功，正在自动登录...');
+
+      try {
+        // 自动调用登录接口
+        const loginResult = await userLogin({
+          user_name: userName.value,
+          user_pwd: password.value
+        });
+
+        if (loginResult && loginResult.code === 1 && loginResult.data) {
+          // 登录成功，保存用户信息
+          setUserInfo(loginResult.data);
+
+          // 获取重定向路径
+          const redirectPath = props.redirect || route.query.redirect as string || '/';
+
+          showDialog({
+            title: '注册成功',
+            message: `注册成功！${loginResult.data.user_points ? `获得${loginResult.data.user_points}积分` : ''}`,
+            confirmButtonText: '确定',
+            confirmButtonColor: '#ff9500'
+          }).then(() => {
+            // 跳转到重定向页面或首页
+            console.log('注册成功并自动登录，跳转到:', redirectPath);
+            router.push(redirectPath);
+          });
+        } else {
+          // 自动登录失败，跳转到登录页面
+          showDialog({
+            title: '注册成功',
+            message: '注册成功，请手动登录',
+            confirmButtonText: '去登录',
+            confirmButtonColor: '#ff9500'
+          }).then(() => {
+            // 保存重定向路径到登录页面
+            const redirectPath = props.redirect || route.query.redirect as string || '/';
+            const loginQuery: Record<string, string> = {};
+            if (redirectPath && redirectPath !== '/') {
+              loginQuery.redirect = redirectPath;
+            }
+
+            // 跳转到登录页面
+            router.push({
+              path: '/login',
+              query: loginQuery
+            });
+          });
+        }
+      } catch (loginError) {
+        console.error('自动登录失败:', loginError);
+        // 自动登录失败，跳转到登录页面
+        showDialog({
+          title: '注册成功',
+          message: '注册成功，请手动登录',
+          confirmButtonText: '去登录',
+          confirmButtonColor: '#ff9500'
+        }).then(() => {
+          // 保存重定向路径到登录页面
+          const redirectPath = props.redirect || route.query.redirect as string || '/';
+          const loginQuery: Record<string, string> = {};
+          if (redirectPath && redirectPath !== '/') {
+            loginQuery.redirect = redirectPath;
+          }
+
+          // 跳转到登录页面
+          router.push({
+            path: '/login',
+            query: loginQuery
+          });
+        });
+      }
     } else if (result && result.code === 200) {
       // 兼容旧的返回码
       showDialog({
@@ -164,16 +207,16 @@ const goToLogin = () => {
 
 onMounted(() => {
   console.log('注册页面加载，路由参数:', route.query);
-  
+
   // 检查是否有邀请码
   let hasInviteCode = false;
-  
+
   // 1. 优先使用props中的邀请码
   if (props.invite) {
     inviteCode.value = props.invite;
     console.log('从props获取邀请码:', props.invite);
     hasInviteCode = true;
-  } 
+  }
   // 2. 其次从URL参数中获取邀请码
   else {
     const inviteParam = route.query.invite as string;
@@ -183,22 +226,22 @@ onMounted(() => {
       hasInviteCode = true;
     }
   }
-  
+
   // 3. 如果上面方法都没获取到，但URL的根路径有invite参数(处理特殊情况)
   if (!hasInviteCode) {
     const urlParams = new URLSearchParams(window.location.search);
     const rootInviteCode = urlParams.get('invite');
-    
+
     if (rootInviteCode) {
       inviteCode.value = rootInviteCode;
       console.log('从根路径获取邀请码:', rootInviteCode);
       hasInviteCode = true;
-      
+
       // 可以选择清理URL，但这不是必须的
       // 这里不执行清理，因为可能会影响用户体验
     }
   }
-  
+
   // 4. 如果以上方法都没获取到，从localStorage中获取
   if (!hasInviteCode) {
     const storedInviteCode = localStorage.getItem('inviteCode');
@@ -208,7 +251,7 @@ onMounted(() => {
       hasInviteCode = true;
     }
   }
-  
+
   // 打印最终邀请码状态
   console.log('注册页面最终邀请码:', inviteCode.value || '无邀请码');
 });
@@ -220,7 +263,7 @@ onMounted(() => {
     <div class="background-container">
       <div class="background-overlay"></div>
     </div>
-    
+
     <!-- 应用图标和名称 -->
     <div class="app-logo">
       <div class="logo-container">
@@ -229,55 +272,36 @@ onMounted(() => {
         </div>
       </div>
     </div>
-    
+
     <!-- 注册表单 -->
     <div class="register-form">
       <div class="input-group">
-        <input 
-          type="text" 
-          v-model="userName" 
-          placeholder="请输入用户名"
-          class="form-input"
-        />
+        <input type="text" v-model="userName" placeholder="请输入用户名" class="form-input" />
       </div>
-      
+
       <div class="input-group">
-        <input 
-          :type="showPassword ? 'text' : 'password'" 
-          v-model="password" 
-          placeholder="请输入密码"
-          class="form-input"
-        />
+        <input :type="showPassword ? 'text' : 'password'" v-model="password" placeholder="请输入密码" class="form-input" />
         <div class="password-toggle" @click="togglePasswordVisibility">
           <van-icon :name="showPassword ? 'eye-o' : 'closed-eye'" size="24" color="#999" />
         </div>
       </div>
-      
+
       <div class="input-group">
-        <input 
-          :type="showConfirmPassword ? 'text' : 'password'" 
-          v-model="confirmPassword" 
-          placeholder="请确认密码"
-          class="form-input"
-        />
+        <input :type="showConfirmPassword ? 'text' : 'password'" v-model="confirmPassword" placeholder="请确认密码"
+          class="form-input" />
         <div class="password-toggle" @click="toggleConfirmPasswordVisibility">
           <van-icon :name="showConfirmPassword ? 'eye-o' : 'closed-eye'" size="24" color="#999" />
         </div>
       </div>
-      
+
       <div class="input-group">
-        <input 
-          type="text" 
-          v-model="inviteCode" 
-          placeholder="请输入邀请码（选填）"
-          class="form-input"
-        />
+        <input type="text" v-model="inviteCode" placeholder="请输入邀请码（选填）" class="form-input" />
         <div class="input-hint">邀请码可以帮助您获得额外奖励</div>
       </div>
-      
+
       <button class="register-button" @click="handleRegister">注册</button>
     </div>
-    
+
     <!-- 底部操作按钮 -->
     <div class="bottom-actions">
       <div class="action-item" @click="goToLogin">
@@ -342,7 +366,8 @@ onMounted(() => {
   background-color: #000;
   border-radius: 20px;
 }
-.logo-bg img{
+
+.logo-bg img {
   width: 100%;
   border-radius: 20px;
 }
@@ -428,4 +453,4 @@ onMounted(() => {
   font-size: 16px;
   margin-top: 5px;
 }
-</style> 
+</style>

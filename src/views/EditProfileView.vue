@@ -16,13 +16,7 @@
           <img :src="avatarUrl" alt="头像" />
         </div>
         <div class="upload-text">点击更换头像</div>
-        <input 
-          type="file" 
-          accept="image/*" 
-          class="avatar-input" 
-          @change="handleAvatarChange" 
-          ref="fileInput"
-        />
+        <input type="file" accept="image/*" class="avatar-input" @change="handleAvatarChange" ref="fileInput" />
       </div>
 
       <!-- 账号信息 -->
@@ -36,6 +30,24 @@
         <div class="item-label">昵称：</div>
         <div class="item-input">
           <input type="text" v-model="nickname" placeholder="请输入昵称" />
+        </div>
+      </div>
+
+      <!-- 性别 -->
+      <div class="form-item" @click="showSexSelector">
+        <div class="item-label">性别：</div>
+        <div class="item-value">{{ getSexText(sex) }}</div>
+        <div class="item-arrow">
+          <van-icon name="arrow" size="20" color="#ccc" />
+        </div>
+      </div>
+
+      <!-- 生日 -->
+      <div class="form-item" @click="showBirthdayPicker">
+        <div class="item-label">生日：</div>
+        <div class="item-value">{{ birthday || '请选择生日' }}</div>
+        <div class="item-arrow">
+          <van-icon name="arrow" size="20" color="#ccc" />
         </div>
       </div>
 
@@ -55,12 +67,7 @@
     </div>
 
     <!-- 修改密码弹窗 -->
-    <van-popup 
-      v-model:show="pwdPopupVisible" 
-      position="bottom" 
-      round
-      @click-overlay="pwdPopupVisible = false"
-    >
+    <van-popup v-model:show="pwdPopupVisible" position="bottom" round @click-overlay="pwdPopupVisible = false">
       <div class="popup-container">
         <div class="popup-header">
           <div class="popup-title">修改登录密码</div>
@@ -82,13 +89,64 @@
         </div>
       </div>
     </van-popup>
+
+    <!-- 性别选择弹窗 -->
+    <van-popup v-model:show="sexPopupVisible" position="bottom" round @click-overlay="sexPopupVisible = false">
+      <div class="popup-container">
+        <div class="popup-header">
+          <div class="popup-title">选择性别</div>
+          <div class="popup-close" @click="sexPopupVisible = false">
+            <van-icon name="cross" />
+          </div>
+        </div>
+        <div class="popup-content">
+          <div class="sex-options">
+            <div class="sex-option" :class="{ active: sex === 0 }" @click="selectSex(0)">保密</div>
+            <div class="sex-option" :class="{ active: sex === 1 }" @click="selectSex(1)">男</div>
+            <div class="sex-option" :class="{ active: sex === 2 }" @click="selectSex(2)">女</div>
+          </div>
+        </div>
+      </div>
+    </van-popup>
+
+    <!-- 生日选择弹窗 -->
+    <van-popup v-model:show="birthdayPopupVisible" position="bottom" round
+      @click-overlay="birthdayPopupVisible = false">
+      <div class="popup-container">
+        <div class="popup-header">
+          <div class="popup-title">选择生日</div>
+          <div class="popup-close" @click="birthdayPopupVisible = false">
+            <van-icon name="cross" />
+          </div>
+        </div>
+        <div class="popup-content">
+          <div class="birthday-inputs">
+            <div class="birthday-row">
+              <select v-model="tempYear" class="birthday-select">
+                <option v-for="year in years" :key="year" :value="year">{{ year }}年</option>
+              </select>
+              <select v-model="tempMonth" class="birthday-select">
+                <option v-for="month in months" :key="month" :value="month">{{ month }}月</option>
+              </select>
+              <select v-model="tempDay" class="birthday-select">
+                <option v-for="day in days" :key="day" :value="day">{{ day }}日</option>
+              </select>
+            </div>
+          </div>
+          <div class="birthday-buttons">
+            <div class="birthday-cancel" @click="birthdayPopupVisible = false">取消</div>
+            <div class="birthday-confirm" @click="confirmBirthday">确定</div>
+          </div>
+        </div>
+      </div>
+    </van-popup>
   </div>
 </template>
 
 <script setup lang="ts">
 import { ref, onMounted, onBeforeUnmount, onActivated, onDeactivated, computed } from 'vue';
 import { useRouter } from 'vue-router';
-import { showToast, showLoadingToast, closeToast } from 'vant';
+import { showToast, showLoadingToast, closeToast, showDialog } from 'vant';
 import { updateUserInfo, getUserInfo, isLoggedIn, updateUserPortrait } from '@/api/fetch-api';
 import { BASE_URL } from '@/utils/config';
 
@@ -99,15 +157,93 @@ const fileInput = ref<HTMLInputElement | null>(null);
 const userId = ref('');
 const loading = ref(false);
 
+// 新增字段
+const sex = ref(0); // 0保密 1男 2女
+const birthday = ref('');
+
 // 密码修改相关
 const pwdPopupVisible = ref(false);
 const oldPwd = ref('');
 const newPwd = ref('');
 const repeatPwd = ref('');
 
+// 性别选择相关
+const sexPopupVisible = ref(false);
+
+// 生日选择相关
+const birthdayPopupVisible = ref(false);
+const tempYear = ref(new Date().getFullYear());
+const tempMonth = ref(new Date().getMonth() + 1);
+const tempDay = ref(new Date().getDate());
+
+// 计算属性：年份选项
+const years = computed(() => {
+  const currentYear = new Date().getFullYear();
+  const yearList = [];
+  for (let i = 1950; i <= currentYear; i++) {
+    yearList.push(i);
+  }
+  return yearList.reverse();
+});
+
+// 计算属性：月份选项
+const months = computed(() => {
+  return Array.from({ length: 12 }, (_, i) => i + 1);
+});
+
+// 计算属性：日期选项
+const days = computed(() => {
+  const daysInMonth = new Date(tempYear.value, tempMonth.value, 0).getDate();
+  return Array.from({ length: daysInMonth }, (_, i) => i + 1);
+});
+
 // 返回上一页
 const goBack = () => {
   router.back();
+};
+
+// 获取性别文本
+const getSexText = (sexValue: number) => {
+  switch (sexValue) {
+    case 1:
+      return '男';
+    case 2:
+      return '女';
+    default:
+      return '保密';
+  }
+};
+
+// 显示性别选择器
+const showSexSelector = () => {
+  sexPopupVisible.value = true;
+};
+
+// 选择性别
+const selectSex = (sexValue: number) => {
+  sex.value = sexValue;
+  sexPopupVisible.value = false;
+};
+
+// 显示生日选择器
+const showBirthdayPicker = () => {
+  // 如果有现有生日，解析并设置临时值
+  if (birthday.value) {
+    const parts = birthday.value.split('-');
+    if (parts.length === 3) {
+      tempYear.value = parseInt(parts[0]);
+      tempMonth.value = parseInt(parts[1]);
+      tempDay.value = parseInt(parts[2]);
+    }
+  }
+  birthdayPopupVisible.value = true;
+};
+
+// 确认生日选择
+const confirmBirthday = () => {
+  const formattedBirthday = `${tempYear.value}-${tempMonth.value.toString().padStart(2, '0')}-${tempDay.value.toString().padStart(2, '0')}`;
+  birthday.value = formattedBirthday;
+  birthdayPopupVisible.value = false;
 };
 
 // 将文件转换为base64
@@ -138,9 +274,9 @@ const uploadAvatarBase64 = async (file: File) => {
       message: '上传中...',
       forbidClick: true,
     });
-    
+
     console.log('开始上传头像, 文件大小:', file.size, '文件类型:', file.type);
-    
+
     // 检查文件类型和大小
     if (!file.type.startsWith('image/')) {
       showToast({
@@ -149,7 +285,7 @@ const uploadAvatarBase64 = async (file: File) => {
       });
       return;
     }
-    
+
     if (file.size > 5 * 1024 * 1024) { // 5MB限制
       showToast({
         message: '图片大小不能超过5MB',
@@ -157,21 +293,21 @@ const uploadAvatarBase64 = async (file: File) => {
       });
       return;
     }
-    
+
     // 转换文件为base64
     const base64Data = await fileToBase64(file);
-    
+
     // 使用base64方式上传
     const result = await updateUserPortrait({
       imgdata: base64Data
     });
-    
+
     console.log('头像上传结果:', result);
-    
+
     if (result && result.code === 1) {
       // 显示预览
       avatarUrl.value = URL.createObjectURL(file);
-      
+
       showToast({
         message: '头像上传成功',
         duration: 2000
@@ -202,9 +338,9 @@ const uploadAvatarFile = async (file: File) => {
       message: '上传中...',
       forbidClick: true,
     });
-    
+
     console.log('开始上传头像(文件方式), 文件大小:', file.size, '文件类型:', file.type);
-    
+
     // 检查文件类型和大小
     if (!file.type.startsWith('image/')) {
       showToast({
@@ -213,7 +349,7 @@ const uploadAvatarFile = async (file: File) => {
       });
       return;
     }
-    
+
     if (file.size > 5 * 1024 * 1024) { // 5MB限制
       showToast({
         message: '图片大小不能超过5MB',
@@ -221,18 +357,18 @@ const uploadAvatarFile = async (file: File) => {
       });
       return;
     }
-    
+
     // 使用文件方式上传
     const result = await updateUserPortrait({
       file: file
     });
-    
+
     console.log('头像上传结果:', result);
-    
+
     if (result && result.code === 1) {
       // 显示预览
       avatarUrl.value = URL.createObjectURL(file);
-      
+
       showToast({
         message: '头像上传成功',
         duration: 2000
@@ -260,11 +396,11 @@ const handleAvatarChange = async (event: Event) => {
   const target = event.target as HTMLInputElement;
   if (target.files && target.files.length > 0) {
     const file = target.files[0];
-    
+
     // 尝试两种上传方式
     // 先尝试文件方式上传
     await uploadAvatarFile(file);
-    
+
     // 如果需要尝试base64方式，可以取消下面的注释
     // 通常只需要使用一种方式
     // await uploadAvatarBase64(file);
@@ -274,34 +410,39 @@ const handleAvatarChange = async (event: Event) => {
 // 保存个人资料
 const saveProfile = async () => {
   if (loading.value) return;
-  
+
   try {
     loading.value = true;
     showLoadingToast({
       message: '保存中...',
       forbidClick: true,
     });
-    
-    // 调用API保存数据，即使只修改昵称，也传递密码字段（空值）
+
+    // 调用API保存数据，包含新字段
     const result = await updateUserInfo({
       user_nick_name: nickname.value,
+      sex: sex.value.toString(),
+      birthday: birthday.value,
       user_pwd: '', // 原密码，不修改密码时传空字符串
       user_pwd1: '', // 新密码，不修改密码时传空字符串
       user_pwd2: ''  // 确认密码，不修改密码时传空字符串
     });
-    
+
     if (result && result.code === 1) {
-      showToast({
+      showDialog({
+        title: '提示',
         message: '保存成功',
-        duration: 2000
-      });
-      setTimeout(() => {
+        confirmButtonText: '确定',
+        confirmButtonColor: '#ff9500'
+      }).then(() => {
         router.back();
-      }, 1000);
+      });
     } else {
-      showToast({
+      showDialog({
+        title: '提示',
         message: result?.msg || '保存失败，请重试',
-        duration: 2000
+        confirmButtonText: '确定',
+        confirmButtonColor: '#ff9500'
       });
     }
   } catch (error: any) {
@@ -327,60 +468,78 @@ const showChangePwdPopup = () => {
 // 修改密码
 const changePassword = async () => {
   if (loading.value) return;
-  
+
   if (!oldPwd.value) {
-    showToast({
+    showDialog({
+      title: '提示',
       message: '请输入原密码',
-      duration: 2000
+      confirmButtonText: '确定',
+      confirmButtonColor: '#ff9500'
     });
     return;
   }
   if (!newPwd.value) {
-    showToast({
+    showDialog({
+      title: '提示',
       message: '请输入新密码',
-      duration: 2000
+      confirmButtonText: '确定',
+      confirmButtonColor: '#ff9500'
     });
     return;
   }
   if (newPwd.value !== repeatPwd.value) {
-    showToast({
+    showDialog({
+      title: '提示',
       message: '两次输入的新密码不一致',
-      duration: 2000
+      confirmButtonText: '确定',
+      confirmButtonColor: '#ff9500'
     });
     return;
   }
-  
+
   try {
     loading.value = true;
     showLoadingToast({
       message: '修改中...',
       forbidClick: true,
     });
-    
+
     // 调用API修改密码
     const result = await updateUserInfo({
       user_pwd: oldPwd.value,
       user_pwd1: newPwd.value,
       user_pwd2: repeatPwd.value
     });
-    
+
     if (result && result.code === 1) {
-      showToast({
+      // 先关闭加载提示
+      loading.value = false;
+      closeToast();
+
+      // 显示成功弹窗
+      showDialog({
+        title: '提示',
         message: '密码修改成功',
-        duration: 2000
+        confirmButtonText: '确定',
+        confirmButtonColor: '#ff9500'
       });
       pwdPopupVisible.value = false;
+      return; // 成功时直接返回，不执行finally
     } else {
-      showToast({
+      showDialog({
+        title: '提示',
         message: result?.msg || '密码修改失败，请重试',
-        duration: 2000
+        confirmButtonText: '确定',
+        confirmButtonColor: '#ff9500'
       });
     }
   } catch (error: any) {
     console.error('修改密码失败:', error);
-    showToast({
+    showDialog({
+      title: '提示',
       message: error.message || '修改失败，请稍后再试',
-      duration: 2000
+      confirmButtonText: '确定',
+      confirmButtonColor: '#ff9500'
     });
   } finally {
     loading.value = false;
@@ -398,13 +557,17 @@ onMounted(() => {
     router.push('/login');
     return;
   }
-  
+
   // 获取用户资料
   const userInfo = getUserInfo();
   if (userInfo) {
     userId.value = userInfo.user_name;
     nickname.value = userInfo.user_nick_name || userInfo.user_name || '';
-    
+
+    // 初始化新字段
+    sex.value = userInfo.sex ? parseInt(userInfo.sex) : 0;
+    birthday.value = userInfo.birthday || '';
+
     // 处理头像URL
     if (userInfo.user_portrait) {
       const portrait = userInfo.user_portrait;
@@ -421,7 +584,7 @@ onMounted(() => {
   } else {
     avatarUrl.value = new URL('@/assets/img/img-avatar-default.png', import.meta.url).href;
   }
-  
+
   console.log('页面加载完成');
 });
 
@@ -465,7 +628,8 @@ onBeforeUnmount(() => {
   text-align: center;
 }
 
-.back-button, .header-right {
+.back-button,
+.header-right {
   width: 40px;
 }
 
@@ -631,6 +795,7 @@ onBeforeUnmount(() => {
   border-bottom: 1px solid #444;
   padding-bottom: 10px;
 }
+
 .pwd-input {
   width: 100%;
   background: transparent;
@@ -641,7 +806,91 @@ onBeforeUnmount(() => {
   height: 40px;
   padding: 0;
 }
+
 .pwd-input::placeholder {
   color: #777;
 }
-</style> 
+
+/* 性别选择样式 */
+.sex-options {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 20px 0;
+}
+
+.sex-option {
+  padding: 15px 20px;
+  background-color: #222;
+  border-radius: 8px;
+  text-align: center;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.sex-option.active {
+  background-color: #ff9500;
+  color: #fff;
+}
+
+.sex-option:hover {
+  background-color: #333;
+}
+
+.sex-option.active:hover {
+  background-color: #ff9500;
+}
+
+/* 生日选择样式 */
+.birthday-inputs {
+  padding: 20px 0;
+}
+
+.birthday-row {
+  display: flex;
+  gap: 10px;
+  justify-content: space-between;
+}
+
+.birthday-select {
+  flex: 1;
+  padding: 12px;
+  background-color: #222;
+  border: none;
+  border-radius: 8px;
+  color: #fff;
+  font-size: 16px;
+  outline: none;
+}
+
+.birthday-select option {
+  background-color: #222;
+  color: #fff;
+}
+
+.birthday-buttons {
+  display: flex;
+  gap: 15px;
+  margin-top: 30px;
+}
+
+.birthday-cancel,
+.birthday-confirm {
+  flex: 1;
+  padding: 12px 0;
+  text-align: center;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 16px;
+}
+
+.birthday-cancel {
+  background-color: #333;
+  color: #ccc;
+}
+
+.birthday-confirm {
+  background-color: #ff9500;
+  color: #fff;
+}
+</style>

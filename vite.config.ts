@@ -7,14 +7,10 @@ import vueDevTools from 'vite-plugin-vue-devtools'
 
 // https://vite.dev/config/
 export default defineConfig({
-  plugins: [
-    vue(),
-    vueJsx(),
-    vueDevTools(),
-  ],
+  plugins: [vue(), vueJsx(), vueDevTools()],
   resolve: {
     alias: {
-      '@': fileURLToPath(new URL('./src', import.meta.url))
+      '@': fileURLToPath(new URL('./src', import.meta.url)),
     },
   },
   server: {
@@ -23,48 +19,81 @@ export default defineConfig({
     strictPort: false, // 如果端口被占用，尝试下一个可用端口
     open: true, // 启动后自动打开浏览器
     proxy: {
-      // 配置跨域代理
+      // 配置跨域代理 - 原有接口
       '/api': {
-        target: 'http://jmlapp.vip', // 更新为新的接口地址
+        target: 'https://jiji1.tv',
         changeOrigin: true,
         rewrite: (path) => path.replace(/^\/api/, ''),
-        secure: false, // 允许不安全的证书
-        timeout: 30000, // 增加超时时间
+        secure: true,
+        followRedirects: true, // 🔧 关键修复：让代理处理重定向
+        timeout: 30000,
         proxyTimeout: 30000,
         headers: {
-          // 一些常见的请求头
-          'User-Agent': 'Mozilla/5.0 (iPhone; CPU iPhone OS 16_6 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.6 Mobile/15E148 Safari/604.1',
-          'Accept': '*/*',
+          'User-Agent':
+            'Mozilla/5.0 (iPhone; CPU iPhone OS 16_6 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.6 Mobile/15E148 Safari/604.1',
+          Accept: '*/*',
           'Accept-Language': 'zh-CN,zh;q=0.9,en;q=0.8',
-          'Connection': 'keep-alive',
-          'Origin': 'http://jmlapp.vip',
-          'Referer': 'http://jmlapp.vip/'
+          Connection: 'keep-alive',
+          Origin: 'https://jiji1.tv',
+          Referer: 'https://jiji1.tv/',
         },
-        configure: (proxy, options) => {
-          proxy.on('error', (err, req, res) => {
-            console.log('代理错误:', err);
-          });
-          proxy.on('proxyReq', (proxyReq, req, res) => {
-            console.log('发送代理请求:', req.method, req.url);
-          });
-          proxy.on('proxyRes', (proxyRes, req, res) => {
-            console.log('收到代理响应:', proxyRes.statusCode || -1, req.url);
-            // 输出响应头
-            console.log('响应头:', proxyRes.headers);
-            
-            // 如果是错误响应，打印详细信息
-            if (proxyRes.statusCode && proxyRes.statusCode >= 400) {
-              let body = '';
-              proxyRes.on('data', function(chunk) {
-                body += chunk;
-              });
-              proxyRes.on('end', function() {
-                console.log('错误响应详情:', body);
-              });
+        configure: (proxy) => {
+          proxy.on('error', (err) => {
+            console.error('API代理错误:', err)
+          })
+          // 临时启用详细日志以调试301重定向问题
+          proxy.on('proxyReq', (proxyReq, req) => {
+            console.log('🚀 发送代理请求:', req.method, req.url)
+            console.log('🎯 目标地址:', proxyReq.path)
+          })
+          proxy.on('proxyRes', (proxyRes, req) => {
+            const statusCode = proxyRes.statusCode || -1
+            console.log('📥 收到代理响应:', statusCode, req.url)
+            if (statusCode === 301 || statusCode === 302) {
+              console.warn('⚠️ 检测到重定向，Location:', proxyRes.headers.location)
             }
-          });
-        }
-      }
-    }
-  }
+          })
+        },
+      },
+      // 配置跨域代理 - 用户接口
+      '/userapi': {
+        target: 'https://live.88tv.co/appapi/',
+        changeOrigin: true,
+        rewrite: (path) => path.replace(/^\/userapi/, ''),
+        secure: false,
+        timeout: 30000,
+        proxyTimeout: 30000,
+        followRedirects: true,
+        headers: {
+          'User-Agent':
+            'Mozilla/5.0 (iPhone; CPU iPhone OS 16_6 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.6 Mobile/15E148 Safari/604.1',
+          Accept: 'application/json, text/plain, */*',
+          'Accept-Language': 'zh-CN,zh;q=0.9,en;q=0.8',
+          Connection: 'keep-alive',
+        },
+        configure: (proxy) => {
+          proxy.on('error', (err) => {
+            console.error('用户API代理错误:', err)
+          })
+          // 禁用详细的请求日志以避免控制台混乱
+          // proxy.on('proxyReq', (proxyReq, req) => {
+          //   console.log('发送用户API代理请求:', req.method, req.url)
+          //   // 为JSON请求设置Content-Type
+          //   if (req.headers['content-type'] === 'application/json') {
+          //     proxyReq.setHeader('Content-Type', 'application/json')
+          //   }
+          // })
+          proxy.on('proxyRes', (proxyRes, req) => {
+            // 只记录重定向和错误状态
+            const statusCode = proxyRes.statusCode
+            if (statusCode === 301 || statusCode === 302) {
+              console.warn('检测到重定向，Location:', proxyRes.headers.location)
+            } else if (statusCode && statusCode >= 400) {
+              console.error('API请求失败:', statusCode, req.url)
+            }
+          })
+        },
+      },
+    },
+  },
 })

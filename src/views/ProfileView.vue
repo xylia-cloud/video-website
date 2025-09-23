@@ -4,8 +4,9 @@ import { ref, onMounted, computed } from 'vue';
 import html2canvas from 'html2canvas';
 import { showToast } from 'vant';
 import { useRouter } from 'vue-router';
-import { userLogout, getUserInfo, isLoggedIn, fetchAds } from '@/api/fetch-api';
+import { userLogout, getUserInfo, isLoggedIn, fetchAds, fetchNotices, type NoticeGroup } from '@/api/fetch-api';
 import { BASE_URL } from '@/utils/config';
+import { generateCustomerServiceUrl } from '@/utils/rsa';
 
 const router = useRouter();
 
@@ -22,12 +23,18 @@ const profileAds = ref<any[]>([]);
 const isAdLoading = ref(false);
 const hasAdError = ref(false);
 
+// 公告数据
+const notices = ref<NoticeGroup[]>([]);
+const isNoticeLoading = ref(false);
+const hasNoticeError = ref(false);
+const noticeText = ref('');
+
 // 处理头像URL
 const avatarUrl = computed(() => {
   if (!userInfo.value || !userInfo.value.user_portrait) {
     return new URL('@/assets/img/img-avatar-default.png', import.meta.url).href;
   }
-  
+
   const portrait = userInfo.value.user_portrait;
   if (portrait.startsWith('http')) {
     return portrait;
@@ -41,7 +48,7 @@ const avatarUrl = computed(() => {
 // 处理广告图片URL
 const processAdImageUrl = (imgPath: string): string => {
   if (!imgPath) return '';
-  
+
   if (imgPath.startsWith('http')) {
     return imgPath;
   } else if (imgPath.startsWith('/')) {
@@ -54,7 +61,7 @@ const processAdImageUrl = (imgPath: string): string => {
 // 用户ID或昵称显示
 const displayName = computed(() => {
   if (!userInfo.value) return '';
-  
+
   // 优先显示昵称，没有则显示用户名
   return userInfo.value.user_nick_name || userInfo.value.user_name || '';
 });
@@ -81,16 +88,16 @@ const userPoints = computed(() => {
 const fetchProfileAd = async () => {
   isAdLoading.value = true;
   hasAdError.value = false;
-  
+
   try {
     // 请求个人中心页面的广告数据 (ad_pos: 5 表示个人中心页面)
     const result = await fetchAds({
       ad_pos: 5, // 个人中心页面位置
       ad_type: 2 // 广告类型
     });
-    
+
     console.log('获取个人中心页面广告数据:', result);
-    
+
     if (result && result.code === 1 && result.data && Array.isArray(result.data) && result.data.length > 0) {
       // 显示所有广告
       profileAds.value = result.data.map((ad: any) => ({
@@ -99,7 +106,7 @@ const fetchProfileAd = async () => {
         title: ad.ad_name || '广告',
         link: ad.ad_url || ''
       }));
-      
+
       console.log(`获取到${result.data.length}张广告，全部显示:`, profileAds.value);
     } else {
       console.log('没有获取到个人中心页面广告数据');
@@ -114,12 +121,44 @@ const fetchProfileAd = async () => {
   }
 };
 
+// 获取公告数据
+const fetchNoticeData = async () => {
+  isNoticeLoading.value = true;
+  hasNoticeError.value = false;
+
+  try {
+    const result = await fetchNotices();
+    console.log('获取公告数据:', result);
+
+    if (result && result.code === 1 && result.data && Array.isArray(result.data)) {
+      notices.value = result.data;
+      // 只取首页公告的第一条（最新的一条）
+      const homeNoticeGroup = result.data.find((group: NoticeGroup) => group.id === 1);
+
+      if (homeNoticeGroup && homeNoticeGroup.list && homeNoticeGroup.list.length > 0) {
+        // 只取第一条公告
+        noticeText.value = homeNoticeGroup.list[0].content;
+      }
+      // 如果没有获取到公告，保持默认文本不变
+    } else {
+      console.log('没有获取到公告数据，保持默认公告显示');
+      notices.value = [];
+    }
+  } catch (error) {
+    console.error('获取公告失败:', error);
+    hasNoticeError.value = true;
+    notices.value = [];
+  } finally {
+    isNoticeLoading.value = false;
+  }
+};
+
 // 处理广告点击
 const handleAdClick = (ad: any) => {
   if (!ad || !ad.link) return;
-  
+
   console.log(`个人中心广告点击: ${ad.title}, 链接: ${ad.link}`);
-  
+
   // 如果是内部链接，使用路由跳转
   if (ad.link.startsWith('/')) {
     router.push(ad.link);
@@ -132,7 +171,7 @@ const handleAdClick = (ad: any) => {
 // 处理广告图片加载错误
 const handleAdImageError = (event: Event, ad: any) => {
   console.error(`个人中心广告图片加载失败: ${ad?.imageUrl}`);
-  
+
   // 图片加载失败时从数组中移除该广告
   const index = profileAds.value.findIndex(item => item.id === ad.id);
   if (index > -1) {
@@ -157,24 +196,27 @@ onMounted(() => {
       console.log('当前用户信息:', info);
     }
   }
-  
+
   // 获取广告数据
   fetchProfileAd();
+
+  // 获取公告数据
+  fetchNoticeData();
 });
 
 // 退出登录
 const handleLogout = async () => {
   if (isLoggingOut.value) return;
-  
+
   try {
     isLoggingOut.value = true;
     showToast({
       message: '正在退出登录...',
       duration: 2000
     });
-    
+
     const success = await userLogout();
-    
+
     if (success) {
       showToast({
         message: '已退出登录',
@@ -251,14 +293,92 @@ const goToWallet = () => {
   router.push('/wallet');
 };
 
-// 跳转到我的足迹页面
-const goToFootprint = () => {
-  router.push('/footprint');
+// 跳转到账目明细页面
+const goToAccountDetails = () => {
+  router.push('/account-details');
 };
 
-// 跳转到系统设置页面
-const goToSettings = () => {
-  router.push('/settings');
+// 跳转到提现页面
+const goToWithdraw = () => {
+  router.push('/withdraw');
+};
+
+// 跳转到VIP充值页面
+const goToVipRecharge = () => {
+  router.push('/vip-recharge');
+};
+
+// 跳转到充值记录页面
+const goToRechargeRecord = () => {
+  router.push('/recharge-record');
+};
+
+// 跳转到关注列表页面
+const goToFollowList = () => {
+  router.push('/follow-list');
+};
+
+// 跳转到收藏页面
+const goToCollection = () => {
+  router.push('/collection');
+};
+
+// 跳转到看片足迹页面
+const goToWatchHistory = () => {
+  router.push('/watch-history');
+};
+
+
+// 跳转到游戏记录页面
+const goToGameRecord = () => {
+  // 检查登录状态
+  if (!isLoggedIn()) {
+    showToast('请先登录');
+    return;
+  }
+
+  // 跳转到游戏记录页面
+  router.push('/game-record');
+};
+
+
+// 跳转到系统设置页面（暂时未使用）
+// const goToSettings = () => {
+//   router.push('/settings');
+// };
+
+// 跳转到人工客服
+const goToCustomerService = () => {
+  try {
+    // 获取当前用户信息
+    const currentUserInfo = getUserInfo();
+    if (!currentUserInfo || !currentUserInfo.user_id) {
+      showToast({
+        message: '请先登录后再使用客服功能',
+        duration: 2000
+      });
+      return;
+    }
+
+    showToast({
+      message: '正在跳转客服...',
+      duration: 1000
+    });
+
+    // 生成加密的客服链接
+    const customerServiceUrl = generateCustomerServiceUrl(currentUserInfo.user_id);
+
+    // 在新窗口中打开客服链接
+    window.open(customerServiceUrl, '_blank');
+
+    console.log('人工客服链接已生成并打开:', customerServiceUrl);
+  } catch (error) {
+    console.error('跳转客服失败:', error);
+    showToast({
+      message: '客服功能暂时不可用，请稍后重试',
+      duration: 2000
+    });
+  }
 };
 </script>
 
@@ -301,43 +421,101 @@ const goToSettings = () => {
     <!-- u5e38u7528u529fu80fdu533au57df -->
     <div class="common-section">
       <div class="common-grid">
-        <div class="common-item" @click="goToWallet">
+        <div class="common-item" @click="goToFollowList">
           <div class="common-icon">
-            <img src="@/assets/img/icon-zhqb.svg" alt="" />
+            <img src="@/assets/img/icon-guanzhu.svg" alt="" />
           </div>
-          <div class="common-name">积分明细</div>
+          <div class="common-name">关注</div>
         </div>
-        <div class="common-item" @click="goToFootprint">
+        <div class="common-item" @click="goToCollection">
+          <div class="common-icon">
+            <img src="@/assets/img/icon-shoucang.svg" alt="" />
+          </div>
+          <div class="common-name">收藏</div>
+        </div>
+        <div class="common-item" @click="goToWatchHistory">
           <div class="common-icon">
             <img src="@/assets/img/icon-wdzj.svg" alt="" />
           </div>
-          <div class="common-name">我的足迹</div>
+          <div class="common-name">看片足迹</div>
         </div>
-        <!-- <div class="common-item" @click="goToSettings">
+        <div class="common-item" @click="goToShareFriends">
           <div class="common-icon">
-            <img src="@/assets/img/icon-xtsz.svg" alt="" />
+            <img src="@/assets/img/icon-tuiguang.svg" alt="" />
           </div>
-          <div class="common-name">系统设置</div>
-        </div> -->
+          <div class="common-name">推广</div>
+        </div>
+        <div class="common-item" @click="goToWallet">
+          <div class="common-icon">
+            <img src="@/assets/img/icon-zscz.svg" alt="" />
+          </div>
+          <div class="common-name">钱包</div>
+        </div>
+        <div class="common-item" @click="goToWithdraw">
+          <div class="common-icon">
+            <img src="@/assets/img/icon-tixian2.svg" alt="" />
+          </div>
+          <div class="common-name">提现</div>
+        </div>
+        <div class="common-item" @click="goToVipRecharge">
+          <div class="common-icon">
+            <img src="@/assets/img/icon-chongzhi2.svg" alt="" />
+          </div>
+          <div class="common-name">充值工具</div>
+        </div>
 
-        <!-- <div class="common-item">
-          <div class="common-icon">
-            <img src="@/assets/img/icon-zhzh.svg" alt="" />
-          </div>
-          <div class="common-name">找回账号</div>
-        </div> -->
-        <div class="common-item">
+        <div class="common-item" @click="goToCustomerService">
           <div class="common-icon">
             <img src="@/assets/img/icon-rgkf.svg" alt="" />
           </div>
-          <div class="common-name">人工客服</div>
+          <div class="common-name">在线客服</div>
         </div>
-        <!-- <div class="common-item" @click="goToEditProfile">
-          <div class="common-icon">
-            <img src="@/assets/img/icon-wsxx.svg" alt="" />
-          </div>
-          <div class="common-name">完善信息</div>
-        </div> -->
+
+      </div>
+    </div>
+
+    <!-- 公告版块 -->
+    <div v-if="noticeText" class="notice-section">
+      <div class="notice-header">
+        <div class="notice-icon">
+          <img src="@/assets/img/icon-notice.svg" alt="" />
+        </div>
+        <div class="notice-content">
+          <div class="notice-text">{{ noticeText }}</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 记录列表 -->
+    <div class="record-list-section">
+      <div class="record-item" @click="goToAccountDetails">
+        <div class="record-icon">
+          <img src="@/assets/img/icon-zmmx.svg" alt="账目明细" />
+        </div>
+        <div class="record-name">账目明细</div>
+        <div class="record-arrow">
+          <van-icon name="arrow" size="16" color="#ccc" />
+        </div>
+      </div>
+
+      <div class="record-item" @click="goToRechargeRecord">
+        <div class="record-icon">
+          <img src="@/assets/img/icon-czjl.svg" alt="充值记录" />
+        </div>
+        <div class="record-name">充值记录</div>
+        <div class="record-arrow">
+          <van-icon name="arrow" size="16" color="#ccc" />
+        </div>
+      </div>
+
+      <div class="record-item" @click="goToGameRecord">
+        <div class="record-icon">
+          <img src="@/assets/img/icon-tzjl.svg" alt="投注记录" />
+        </div>
+        <div class="record-name">投注记录</div>
+        <div class="record-arrow">
+          <van-icon name="arrow" size="16" color="#ccc" />
+        </div>
       </div>
     </div>
 
@@ -346,17 +524,8 @@ const goToSettings = () => {
       <div v-if="isAdLoading" class="ad-loading">加载中...</div>
       <div v-else-if="hasAdError" class="ad-error">广告加载失败</div>
       <div v-else class="profile-ads-list">
-        <div 
-          v-for="ad in profileAds" 
-          :key="ad.id" 
-          class="profile-ad-banner" 
-          @click="handleAdClick(ad)"
-        >
-        <img 
-            :src="ad.imageUrl" 
-            :alt="ad.title" 
-            @error="(event) => handleAdImageError(event, ad)"
-        />
+        <div v-for="ad in profileAds" :key="ad.id" class="profile-ad-banner" @click="handleAdClick(ad)">
+          <img :src="ad.imageUrl" :alt="ad.title" @error="(event) => handleAdImageError(event, ad)" />
         </div>
       </div>
     </div>
@@ -402,21 +571,21 @@ const goToSettings = () => {
             <!-- 使用临时二维码，实际项目中应该使用API生成 -->
             <svg viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg" class="qrcode-svg">
               <!-- 简化的二维码图形 -->
-              <rect x="0" y="0" width="200" height="200" fill="white"/>
-              <rect x="20" y="20" width="40" height="40" fill="black"/>
-              <rect x="140" y="20" width="40" height="40" fill="black"/>
-              <rect x="20" y="140" width="40" height="40" fill="black"/>
-              <rect x="70" y="70" width="60" height="60" fill="black"/>
-              <rect x="70" y="20" width="10" height="10" fill="black"/>
-              <rect x="120" y="20" width="10" height="10" fill="black"/>
-              <rect x="20" y="70" width="10" height="10" fill="black"/>
-              <rect x="170" y="70" width="10" height="10" fill="black"/>
-              <rect x="70" y="170" width="10" height="10" fill="black"/>
-              <rect x="120" y="170" width="10" height="10" fill="black"/>
-              <rect x="170" y="170" width="10" height="10" fill="black"/>
-              <rect x="140" y="70" width="20" height="20" fill="black"/>
-              <rect x="140" y="140" width="20" height="20" fill="black"/>
-              <rect x="70" y="140" width="20" height="20" fill="black"/>
+              <rect x="0" y="0" width="200" height="200" fill="white" />
+              <rect x="20" y="20" width="40" height="40" fill="black" />
+              <rect x="140" y="20" width="40" height="40" fill="black" />
+              <rect x="20" y="140" width="40" height="40" fill="black" />
+              <rect x="70" y="70" width="60" height="60" fill="black" />
+              <rect x="70" y="20" width="10" height="10" fill="black" />
+              <rect x="120" y="20" width="10" height="10" fill="black" />
+              <rect x="20" y="70" width="10" height="10" fill="black" />
+              <rect x="170" y="70" width="10" height="10" fill="black" />
+              <rect x="70" y="170" width="10" height="10" fill="black" />
+              <rect x="120" y="170" width="10" height="10" fill="black" />
+              <rect x="170" y="170" width="10" height="10" fill="black" />
+              <rect x="140" y="70" width="20" height="20" fill="black" />
+              <rect x="140" y="140" width="20" height="20" fill="black" />
+              <rect x="70" y="140" width="20" height="20" fill="black" />
             </svg>
           </div>
           <div class="credential-website">永久网址: ym01.ch</div>
@@ -435,7 +604,7 @@ const goToSettings = () => {
 export default {
   data() {
     return {
-      
+
     }
   }
 }
@@ -499,8 +668,9 @@ export default {
 .vip-card {
   text-align: center;
   line-height: 1;
-  padding: 16px;  
+  padding: 16px;
 }
+
 .vip-card img {
   width: 100%;
   object-fit: cover;
@@ -609,10 +779,7 @@ export default {
 
 /* u5e38u7528u529fu80fdu533au57df */
 .common-section {
-  background-color: #222;
   margin: 0 15px 15px;
-  border-radius: 10px;
-  padding: 15px;
 }
 
 .section-title {
@@ -623,7 +790,7 @@ export default {
 
 .common-grid {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
+  grid-template-columns: repeat(4, 1fr);
   gap: 15px;
 }
 
@@ -631,15 +798,19 @@ export default {
   display: flex;
   flex-direction: column;
   align-items: center;
+  gap: 8px;
+  border-radius: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.35);
+  background: rgba(255, 255, 255, 0.22);
+  padding: 8px 12px;
 }
 
 .common-icon {
-  width: 50px;
-  height: 50px;
+  width: 30px;
+  height: 30px;
   display: flex;
   justify-content: center;
   align-items: center;
-  background-color: #333;
   border-radius: 50%;
 }
 
@@ -652,6 +823,115 @@ export default {
   font-size: 12px;
   color: #ccc;
   text-align: center;
+}
+
+/* 公告版块样式 */
+.notice-section {
+  background: #2C2C2C;
+  margin: 0 15px 15px;
+  padding: 12px 16px;
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.notice-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.notice-icon {
+  color: #ff9500;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+}
+
+.notice-content {
+  flex: 1;
+  overflow: hidden;
+  position: relative;
+  height: 20px;
+}
+
+.notice-text {
+  color: #ffffff;
+  font-size: 14px;
+  line-height: 1.4;
+  white-space: nowrap;
+  position: absolute;
+  top: 0;
+  left: 0;
+  animation: scrollNoticeText 20s linear infinite;
+  width: max-content;
+}
+
+@keyframes scrollNoticeText {
+  0% {
+    transform: translateX(100%);
+  }
+
+  100% {
+    transform: translateX(-100%);
+  }
+}
+
+/* 记录列表样式 */
+.record-list-section {
+  background: #2C2C2C;
+  margin: 0 15px 15px;
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.record-item {
+  display: flex;
+  align-items: center;
+  padding: 16px 20px;
+  cursor: pointer;
+  transition: background-color 0.3s ease;
+  border-bottom: 1px solid #333;
+}
+
+.record-item:last-child {
+  border-bottom: none;
+}
+
+.record-item:hover {
+  background-color: rgba(255, 255, 255, 0.05);
+}
+
+.record-icon {
+  width: 32px;
+  height: 32px;
+  margin-right: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 8px;
+  flex-shrink: 0;
+}
+
+.record-icon img {
+  width: 24px;
+  height: 24px;
+  object-fit: contain;
+}
+
+.record-name {
+  flex: 1;
+  font-size: 16px;
+  color: #fff;
+  font-weight: 500;
+}
+
+.record-arrow {
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
 /* 退出登录前的广告位样式 */
@@ -687,7 +967,7 @@ export default {
   object-fit: cover;
 }
 
-.ad-loading, 
+.ad-loading,
 .ad-error {
   padding: 20px;
   text-align: center;
@@ -731,7 +1011,7 @@ export default {
 .tabbar-icon {
   width: 24px;
   height: 24px;
-  
+
 }
 
 .nav-item.active,
@@ -858,4 +1138,4 @@ export default {
   cursor: pointer;
   margin-top: 10px;
 }
-</style> 
+</style>

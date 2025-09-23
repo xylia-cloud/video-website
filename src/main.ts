@@ -2,7 +2,23 @@ import './assets/main.css'
 
 import { createApp } from 'vue'
 import { createPinia } from 'pinia'
-import { Button, NavBar, Tabbar, TabbarItem, Cell, Icon, Image, Lazyload, Swipe, SwipeItem, Toast, Popup, Field } from 'vant'
+import {
+  Button,
+  NavBar,
+  Tabbar,
+  TabbarItem,
+  Cell,
+  Icon,
+  Image,
+  Lazyload,
+  Swipe,
+  SwipeItem,
+  Toast,
+  Popup,
+  Field,
+  Loading,
+  Dialog,
+} from 'vant'
 import 'vant/lib/index.css'
 
 import App from './App.vue'
@@ -25,5 +41,7 @@ app.use(SwipeItem)
 app.use(Toast)
 app.use(Popup)
 app.use(Field)
+app.use(Loading)
+app.use(Dialog)
 
 app.mount('#app')
