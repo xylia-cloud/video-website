@@ -1,8 +1,57 @@
-<IfModule mod_rewrite.c>
-  RewriteEngine On
-  RewriteBase /
-  RewriteRule ^index\.html$ - [L]
-  RewriteCond %{REQUEST_FILENAME} !-f
-  RewriteCond %{REQUEST_FILENAME} !-d
-  RewriteRule . /index.html [L]
-</IfModule> 
+RewriteEngine On
+
+# ==================== PHP代理路由规则 ====================
+
+# 1. 处理 /api/ 路径 (视频API)
+RewriteRule ^api/(.*)$ proxy.php [QSA,L]
+
+# 2. 处理 /userapi/ 路径 (用户API)  
+RewriteRule ^userapi/(.*)$ proxy.php [QSA,L]
+
+# 3. 处理直接的service参数请求 (用户API智能路由)
+RewriteCond %{QUERY_STRING} service=
+RewriteCond %{REQUEST_URI} !^/proxy\.php
+RewriteRule ^$ proxy.php [QSA,L]
+
+# ==================== 前端SPA路由 ====================
+
+# 确保前端路由正常工作
+RewriteCond %{REQUEST_FILENAME} !-f
+RewriteCond %{REQUEST_FILENAME} !-d
+RewriteCond %{REQUEST_URI} !^/proxy\.php
+RewriteCond %{REQUEST_URI} !^/api/
+RewriteCond %{REQUEST_URI} !^/userapi/
+RewriteRule ^.*$ index.html [QSA,L]
+
+# ==================== 安全和性能优化 ====================
+
+# 防止直接访问敏感文件
+<Files "*.log">
+    Deny from all
+</Files>
+
+# 开启压缩
+<IfModule mod_deflate.c>
+    AddOutputFilterByType DEFLATE text/plain
+    AddOutputFilterByType DEFLATE text/html
+    AddOutputFilterByType DEFLATE text/xml
+    AddOutputFilterByType DEFLATE text/css
+    AddOutputFilterByType DEFLATE application/xml
+    AddOutputFilterByType DEFLATE application/xhtml+xml
+    AddOutputFilterByType DEFLATE application/rss+xml
+    AddOutputFilterByType DEFLATE application/javascript
+    AddOutputFilterByType DEFLATE application/x-javascript
+    AddOutputFilterByType DEFLATE application/json
+</IfModule>
+
+# 缓存静态资源
+<IfModule mod_expires.c>
+    ExpiresActive On
+    ExpiresByType text/css "access plus 1 month"
+    ExpiresByType application/javascript "access plus 1 month"
+    ExpiresByType image/png "access plus 1 month"
+    ExpiresByType image/jpg "access plus 1 month"
+    ExpiresByType image/jpeg "access plus 1 month"
+    ExpiresByType image/gif "access plus 1 month"
+    ExpiresByType image/svg+xml "access plus 1 month"
+</IfModule>

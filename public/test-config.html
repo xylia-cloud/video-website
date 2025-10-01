@@ -1,0 +1,168 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>PHP代理配置测试</title>
+    <style>
+      body {
+        font-family: Arial, sans-serif;
+        padding: 20px;
+      }
+      .test-section {
+        margin: 20px 0;
+        padding: 15px;
+        border: 1px solid #ccc;
+        border-radius: 5px;
+      }
+      .success {
+        background-color: #d4edda;
+        border-color: #c3e6cb;
+      }
+      .error {
+        background-color: #f8d7da;
+        border-color: #f5c6cb;
+      }
+      .btn {
+        background-color: #007cba;
+        color: white;
+        padding: 10px 15px;
+        border: none;
+        border-radius: 5px;
+        cursor: pointer;
+        margin: 5px;
+      }
+      .btn:hover {
+        background-color: #0056b3;
+      }
+      pre {
+        background-color: #f8f9fa;
+        padding: 10px;
+        border-radius: 5px;
+        overflow-x: auto;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>🚀 PHP代理配置测试</h1>
+
+    <div class="test-section">
+      <h2>📋 当前配置信息</h2>
+      <p><strong>环境:</strong> <span id="env">检测中...</span></p>
+      <p><strong>视频API:</strong> <span id="videoApi">检测中...</span></p>
+      <p><strong>用户API:</strong> <span id="userApi">检测中...</span></p>
+    </div>
+
+    <div class="test-section">
+      <h2>🧪 API测试</h2>
+      <button class="btn" onclick="testVideoAPI()">测试视频API</button>
+      <button class="btn" onclick="testUserAPI()">测试用户API</button>
+      <button class="btn" onclick="testAllAPIs()">测试所有API</button>
+      <div id="testResults"></div>
+    </div>
+
+    <script>
+      // 检测环境配置
+      function detectEnvironment() {
+        const isDev =
+          window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
+        const env = isDev ? '开发环境' : '生产环境'
+
+        let videoApi, userApi
+
+        if (isDev) {
+          videoApi = '/api'
+          userApi = '/userapi'
+        } else {
+          videoApi = '/proxy.php?target=video&path='
+          userApi = '/proxy.php?target=user'
+        }
+
+        document.getElementById('env').textContent = env
+        document.getElementById('videoApi').textContent = videoApi
+        document.getElementById('userApi').textContent = userApi
+
+        return { videoApi, userApi }
+      }
+
+      // 测试视频API
+      async function testVideoAPI() {
+        const { videoApi } = detectEnvironment()
+        const results = document.getElementById('testResults')
+
+        results.innerHTML += '<h3>🎥 测试视频API...</h3>'
+
+        try {
+          const formData = new FormData()
+          formData.append('mid', '1')
+          formData.append('limit', '10')
+          formData.append('page', '1')
+          formData.append('tid', '1')
+
+          const response = await fetch(videoApi + '/index.php/ajax/data.html', {
+            method: 'POST',
+            body: formData,
+          })
+
+          const data = await response.json()
+
+          if (response.ok && data.code === 1) {
+            results.innerHTML += `<div class="test-section success">
+                        <strong>✅ 视频API测试成功</strong><br>
+                        状态: ${response.status}<br>
+                        返回数据: ${data.list ? data.list.length : 0} 条视频<br>
+                        总计: ${data.total || 0} 条
+                    </div>`
+          } else {
+            throw new Error(`API返回错误: ${data.msg || '未知错误'}`)
+          }
+        } catch (error) {
+          results.innerHTML += `<div class="test-section error">
+                    <strong>❌ 视频API测试失败</strong><br>
+                    错误: ${error.message}
+                </div>`
+        }
+      }
+
+      // 测试用户API
+      async function testUserAPI() {
+        const { userApi } = detectEnvironment()
+        const results = document.getElementById('testResults')
+
+        results.innerHTML += '<h3>👤 测试用户API...</h3>'
+
+        try {
+          const response = await fetch(userApi + '/?service=home.getNotice')
+          const data = await response.json()
+
+          if (response.ok && data.ret === 200) {
+            results.innerHTML += `<div class="test-section success">
+                        <strong>✅ 用户API测试成功</strong><br>
+                        状态: ${response.status}<br>
+                        公告数量: ${data.data.info ? data.data.info.length : 0} 个分组
+                    </div>`
+          } else {
+            throw new Error(`API返回错误: ${data.msg || '未知错误'}`)
+          }
+        } catch (error) {
+          results.innerHTML += `<div class="test-section error">
+                    <strong>❌ 用户API测试失败</strong><br>
+                    错误: ${error.message}
+                </div>`
+        }
+      }
+
+      // 测试所有API
+      async function testAllAPIs() {
+        document.getElementById('testResults').innerHTML = '<h3>🔄 开始全面测试...</h3>'
+        await testVideoAPI()
+        await testUserAPI()
+      }
+
+      // 页面加载时检测环境
+      window.onload = function () {
+        detectEnvironment()
+      }
+    </script>
+  </body>
+</html>

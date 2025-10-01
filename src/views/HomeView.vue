@@ -4,14 +4,9 @@ import VideoList from '@/components/VideoList.vue';
 import { ref, onMounted, onBeforeUnmount, computed, onActivated } from 'vue';
 import { getRecommendVideos } from '@/api/video';
 import { fetchRecommendVideos, fetchTypesList, fetchAds, fetchTags } from '@/api/fetch-api';
-import type { TypeItem, TagItem } from '@/api/fetch-api';
+import type { TypeItem } from '@/api/fetch-api';
 import { BASE_URL, VIDEO_CATEGORIES, DEFAULT_PAGE_SIZE } from '@/utils/config';
 import { useRouter, useRoute } from 'vue-router';
-import { showToast, showDialog } from 'vant';
-// 导入截图库
-import html2canvas from 'html2canvas';
-// 导入弹窗图片
-import homePopupImageSrc from '@/assets/img/home-popup.jpg';
 
 // 使用路由
 const router = useRouter();
@@ -46,6 +41,7 @@ interface VideoItem {
   time?: string;      // 发布时间
   points?: string;    // 视频价格
 }
+
 
 // 定义API返回的视频数据接口
 interface ApiVideoItem {
@@ -146,6 +142,14 @@ const isLoadingMore = ref(false);
 const hasMoreVideos = ref(true);
 const isFirstLoad = ref(true); // 标记是否为第一次加载
 
+// 新增：最新视频数据
+const latestVideoData = ref<VideoItem[]>([]);
+const isLoadingLatest = ref(false);
+const hasLatestError = ref(false);
+const latestErrorMessage = ref('');
+const latestCurrentPage = ref(1);
+const latestTotalPages = ref(1);
+
 // 是否使用原生fetch还是axios
 const useFetch = true;
 
@@ -155,11 +159,6 @@ const searchKeyword = ref('');
 // 轮播图当前索引
 const currentBannerIndex = ref(0);
 
-// 首页弹窗相关状态
-const showHomePopup = ref(false);
-const homePopupImage = ref(homePopupImageSrc); // 使用导入的图片
-const popupContent = ref<HTMLElement | null>(null);
-const hasShownPopupThisSession = ref(false); // 标记本次会话是否已经显示过弹窗
 
 // 计算属性：判断当前是否为第一个标签
 const isFirstTabActive = computed(() => {
@@ -269,8 +268,7 @@ const switchType = (typeId: number) => {
   const isFirstTab = typeId === firstTypeId;
 
   // 获取对应的广告数据
-  const isListTab = !isFirstTab;
-  fetchListAds(isListTab);
+  fetchListAds();
 
   if (isFirstTab) {
     // 第一个标签立即加载，如果没有缓存数据
@@ -330,6 +328,75 @@ const adPositions = ref<number[]>([3, 6, 11]);
 // 存储已插入广告的视频数据，用于"换一批"后的数据处理
 const videoDataWithAds = ref<VideoItem[]>([]);
 
+// 获取最新视频数据
+const fetchLatestVideosData = async (page: number = 1) => {
+  isLoadingLatest.value = true;
+  hasLatestError.value = false;
+  latestErrorMessage.value = '';
+
+  try {
+    console.log('🔥 开始获取最新视频数据，页码:', page);
+
+    // 调用接口获取最新视频，tid不为1时按发布时间排序
+    const result = await fetchRecommendVideos({
+      mid: 1,
+      limit: DEFAULT_PAGE_SIZE,
+      page: page,
+      tid: 2 // tid不是1的时候，请求的就是按发布时间排序的视频列表
+    });
+
+    console.log('🔥 最新视频API返回:', result);
+
+    // 检查不同的数据结构
+    let apiData = null;
+    if (result && result.code === 1) {
+      if (result.list && Array.isArray(result.list)) {
+        // 新的数据格式：直接在 result.list 中
+        apiData = result.list;
+        console.log('🔥 使用 result.list 数据格式');
+
+        // 更新分页信息
+        latestCurrentPage.value = result.page || page;
+        latestTotalPages.value = result.pagecount || 1;
+      } else if (result.data && Array.isArray(result.data.data)) {
+        // 旧的数据格式：在 result.data.data 中
+        apiData = result.data.data;
+        console.log('🔥 使用 result.data.data 数据格式');
+
+        // 更新分页信息
+        latestCurrentPage.value = result.data.page || page;
+        latestTotalPages.value = result.data.pagecount || 1;
+      }
+    }
+
+    if (apiData && Array.isArray(apiData)) {
+      // 映射字段
+      const processedData = apiData.map(processVideoData);
+      console.log('🔥 最新视频映射后数据长度:', processedData.length);
+      console.log('🔥 最新视频分页信息:', {
+        currentPage: latestCurrentPage.value,
+        totalPages: latestTotalPages.value
+      });
+
+      // 添加短暂延迟，确保UI更新的一致性
+      await new Promise(resolve => setTimeout(resolve, 100));
+
+      latestVideoData.value = processedData;
+      console.log('✅ 最新视频数据加载成功');
+    } else {
+      console.error('❌ 最新视频数据格式不正确:', result);
+      hasLatestError.value = true;
+      latestErrorMessage.value = '数据格式错误';
+    }
+  } catch (error) {
+    console.error('🚫 获取最新视频数据失败:', error);
+    hasLatestError.value = true;
+    latestErrorMessage.value = '网络错误，请稍后再试';
+  } finally {
+    isLoadingLatest.value = false;
+  }
+};
+
 // 获取推荐视频数据
 const fetchRecommendVideosData = async (page = 1, tid = VIDEO_CATEGORIES.ALL, loadMore = false) => {
   // 如果是加载更多，设置加载更多状态
@@ -386,7 +453,10 @@ const fetchRecommendVideosData = async (page = 1, tid = VIDEO_CATEGORIES.ALL, lo
 
     // 映射字段
     const processedData = apiData.map(processVideoData);
-    console.log('视频映射后数据长度:', processedData.length);
+    console.log('🔍 [初始加载] API返回原始数据长度:', apiData.length);
+    console.log('🔍 [初始加载] 视频映射后数据长度:', processedData.length);
+    console.log('🔍 [初始加载] 当前页码:', page);
+    console.log('🔍 [初始加载] DEFAULT_PAGE_SIZE:', DEFAULT_PAGE_SIZE);
 
     // 处理数据并插入广告
     const finalData = processDataWithAds(processedData, page);
@@ -436,7 +506,8 @@ const processDataWithAds = (processedData: VideoItem[], page: number): VideoItem
 
   // 只有第一页且有广告时才处理
   if (page === 1 && listAds.value.length > 0) {
-    console.log('广告数据长度:', listAds.value.length);
+    console.log('📢 [processDataWithAds] 处理广告插入，广告数据长度:', listAds.value.length);
+    console.log('📢 [processDataWithAds] 输入视频数据长度:', processedData.length);
 
     // 使用前三个广告
     const adsToUse = listAds.value.slice(0, 3);
@@ -479,6 +550,22 @@ const handleSearch = () => {
       query: { wd: searchKeyword.value.trim() }
     });
   }
+};
+
+
+// 最新视频换一批
+const refreshLatestVideos = () => {
+  // 防止重复点击
+  if (isLoadingLatest.value) return;
+
+  const nextPage = latestCurrentPage.value < latestTotalPages.value ? latestCurrentPage.value + 1 : 1;
+  console.log(`🔥 最新视频换一批，加载第 ${nextPage} 页数据`);
+
+  // 先清空数据，显示加载状态
+  latestVideoData.value = [];
+
+  // 然后加载新数据
+  fetchLatestVideosData(nextPage);
 };
 
 // 刷新视频数据 - 加载下一页（仅用于换一批按钮）
@@ -525,9 +612,13 @@ const refreshVideos = () => {
 
         // 映射字段
         const processedData = apiData.map(processVideoData);
+        console.log('🔄 [换一批] API返回原始数据长度:', apiData.length);
+        console.log('🔄 [换一批] 视频映射后数据长度:', processedData.length);
+        console.log('🔄 [换一批] DEFAULT_PAGE_SIZE:', DEFAULT_PAGE_SIZE);
 
         // 减少显示一条视频，如果视频数量足够的话
         if (processedData.length > DEFAULT_PAGE_SIZE / 2) {
+          console.log('🔄 [换一批] 移除最后一条视频，当前长度:', processedData.length);
           processedData.pop();
         }
 
@@ -809,7 +900,7 @@ interface ListAd {
 const listAds = ref<ListAd[]>([]);
 
 // 获取列表广告数据
-const fetchListAds = async (isListTab: boolean) => {
+const fetchListAds = async () => {
   try {
     // 请求首页单图广告数据(ad_type=2)
     const result = await fetchAds({
@@ -925,24 +1016,8 @@ const removeScrollListener = () => {
   window.removeEventListener('scroll', checkScrollForLazyLoad);
 };
 
-// 检查是否需要显示首页弹窗
-const checkHomePopupStatus = () => {
-  // 检查当前会话是否已经显示过弹窗
-  if (!hasShownPopupThisSession.value && !sessionStorage.getItem('homePopupShownThisSession')) {
-    showHomePopup.value = true;
-    // 标记本次会话已经显示过弹窗
-    sessionStorage.setItem('homePopupShownThisSession', 'true');
-    hasShownPopupThisSession.value = true;
-  }
-};
 
-// 关闭首页弹窗
-const closeHomePopup = () => {
-  showHomePopup.value = false;
-};
 
-// 记录页面会话状态
-const isNavigatedFromInside = ref(false);
 
 // 处理页面关闭或刷新的函数
 const handlePageUnload = () => {
@@ -960,13 +1035,11 @@ onMounted(async () => {
   window.addEventListener('beforeunload', handlePageUnload);
 
   // 尝试恢复之前的会话数据
-  const hasRestoredData = restoreSessionData();
+  restoreSessionData();
 
   // 处理邀请码参数
   handleInviteCode();
 
-  // 检查是否显示首页弹窗
-  checkHomePopupStatus();
 
   // 获取类型列表数据
   await fetchTypesData();
@@ -996,13 +1069,12 @@ onMounted(async () => {
   // 确定是否是首页标签
   const firstTypeId = typesList.value.length > 0 ? typesList.value[0].type_id : 1;
   const isFirstTab = activeTypeId.value === firstTypeId;
-  const isListTab = !isFirstTab;
 
   // 先获取广告数据
   await Promise.all([
     fetchBannerAds(),
     fetchSingleAd(),
-    fetchListAds(isListTab) // 根据当前标签类型获取对应广告
+    fetchListAds() // 根据当前标签类型获取对应广告
   ]);
 
   // 检查当前标签是否有有效的缓存数据
@@ -1032,6 +1104,11 @@ onMounted(async () => {
   }
 
   fetchTagsData();
+
+  // 如果是首页标签，加载最新视频数据
+  if (isFirstTab) {
+    fetchLatestVideosData();
+  }
 
   // 如果不是首页标签，添加滚动监听
   if (!isFirstTab) {
@@ -1112,55 +1189,6 @@ const openAppDownload = () => {
   console.log('跳转到APP下载页面:', appDownloadUrl);
 };
 
-// 保存弹窗为图片
-const savePopupAsImage = async () => {
-  if (!popupContent.value) return;
-
-  try {
-    // 显示加载提示
-    showToast({
-      message: '正在生成图片...',
-      duration: 2000,
-    });
-
-    // 使用html2canvas将DOM元素转换为Canvas
-    const canvas = await html2canvas(popupContent.value, {
-      backgroundColor: '#1e1e1e',
-      scale: 2, // 提高分辨率
-      logging: false,
-      useCORS: true
-    });
-
-    // 将Canvas转换为图片URL
-    const imgUrl = canvas.toDataURL('image/png');
-
-    // 创建下载链接
-    const downloadLink = document.createElement('a');
-    downloadLink.href = imgUrl;
-    downloadLink.download = '防失联域名信息.png';
-
-    // 模拟点击下载
-    document.body.appendChild(downloadLink);
-    downloadLink.click();
-    document.body.removeChild(downloadLink);
-
-    // 显示成功提示
-    showToast({
-      message: '图片已保存',
-      type: 'success',
-      duration: 2000,
-    });
-  } catch (error) {
-    console.error('保存图片失败:', error);
-    // 显示错误提示
-    showToast({
-      message: '保存失败，请手动截图',
-      type: 'fail',
-      duration: 2000,
-    });
-  }
-};
-
 // 保存会话数据到sessionStorage
 const saveSessionData = () => {
   try {
@@ -1190,47 +1218,6 @@ const restoreSessionData = () => {
 
 <template>
   <div class="home">
-    <!-- 首页图片弹窗 -->
-    <div v-if="showHomePopup" class="home-popup-overlay">
-      <div class="home-popup-container">
-        <div class="home-popup-content" ref="popupContent">
-          <div class="popup-section">
-            <div class="section-title">防失联域名：</div>
-            <div class="domain-list">
-              <span class="domain-item">jiji8.tv</span>
-              <span class="domain-item">jiji1.tv</span>
-              <span class="domain-item">jiji8.cc</span>
-              <span class="domain-item">jiji8.vip</span>
-            </div>
-            <div class="section-tip">建议截图保存以免丢失看片好站。</div>
-          </div>
-
-          <div class="popup-section">
-            <div class="section-content"><span class="highlight">随意注册</span> 免费看片</div>
-            <div class="section-content">分享好友领积分免费看，每日更新海量片源。</div>
-            <div class="section-content">本站永久免费，每日登陆送看片积分</div>
-          </div>
-
-          <div class="popup-section">
-            <div class="section-content">娱乐请找365集团旗下产品。</div>
-            <div class="other-sites">
-              <div class="site-item">风月坊：<span class="site-url">jml918.vip</span></div>
-              <div class="site-item">368：<span class="site-url">186j.win</span></div>
-              <div class="site-item">新世纪：<span class="site-url">xsj88.net</span></div>
-            </div>
-          </div>
-
-          <div class="popup-section warning">
-            <div class="section-content">温馨提示切勿相信视频里的广告，已有多人被诈骗。</div>
-          </div>
-
-          <div class="popup-buttons">
-            <button class="popup-btn popup-btn-save" @click="savePopupAsImage">保存图片</button>
-            <button class="popup-btn popup-btn-close" @click="closeHomePopup">关闭</button>
-          </div>
-        </div>
-      </div>
-    </div>
 
     <!-- 顶部搜索栏 -->
     <div class="search-bar">
@@ -1241,8 +1228,8 @@ const restoreSessionData = () => {
         <van-icon v-if="searchKeyword" name="clear" color="#999" class="clear-icon" @click="searchKeyword = ''" />
       </div>
       <div class="app-download" @click="openAppDownload">
-        <img src="@/assets/img/icon-download.svg" alt="APP下载" />
-        APP下载
+        <img src="@/assets/img/icon-yjym.svg" alt="永久域名" />
+        永久域名
       </div>
     </div>
 
@@ -1292,17 +1279,63 @@ const restoreSessionData = () => {
         <img :src="singleAd.imageUrl" :alt="singleAd.title" @error="handleImageError($event, singleAd)" />
       </div>
 
-      <!-- 视频列表 -->
-      <div v-if="isLoading && videoData.length === 0" class="loading-state">
-        <van-loading type="spinner" color="#ff9500" />
-        <div class="loading-text">加载中...</div>
+      <!-- 最热视频列表（仅首页标签显示标题） -->
+      <div v-if="isFirstTabActive">
+        <!-- 最热标题 -->
+        <div class="section-title">最热</div>
+        <div v-if="isLoading && videoData.length === 0" class="loading-state">
+          <van-loading type="spinner" color="#ff9500" />
+          <div class="loading-text">加载中...</div>
+        </div>
+        <div v-else-if="hasError" class="error-state">
+          <van-icon name="warning-o" size="24" color="#ff9500" />
+          <div class="error-text">加载失败，请稍后再试</div>
+          <div v-if="errorMessage" class="error-detail">{{ errorMessage }}</div>
+        </div>
+        <VideoList v-else :videos="videoData" />
+
+        <!-- 热门视频换一批按钮 -->
+        <div v-if="videoData.length > 0" class="refresh-btn" @click="refreshVideos">
+          <van-icon name="replay" />
+          <span>换一批</span>
+        </div>
       </div>
-      <div v-else-if="hasError" class="error-state">
-        <van-icon name="warning-o" size="24" color="#ff9500" />
-        <div class="error-text">加载失败，请稍后再试</div>
-        <div v-if="errorMessage" class="error-detail">{{ errorMessage }}</div>
+
+      <!-- 非首页标签的视频列表 -->
+      <div v-else>
+        <div v-if="isLoading && videoData.length === 0" class="loading-state">
+          <van-loading type="spinner" color="#ff9500" />
+          <div class="loading-text">加载中...</div>
+        </div>
+        <div v-else-if="hasError" class="error-state">
+          <van-icon name="warning-o" size="24" color="#ff9500" />
+          <div class="error-text">加载失败，请稍后再试</div>
+          <div v-if="errorMessage" class="error-detail">{{ errorMessage }}</div>
+        </div>
+        <VideoList v-else :videos="videoData" />
       </div>
-      <VideoList v-else :videos="videoData" />
+
+      <!-- 最新视频列表（仅首页标签显示） -->
+      <div v-if="isFirstTabActive">
+        <!-- 最新标题 -->
+        <div class="section-title">最新</div>
+        <div v-if="isLoadingLatest || latestVideoData.length === 0" class="loading-state">
+          <van-loading type="spinner" color="#ff9500" />
+          <div class="loading-text">{{ isLoadingLatest ? '加载最新视频中...' : '加载中...' }}</div>
+        </div>
+        <div v-else-if="hasLatestError" class="error-state">
+          <van-icon name="warning-o" size="24" color="#ff9500" />
+          <div class="error-text">加载失败，请稍后再试</div>
+          <div v-if="latestErrorMessage" class="error-detail">{{ latestErrorMessage }}</div>
+        </div>
+        <VideoList v-else :videos="latestVideoData" />
+
+        <!-- 最新视频换一批按钮 -->
+        <div v-if="latestVideoData.length > 0 && !isLoadingLatest" class="refresh-btn" @click="refreshLatestVideos">
+          <van-icon name="replay" />
+          <span>换一批</span>
+        </div>
+      </div>
 
       <!-- 加载更多状态（仅非第一个标签显示） -->
       <div v-if="isLoadingMore && !isFirstTabActive" class="loading-more">
@@ -1317,11 +1350,6 @@ const restoreSessionData = () => {
         已经到底了~
       </div>
 
-      <!-- 换一批按钮（仅第一个标签显示） -->
-      <div v-if="isFirstTabActive" class="refresh-btn" @click="refreshVideos">
-        <van-icon name="replay" />
-        <span>换一批</span>
-      </div>
     </div>
 
     <!-- 底部导航 -->
@@ -1358,66 +1386,8 @@ const restoreSessionData = () => {
   /* 防止横向滚动 */
 }
 
-/* 首页弹窗样式 */
-.home-popup-overlay {
-  position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background-color: rgba(0, 0, 0, 0.7);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: 9999;
-}
 
-.home-popup-container {
-  width: 92%;
-  max-width: 420px;
-  position: relative;
-  animation: popupFadeIn 0.3s ease;
-}
 
-@keyframes popupFadeIn {
-  from {
-    opacity: 0;
-    transform: scale(0.9);
-  }
-
-  to {
-    opacity: 1;
-    transform: scale(1);
-  }
-}
-
-.home-popup-image {
-  width: 100%;
-  border-radius: 10px;
-  overflow: hidden;
-  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5);
-}
-
-.home-popup-image img {
-  width: 100%;
-  display: block;
-}
-
-.home-popup-close {
-  position: absolute;
-  bottom: -50px;
-  left: 50%;
-  transform: translateX(-50%);
-  width: 40px;
-  height: 40px;
-  background-color: rgba(0, 0, 0, 0.6);
-  border-radius: 50%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  cursor: pointer;
-  border: 2px solid rgba(255, 255, 255, 0.3);
-}
 
 /* 顶部搜索栏 */
 .search-bar {
@@ -1720,6 +1690,32 @@ const restoreSessionData = () => {
   border-radius: 6px;
 }
 
+/* 视频列表标题 */
+.section-title {
+  padding: 20px 15px 15px 15px;
+  font-size: 18px;
+  font-weight: bold;
+  color: #fff;
+  position: relative;
+}
+
+.section-title::before {
+  content: '';
+  position: absolute;
+  left: 15px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 4px;
+  height: 18px;
+  background: linear-gradient(45deg, #ff9500, #ffb366);
+  border-radius: 2px;
+  margin-right: 10px;
+}
+
+.section-title {
+  padding-left: 30px;
+}
+
 /* 加载状态 */
 .loading-state,
 .error-state {
@@ -1765,152 +1761,5 @@ const restoreSessionData = () => {
   margin-bottom: 15px;
   color: #999;
   font-size: 14px;
-}
-
-.home-popup-content {
-  width: 100%;
-  background-color: #1e1e1e;
-  border-radius: 12px;
-  overflow: hidden;
-  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5);
-  padding: 20px;
-  border: 1px solid #333;
-}
-
-.popup-title {
-  font-size: 18px;
-  font-weight: bold;
-  color: #ff9500;
-  text-align: center;
-  margin-bottom: 15px;
-  padding-bottom: 10px;
-  border-bottom: 1px solid #333;
-}
-
-.popup-section {
-  margin-bottom: 15px;
-  padding-bottom: 10px;
-  border-bottom: 1px solid #333;
-}
-
-.popup-section:last-child {
-  margin-bottom: 0;
-  padding-bottom: 0;
-  border-bottom: none;
-}
-
-.section-title {
-  font-size: 15px;
-  font-weight: bold;
-  color: #fff;
-  margin-bottom: 8px;
-}
-
-.domain-list {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-  margin-bottom: 8px;
-}
-
-.domain-item {
-  background-color: #333;
-  border-radius: 4px;
-  padding: 4px 8px;
-  color: #ff9500;
-  font-size: 14px;
-}
-
-.section-tip {
-  font-size: 13px;
-  color: #ff9500;
-  margin-top: 8px;
-}
-
-.section-content {
-  font-size: 14px;
-  color: #ddd;
-  line-height: 1.5;
-  margin-bottom: 6px;
-}
-
-.highlight {
-  color: #ff9500;
-  font-weight: bold;
-}
-
-.other-sites {
-  margin-top: 8px;
-}
-
-.site-item {
-  font-size: 14px;
-  color: #ddd;
-  margin-bottom: 5px;
-}
-
-.site-url {
-  color: #ff9500;
-  font-weight: bold;
-}
-
-.warning {
-  background-color: rgba(255, 0, 0, 0.1);
-  border-radius: 6px;
-  padding: 10px;
-  border: 1px solid rgba(255, 0, 0, 0.3);
-}
-
-.warning .section-content {
-  color: #ff6b6b;
-  font-weight: bold;
-}
-
-.home-popup-image {
-  width: 100%;
-  border-radius: 10px;
-  overflow: hidden;
-  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5);
-}
-
-.home-popup-image img {
-  width: 100%;
-  display: block;
-}
-
-.popup-buttons {
-  display: flex;
-  justify-content: space-between;
-  margin-top: 16px;
-  gap: 10px;
-}
-
-.popup-btn {
-  flex: 1;
-  padding: 10px 0;
-  border-radius: 6px;
-  font-size: 15px;
-  font-weight: bold;
-  cursor: pointer;
-  border: none;
-  transition: all 0.2s ease;
-}
-
-.popup-btn-save {
-  background-color: #ff9500;
-  color: #fff;
-}
-
-.popup-btn-save:hover {
-  background-color: #e68600;
-}
-
-.popup-btn-close {
-  background-color: #333;
-  color: #fff;
-}
-
-.popup-btn-close:hover {
-  background-color: #444;
 }
 </style>

@@ -1,11 +1,11 @@
 <script setup lang="ts">
 import { ref, onMounted, computed, onBeforeUnmount, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
-import { fetchVideoDetail, fetchRecommendVideos, fetchDetailRecommend, updateVideoHits, updateVideoDigg, updateUserLog, getUserInfo, isLoggedIn, setUserInfo, fetchUserDatas, fetchAds, userLogin, registerUser } from '@/api/fetch-api';
+import { fetchVideoDetail, fetchRecommendVideos, fetchDetailRecommend, updateVideoHits, updateVideoDigg, updateUserLog, getUserInfo, isLoggedIn, setUserInfo, fetchUserDatas, fetchAds, userLogin, registerUser, createAuthHeaders } from '@/api/fetch-api';
 import type { VideoDetail } from '@/api/fetch-api';
 import { BASE_URL } from '@/utils/config';
 // 导入Vant组件
-import { Icon, Loading, showToast, showDialog } from 'vant';
+import { Icon, Loading, showToast, showDialog, closeToast } from 'vant';
 // 导入hls.js
 import Hls from 'hls.js';
 // 导入视频列表组件
@@ -120,6 +120,12 @@ const videoSrc = ref('');
 // 定义视频播放状态
 const isVideoPlayed = ref(false); // 记录视频是否已经播放过
 
+// 广告弹窗相关状态
+const showVideoAd = ref(false); // 是否显示视频广告弹窗
+
+// 充值完成提示弹窗
+const showChargeCompleteDialog = ref(false); // 是否显示充值完成提示弹窗
+
 // 点赞状态
 const isDiggLoading = ref(false);
 const isDigged = ref(false); // 是否已点赞
@@ -214,6 +220,12 @@ const loginPassword = ref('');
 const isAuthLoading = ref(false);
 const authErrorMsg = ref('');
 
+// 充值弹窗相关状态
+const showChargeModal = ref(false);
+const chargeOptions = ref<Array<{ price: number, type: number, desc: string }>>([]);
+const isLoadingChargeOptions = ref(false);
+const selectedChargeOption = ref<{ price: number, type: number, desc: string } | null>(null);
+
 // 判断是否需要显示安全提示
 const checkSafetyTipStatus = () => {
   // 从localStorage读取用户是否选择过"不再提醒"
@@ -293,6 +305,325 @@ const closeAuthModal = () => {
   registerConfirmPassword.value = '';
   registerInviteCode.value = '';
   authErrorMsg.value = '';
+};
+
+// 获取充值选项
+const fetchChargeOptions = async () => {
+  if (isLoadingChargeOptions.value) return;
+
+  isLoadingChargeOptions.value = true;
+  try {
+    // 获取包含认证信息的请求头
+    const authHeaders = createAuthHeaders(false) as any; // 充值选项可能不需要强制登录，但需要认证信息
+
+    // 构建充值选项接口URL，使用视频API的BASE_URL
+    const chargeUrl = `${BASE_URL}/index.php/ajax/charge.html`;
+    console.log('🔍 充值选项接口请求URL:', chargeUrl);
+
+    // 构建请求参数，包含reqTime和token（如果有）
+    const queryParams = new URLSearchParams();
+    if (authHeaders.reqTime) {
+      queryParams.append('reqTime', authHeaders.reqTime.toString());
+    }
+    if (authHeaders.token) {
+      queryParams.append('token', authHeaders.token.toString());
+    }
+
+    const finalUrl = queryParams.toString() ? `${chargeUrl}?${queryParams.toString()}` : chargeUrl;
+
+    console.log('📝 充值选项参数:', {
+      reqTime: authHeaders.reqTime,
+      token: authHeaders.token ? '***已设置***' : '未设置'
+    });
+
+    const response = await fetch(finalUrl, {
+      method: 'GET',
+      headers: authHeaders
+    });
+
+    if (!response.ok) {
+      throw new Error(`HTTP error! Status: ${response.status}`);
+    }
+
+    const result = await response.json();
+    console.log('💰 充值选项接口返回:', result);
+
+    if (result.code === 1 && result.data) {
+      chargeOptions.value = result.data;
+      console.log('✅ 充值选项加载成功，共', result.data.length, '个选项');
+    } else {
+      console.error('❌ 获取充值选项失败:', result.msg);
+      chargeOptions.value = [];
+    }
+  } catch (error) {
+    console.error('🚫 获取充值选项请求失败:', error);
+    chargeOptions.value = [];
+  } finally {
+    isLoadingChargeOptions.value = false;
+  }
+};
+
+// 显示充值弹窗
+const showChargeDialog = async () => {
+  console.log('🔥 开始显示充值弹窗');
+
+  // 先获取充值选项
+  await fetchChargeOptions();
+
+  console.log('🔥 获取到的充值选项:', chargeOptions.value);
+
+  // 默认选中第四个选项（索引为3）
+  if (chargeOptions.value.length >= 4) {
+    selectedChargeOption.value = chargeOptions.value[3];
+    console.log('✅ 默认选中第四个充值选项:', selectedChargeOption.value);
+  } else if (chargeOptions.value.length > 0) {
+    // 如果没有第四个选项，选中最后一个
+    selectedChargeOption.value = chargeOptions.value[chargeOptions.value.length - 1];
+    console.log('✅ 默认选中最后一个充值选项:', selectedChargeOption.value);
+  } else {
+    selectedChargeOption.value = null;
+    console.log('❌ 没有可用的充值选项');
+  }
+
+  console.log('🔥 设置 showChargeModal = true');
+  showChargeModal.value = true;
+  console.log('🔥 当前 showChargeModal 状态:', showChargeModal.value);
+
+  // 额外调试：等一下再检查状态
+  setTimeout(() => {
+    console.log('🔥 延迟检查 showChargeModal 状态:', showChargeModal.value);
+    console.log('🔥 DOM中是否存在充值弹窗元素:', document.querySelector('.charge-modal-overlay'));
+  }, 100);
+};
+
+// 测试函数：直接显示充值弹窗（用于调试）
+const testShowChargeModal = () => {
+  console.log('🧪 测试直接显示充值弹窗');
+  // 添加一些假的充值选项
+  chargeOptions.value = [
+    { price: 10, type: 1, desc: '测试选项1' },
+    { price: 20, type: 2, desc: '测试选项2' }
+  ];
+  selectedChargeOption.value = chargeOptions.value[0];
+  showChargeModal.value = true;
+  console.log('🧪 测试弹窗状态:', showChargeModal.value);
+};
+
+// 显示充值完成提示弹窗
+const showChargeCompletePrompt = () => {
+  showChargeCompleteDialog.value = true;
+};
+
+// 刷新积分
+const refreshUserPoints = async () => {
+  console.log('🔄 开始刷新用户积分...');
+
+  try {
+    // 显示加载提示
+    showToast({
+      message: '正在刷新积分...',
+      position: 'top',
+      duration: 0, // 不自动消失
+      className: 'custom-toast-loading',
+      icon: 'loading',
+    });
+
+    // 获取最新的用户信息
+    await getUserRealTimeInfo();
+
+    // 关闭加载提示
+    closeToast();
+
+    // 显示成功提示
+    showToast({
+      message: '积分刷新成功！',
+      position: 'top',
+      duration: 2000,
+      className: 'custom-toast-success',
+      icon: 'success',
+    });
+
+    // 关闭充值完成弹窗
+    showChargeCompleteDialog.value = false;
+
+    console.log('✅ 积分刷新完成，当前积分:', userPoints.value);
+
+  } catch (error) {
+    console.error('❌ 刷新积分失败:', error);
+
+    // 关闭加载提示
+    closeToast();
+
+    showToast({
+      message: '刷新积分失败，请稍后再试',
+      position: 'top',
+      duration: 3000,
+      className: 'custom-toast-error',
+      icon: 'cross',
+    });
+  }
+};
+
+// 关闭充值完成弹窗
+const closeChargeCompleteDialog = () => {
+  showChargeCompleteDialog.value = false;
+};
+
+// 选择充值选项
+const selectChargeOption = (option: { price: number, type: number, desc: string }) => {
+  selectedChargeOption.value = option;
+};
+
+// 确认充值
+const confirmCharge = async () => {
+  if (!selectedChargeOption.value) {
+    showToast({
+      message: '请选择充值选项',
+      position: 'top',
+      duration: 2000,
+      className: 'custom-toast-error',
+      icon: 'cross',
+    });
+    return;
+  }
+
+  try {
+    // 显示加载状态
+    showToast({
+      message: '正在处理充值...',
+      position: 'top',
+      duration: 0, // 不自动消失
+      className: 'custom-toast-loading',
+      icon: 'loading',
+    });
+
+    // 构建充值接口URL
+    const buyUrl = `${BASE_URL}/index.php/ajax/buy.html`;
+    console.log('🔍 充值接口请求URL:', buyUrl);
+
+    // 获取包含认证信息的请求头
+    const authHeaders = createAuthHeaders(true) as any; // 充值需要认证
+
+    // 构建请求参数，包含type、reqTime和token
+    const formData = new URLSearchParams();
+    formData.append('type', selectedChargeOption.value.type.toString());
+
+    // 从请求头中提取reqTime和token，添加到请求体
+    if (authHeaders.reqTime) {
+      formData.append('reqTime', authHeaders.reqTime.toString());
+    }
+    if (authHeaders.token) {
+      formData.append('token', authHeaders.token.toString());
+    }
+
+    console.log('📝 充值参数:', {
+      type: selectedChargeOption.value.type,
+      reqTime: authHeaders.reqTime,
+      token: authHeaders.token ? '***已设置***' : '未设置'
+    });
+
+    const response = await fetch(buyUrl, {
+      method: 'POST',
+      headers: {
+        ...authHeaders,
+        'Content-Type': 'application/x-www-form-urlencoded'
+      },
+      body: formData.toString()
+    });
+
+    if (!response.ok) {
+      throw new Error(`HTTP error! Status: ${response.status}`);
+    }
+
+    const result = await response.json();
+    console.log('💰 充值接口返回:', result);
+
+    // 关闭加载提示
+    closeToast();
+
+    if (result.code === 1) {
+      // 检查是否返回了支付链接
+      if (result.data && result.data.payUrl) {
+        // 打开支付页面
+        console.log('🔗 打开支付页面:', result.data.payUrl);
+        window.open(result.data.payUrl, '_blank');
+
+        showToast({
+          message: '请在新窗口完成支付',
+          position: 'top',
+          duration: 3000,
+          className: 'custom-toast-info',
+          icon: 'info-o',
+        });
+
+        // 关闭充值弹窗
+        showChargeModal.value = false;
+
+        // 延迟显示充值完成提示弹窗
+        setTimeout(() => {
+          showChargeCompletePrompt();
+        }, 1000);
+
+      } else {
+        // 充值成功（无需跳转支付页面）
+        showToast({
+          message: '充值成功！',
+          position: 'top',
+          duration: 2000,
+          className: 'custom-toast-success',
+          icon: 'success',
+        });
+
+        // 关闭充值弹窗
+        showChargeModal.value = false;
+
+        // 刷新用户信息
+        await getUserRealTimeInfo();
+
+        // 可以在这里添加其他成功后的逻辑，比如重新检查积分并播放视频
+      }
+
+    } else if (result.code === 0 && result.msg === '请先登录') {
+      // 需要登录
+      showToast({
+        message: '请先登录后再充值',
+        position: 'top',
+        duration: 2000,
+        className: 'custom-toast-error',
+        icon: 'cross',
+      });
+
+      // 关闭充值弹窗
+      showChargeModal.value = false;
+
+      // 显示登录弹窗
+      showAuthenticationModal('login');
+
+    } else {
+      // 充值失败
+      showToast({
+        message: result.msg || '充值失败，请重试',
+        position: 'top',
+        duration: 3000,
+        className: 'custom-toast-error',
+        icon: 'cross',
+      });
+    }
+
+  } catch (error) {
+    console.error('🚫 充值请求失败:', error);
+
+    // 关闭加载提示
+    closeToast();
+
+    showToast({
+      message: '网络错误，请稍后再试',
+      position: 'top',
+      duration: 3000,
+      className: 'custom-toast-error',
+      icon: 'cross',
+    });
+  }
 };
 
 // 处理登录提交
@@ -432,6 +763,9 @@ watch(
 
       // 重置播放状态
       isPlaying.value = false;
+
+      // 重置广告状态
+      showVideoAd.value = false;
 
       // 清理HLS实例
       if (hls.value) {
@@ -705,6 +1039,30 @@ const getUserRealTimeInfo = async () => {
 
 // 播放视频
 const playVideo = async () => {
+  // 先显示广告弹窗
+  showVideoAd.value = true;
+};
+
+// 关闭广告弹窗并继续播放流程
+const closeVideoAdAndPlay = () => {
+  showVideoAd.value = false;
+
+  // 继续原来的播放逻辑
+  proceedToPlay();
+};
+
+// 广告左侧点击跳转
+const handleAdLeftClick = () => {
+  window.open('https://fyf8.cc', '_blank');
+};
+
+// 广告右侧点击跳转
+const handleAdRightClick = () => {
+  window.open('https://186ab.cc', '_blank');
+};
+
+// 继续播放流程（原来的playVideo逻辑）
+const proceedToPlay = async () => {
   // 先判断是否是免费视频
   if (isFreeVideo.value) {
     // 免费视频流程
@@ -769,21 +1127,14 @@ const continuePlay = async () => {
       : userPoints.value;
 
     // 检查积分余额
+    console.log('🔥 积分检查 - 当前积分:', currentPoints, '需要积分:', pointsNeeded.value);
     if (currentPoints < pointsNeeded.value) {
-      showDialog({
-        title: '积分不足',
-        message: `观看此视频需要 ${pointsNeeded.value} 积分，您当前余额 ${currentPoints} 积分，积分不足无法观看`,
-        confirmButtonText: '去充值',
-        cancelButtonText: '取消',
-        showCancelButton: true,
-        confirmButtonColor: '#ff9500'
-      }).then(() => {
-        // 跳转到钱包页面充值
-        router.push('/wallet');
-      }).catch(() => {
-        // 用户取消充值
-      });
+      console.log('🔥 积分不足，显示充值弹窗');
+      // 显示充值选项弹窗
+      await showChargeDialog();
       return;
+    } else {
+      console.log('🔥 积分充足，继续播放流程');
     }
 
     // 积分足够，弹窗确认扣费
@@ -1580,6 +1931,9 @@ onBeforeUnmount(() => {
     videoEl.value.removeEventListener('ended', handleVideoEnded);
   }
 
+  // 重置广告状态
+  showVideoAd.value = false;
+
   // 移除滚动事件监听
   window.removeEventListener('scroll', handleScroll);
 });
@@ -1589,6 +1943,12 @@ onMounted(() => {
   const urlInviteCode = parseUrlInviteCode();
   if (urlInviteCode) {
     console.log('组件挂载时从URL成功解析到邀请码:', urlInviteCode);
+  }
+
+  // 将测试函数暴露给全局作用域（仅开发环境）
+  if (import.meta.env.DEV) {
+    (window as any).testShowChargeModal = testShowChargeModal;
+    console.log('🧪 测试函数已暴露：window.testShowChargeModal()');
   }
 
   // 打印URL相关信息用于调试
@@ -1775,6 +2135,62 @@ const handleAdClick = (ad: ListAd) => {
       </div>
     </div>
 
+    <!-- 充值选项弹窗 -->
+    <div v-if="showChargeModal" class="charge-modal-overlay" @click.self="showChargeModal = false">
+      <div class="charge-modal">
+        <div class="charge-header">
+          <h3>选择充值方案</h3>
+          <div class="charge-subtitle">积分不足，请选择充值方案</div>
+        </div>
+
+        <div class="charge-content">
+          <div v-if="isLoadingChargeOptions" class="charge-loading">
+            <Loading type="spinner" color="#ff9500" />
+            <div>加载充值选项中...</div>
+          </div>
+
+          <div v-else-if="chargeOptions.length === 0" class="charge-empty">
+            <Icon name="warning-o" size="24" color="#ff9500" />
+            <div>暂无充值选项</div>
+          </div>
+
+          <div v-else class="charge-options">
+            <div v-for="option in chargeOptions" :key="option.type"
+              :class="['charge-option', { 'selected': selectedChargeOption?.type === option.type }]"
+              @click="selectChargeOption(option)">
+              <div class="option-price">¥{{ option.price }}</div>
+              <div class="option-desc">{{ option.desc }}</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="charge-footer">
+          <button class="charge-cancel-btn" @click="showChargeModal = false">取消</button>
+          <button class="charge-confirm-btn" @click="confirmCharge" :disabled="!selectedChargeOption">
+            确认充值
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- 充值完成提示弹窗 -->
+    <div v-if="showChargeCompleteDialog" class="charge-complete-overlay">
+      <div class="charge-complete-modal">
+        <div class="complete-icon">
+          <Icon name="success" size="48" color="#ff9500" />
+        </div>
+        <div class="complete-title">支付提示</div>
+        <div class="complete-content">
+          <p>如果您已完成支付，请点击已完成充值按钮</p>
+        </div>
+        <div class="complete-buttons">
+          <button class="complete-confirm-btn" @click="refreshUserPoints">
+            已完成充值
+          </button>
+        </div>
+      </div>
+    </div>
+
     <!-- 顶部导航栏 -->
     <div class="top-nav">
       <div class="back-btn" @click="goBack">
@@ -1798,6 +2214,27 @@ const handleAdClick = (ad: ListAd) => {
     <template v-else-if="videoDetail">
       <!-- 视频播放器 - 始终显示，根据状态控制是否显示封面或播放器 -->
       <div ref="videoContainerRef" :class="['video-container', { 'video-floating': isVideoFloating && isPlaying }]">
+        <!-- 视频广告弹窗 -->
+        <div v-if="showVideoAd" class="video-ad-overlay">
+          <div class="video-ad-modal">
+            <!-- 关闭按钮 -->
+            <div class="ad-close-btn" @click="closeVideoAdAndPlay">
+              <Icon name="cross" size="20" color="#fff" />
+            </div>
+
+            <!-- 广告图片 -->
+            <div class="ad-content">
+              <img src="@/assets/img/ad-video-cover.jpeg" alt="广告" class="ad-image" />
+
+              <!-- 左侧点击区域 -->
+              <div class="ad-click-area ad-left" @click="handleAdLeftClick"></div>
+
+              <!-- 右侧点击区域 -->
+              <div class="ad-click-area ad-right" @click="handleAdRightClick"></div>
+            </div>
+          </div>
+        </div>
+
         <!-- 视频播放器 -->
         <template v-if="isPlaying">
           <div v-if="hasError" class="play-error">
@@ -2692,5 +3129,400 @@ const handleAdClick = (ad: ListAd) => {
   position: absolute;
   left: 0;
   color: #ff9500;
+}
+
+/* 充值弹窗样式 */
+.charge-modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(0, 0, 0, 0.8);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 10000;
+  padding: 20px;
+}
+
+.charge-modal {
+  background: linear-gradient(135deg, #1a1a1a 0%, #2d2d2d 100%);
+  border-radius: 16px;
+  width: 100%;
+  max-width: 400px;
+  max-height: 80vh;
+  overflow-y: auto;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+  border: 1px solid rgba(255, 149, 0, 0.2);
+}
+
+.charge-header {
+  padding: 24px 24px 16px;
+  text-align: center;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.charge-header h3 {
+  color: #fff;
+  font-size: 20px;
+  font-weight: bold;
+  margin: 0 0 8px 0;
+}
+
+.charge-subtitle {
+  color: #aaa;
+  font-size: 14px;
+  margin: 0;
+}
+
+.charge-content {
+  padding: 20px 24px;
+}
+
+.charge-loading {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  padding: 40px 20px;
+  color: #aaa;
+}
+
+.charge-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  padding: 40px 20px;
+  color: #aaa;
+}
+
+.charge-options {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+.charge-option {
+  background: rgba(255, 255, 255, 0.05);
+  border: 2px solid rgba(255, 255, 255, 0.1);
+  border-radius: 12px;
+  padding: 16px 12px;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  min-height: 80px;
+  justify-content: center;
+}
+
+.charge-option:hover {
+  border-color: rgba(255, 149, 0, 0.5);
+  background: rgba(255, 149, 0, 0.1);
+}
+
+.charge-option.selected {
+  border-color: #ff9500;
+  background: rgba(255, 149, 0, 0.15);
+  box-shadow: 0 0 20px rgba(255, 149, 0, 0.3);
+}
+
+.option-price {
+  color: #ff9500;
+  font-size: 20px;
+  font-weight: bold;
+  margin-bottom: 4px;
+}
+
+.option-desc {
+  color: #fff;
+  font-size: 14px;
+  line-height: 1.2;
+}
+
+
+.charge-footer {
+  padding: 16px 24px 24px;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.charge-cancel-btn {
+  padding: 12px 20px;
+  background: rgba(255, 255, 255, 0.1);
+  color: #fff;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 8px;
+  font-size: 16px;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.charge-cancel-btn:hover {
+  background: rgba(255, 255, 255, 0.15);
+}
+
+.charge-confirm-btn {
+  padding: 12px 20px;
+  background: linear-gradient(90deg, #ff9500, #ff6d00);
+  color: #fff;
+  border: none;
+  border-radius: 8px;
+  font-size: 16px;
+  font-weight: bold;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  box-shadow: 0 4px 15px rgba(255, 149, 0, 0.3);
+}
+
+.charge-confirm-btn:hover:not(:disabled) {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(255, 149, 0, 0.4);
+}
+
+.charge-confirm-btn:disabled {
+  background: linear-gradient(90deg, #666, #555);
+  cursor: not-allowed;
+  box-shadow: none;
+  opacity: 0.6;
+}
+
+/* 移动端适配 */
+@media (max-width: 480px) {
+  .charge-modal {
+    margin: 10px;
+    max-width: none;
+  }
+
+  .charge-header {
+    padding: 20px 16px 12px;
+  }
+
+  .charge-content {
+    padding: 16px;
+  }
+
+  .charge-options {
+    gap: 8px;
+  }
+
+  .charge-option {
+    padding: 12px 8px;
+    min-height: 70px;
+  }
+
+  .charge-footer {
+    padding: 12px 16px 20px;
+    gap: 8px;
+  }
+
+  .option-price {
+    font-size: 18px;
+  }
+
+  .option-desc {
+    font-size: 12px;
+  }
+}
+
+/* 视频广告弹窗样式 */
+.video-ad-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.9);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 10;
+}
+
+.video-ad-modal {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  background: #000;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+.ad-close-btn {
+  position: absolute;
+  top: 15px;
+  right: 15px;
+  width: 36px;
+  height: 36px;
+  background: rgba(0, 0, 0, 0.6);
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  z-index: 10;
+  transition: all 0.3s ease;
+}
+
+.ad-close-btn:hover {
+  background: rgba(0, 0, 0, 0.8);
+  transform: scale(1.1);
+}
+
+.ad-content {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.ad-image {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.ad-click-area {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 50%;
+  cursor: pointer;
+  background: transparent;
+  transition: background-color 0.3s ease;
+  z-index: 1;
+}
+
+.ad-click-area:hover {
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.ad-left {
+  left: 0;
+}
+
+.ad-right {
+  right: 0;
+}
+
+
+/* 移动端适配 */
+@media (max-width: 768px) {
+  .ad-close-btn {
+    width: 32px;
+    height: 32px;
+    top: 10px;
+    right: 10px;
+  }
+}
+
+/* 充值完成提示弹窗样式 */
+.charge-complete-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(0, 0, 0, 0.8);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 10001;
+  /* 比充值弹窗高一层 */
+  padding: 20px;
+}
+
+.charge-complete-modal {
+  background: linear-gradient(135deg, #1a1a1a 0%, #2d2d2d 100%);
+  border-radius: 16px;
+  width: 100%;
+  max-width: 360px;
+  padding: 30px 20px;
+  text-align: center;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
+}
+
+.complete-icon {
+  margin-bottom: 20px;
+}
+
+.complete-title {
+  font-size: 20px;
+  font-weight: bold;
+  color: #fff;
+  margin-bottom: 20px;
+}
+
+.complete-content {
+  margin-bottom: 30px;
+}
+
+.complete-content p {
+  color: #ccc;
+  font-size: 14px;
+  line-height: 1.6;
+  margin: 0 0 10px 0;
+}
+
+.complete-note {
+  font-size: 12px !important;
+  color: #999 !important;
+}
+
+.complete-buttons {
+  display: flex;
+  justify-content: center;
+}
+
+.complete-confirm-btn {
+  padding: 12px 40px;
+  border: none;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: bold;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  min-width: 140px;
+}
+
+
+.complete-confirm-btn {
+  background: linear-gradient(90deg, #ff9500, #ff6d00);
+  color: #fff;
+  box-shadow: 0 4px 15px rgba(255, 149, 0, 0.3);
+}
+
+.complete-confirm-btn:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(255, 149, 0, 0.4);
+}
+
+/* 移动端适配 */
+@media (max-width: 768px) {
+  .charge-complete-modal {
+    max-width: 300px;
+    padding: 25px 15px;
+  }
+
+  .complete-title {
+    font-size: 18px;
+  }
+
+  .complete-confirm-btn {
+    padding: 10px 30px;
+    font-size: 13px;
+    min-width: 120px;
+  }
 }
 </style>
