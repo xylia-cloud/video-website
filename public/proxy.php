@@ -52,10 +52,34 @@ function detectApiType() {
         // 进一步清理target值
         $target = trim($target, '/?');
         
+        $path = $_GET['path'] ?? '';
+        $params = array_diff_key($_GET, array_flip(['target', 'path']));
+        
+        // 特殊处理：如果path中包含查询参数，需要将其分离
+        if ($path && strpos($path, '?') !== false) {
+            error_log("Processing path with query params: $path");
+            
+            $pathParts = explode('?', $path, 2);
+            $cleanPath = $pathParts[0];
+            $pathQuery = $pathParts[1] ?? '';
+            
+            // 解析path中的查询参数并合并到params中
+            if ($pathQuery) {
+                parse_str($pathQuery, $pathParams);
+                error_log("Path params: " . json_encode($pathParams));
+                error_log("Original params: " . json_encode($params));
+                $params = array_merge($pathParams, $params);
+                error_log("Merged params: " . json_encode($params));
+            }
+            
+            $path = $cleanPath;
+            error_log("Clean path: $path");
+        }
+        
         return [
             'type' => $target,
-            'path' => $_GET['path'] ?? '',
-            'params' => array_diff_key($_GET, array_flip(['target', 'path']))
+            'path' => $path,
+            'params' => $params
         ];
     }
     
@@ -151,9 +175,11 @@ function buildTargetUrl($apiInfo) {
  * 获取请求头
  */
 function getRequestHeaders($apiType) {
+    $headers = [];
+    
     if ($apiType === 'user') {
         // 用户API请求头
-        return [
+        $headers = [
             'User-Agent: Mozilla/5.0 (iPhone; CPU iPhone OS 16_6 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.6 Mobile/15E148 Safari/604.1',
             'Accept: application/json, text/plain, */*',
             'Accept-Language: zh-CN,zh;q=0.9,en;q=0.8',
@@ -161,7 +187,7 @@ function getRequestHeaders($apiType) {
         ];
     } else {
         // 视频API请求头
-        return [
+        $headers = [
             'User-Agent: Mozilla/5.0 (iPhone; CPU iPhone OS 16_6 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.6 Mobile/15E148 Safari/604.1',
             'Accept: */*',
             'Accept-Language: zh-CN,zh;q=0.9,en;q=0.8',
@@ -170,6 +196,31 @@ function getRequestHeaders($apiType) {
             'Referer: https://jiji1.tv/',
         ];
     }
+    
+    // ✅ 转发客户端的自定义请求头（token、reqTime等）
+    // 获取所有HTTP_*开头的服务器变量（这些是客户端发送的请求头）
+    foreach ($_SERVER as $key => $value) {
+        // 只处理HTTP_开头的变量（这些是HTTP请求头）
+        if (strpos($key, 'HTTP_') === 0) {
+            // 转换为标准HTTP头格式
+            // HTTP_TOKEN -> Token
+            // HTTP_REQTIME -> Reqtime
+            $headerName = str_replace('HTTP_', '', $key);
+            $headerName = str_replace('_', '-', $headerName);
+            
+            // 转换为标准的大小写格式（首字母大写）
+            $headerName = implode('-', array_map('ucfirst', array_map('strtolower', explode('-', $headerName))));
+            
+            // 跳过一些不需要转发的标准请求头
+            $skipHeaders = ['Host', 'Connection', 'Content-Length', 'Origin', 'Referer', 'Accept', 'Accept-Language', 'User-Agent', 'Accept-Encoding'];
+            if (!in_array($headerName, $skipHeaders)) {
+                $headers[] = "$headerName: $value";
+                error_log("Forwarding header: $headerName: $value");
+            }
+        }
+    }
+    
+    return $headers;
 }
 
 // ==================== 调试功能 ====================
@@ -319,6 +370,28 @@ switch ($method) {
         
         $contentType = $_SERVER['CONTENT_TYPE'] ?? '';
         
+        // 🔥 关键修复：如果没有Content-Type，根据数据自动设置
+        if (empty($contentType)) {
+            $inputData = file_get_contents('php://input');
+            
+            // 检查是否是JSON格式
+            if (!empty($inputData)) {
+                json_decode($inputData);
+                if (json_last_error() === JSON_ERROR_NONE) {
+                    $contentType = 'application/json';
+                } else {
+                    // 默认为表单格式
+                    $contentType = 'application/x-www-form-urlencoded';
+                }
+            } else if (!empty($_POST)) {
+                // 有POST数据但无Content-Type，默认为表单格式
+                $contentType = 'application/x-www-form-urlencoded';
+            }
+            
+            // 记录自动检测的Content-Type
+            error_log("Auto-detected Content-Type: $contentType");
+        }
+        
         if (strpos($contentType, 'application/json') !== false) {
             // JSON数据
             $postData = file_get_contents('php://input');
@@ -327,6 +400,12 @@ switch ($method) {
         } elseif (strpos($contentType, 'application/x-www-form-urlencoded') !== false) {
             // 表单数据
             $postData = file_get_contents('php://input');
+            
+            // 🔥 关键修复：如果php://input为空但$_POST有数据，使用$_POST
+            if (empty($postData) && !empty($_POST)) {
+                $postData = http_build_query($_POST);
+            }
+            
             curl_setopt($ch, CURLOPT_POSTFIELDS, $postData);
             $headers[] = 'Content-Type: application/x-www-form-urlencoded';
         } elseif (strpos($contentType, 'multipart/form-data') !== false) {
@@ -346,6 +425,14 @@ switch ($method) {
             if (empty($postData) && !empty($_POST)) {
                 $postData = http_build_query($_POST);
                 $headers[] = 'Content-Type: application/x-www-form-urlencoded';
+            } else if (!empty($postData)) {
+                // 有数据但无Content-Type，尝试自动判断
+                json_decode($postData);
+                if (json_last_error() === JSON_ERROR_NONE) {
+                    $headers[] = 'Content-Type: application/json';
+                } else {
+                    $headers[] = 'Content-Type: application/x-www-form-urlencoded';
+                }
             }
             curl_setopt($ch, CURLOPT_POSTFIELDS, $postData);
         }
@@ -355,7 +442,9 @@ switch ($method) {
         curl_setopt($ch, CURLOPT_CUSTOMREQUEST, 'PUT');
         $putData = file_get_contents('php://input');
         curl_setopt($ch, CURLOPT_POSTFIELDS, $putData);
-        $headers[] = 'Content-Type: application/json';
+        
+        $contentType = $_SERVER['CONTENT_TYPE'] ?? 'application/json';
+        $headers[] = 'Content-Type: ' . $contentType;
         break;
         
     case 'DELETE':
@@ -365,6 +454,10 @@ switch ($method) {
 
 // 设置请求头
 curl_setopt($ch, CURLOPT_HTTPHEADER, $headers);
+
+// 🔥 调试信息：记录最终发送的请求头
+error_log("Final request headers: " . json_encode($headers));
+error_log("Request method: $method, Target URL: $targetUrl");
 
 // 执行请求
 $response = curl_exec($ch);

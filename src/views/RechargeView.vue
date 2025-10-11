@@ -4,6 +4,7 @@ import { ref, onMounted, computed } from 'vue';
 import { showToast, showDialog } from 'vant';
 import { useRouter } from 'vue-router';
 import { fetchPayChannels, fetchChargeRules, createChargeOrder, getUserInfo, fetchUserDatas, setUserInfo } from '@/api/fetch-api';
+import HeaderNav from '@/components/HeaderNav.vue';
 
 // 接口类型定义
 interface PaymentChannel {
@@ -76,6 +77,18 @@ const handleAdClick = (ad: { id: number; name: string; icon: string; link: strin
 
 // 钻石余额
 const diamondBalance = ref(0);
+
+// 选项卡状态
+const activeTab = ref('game'); // 'game' 或 'video'
+
+// 切换选项卡
+const switchTab = (tab: string) => {
+  if (tab === 'video') {
+    router.push('/vip-recharge');
+  } else {
+    activeTab.value = tab;
+  }
+};
 
 // 广告列表数据
 const adsList = ref([
@@ -559,19 +572,22 @@ onMounted(async () => {
 
 <template>
   <div class="recharge-page">
-    <!-- 固定顶部区域 -->
-    <div class="fixed-top-section">
-      <!-- 顶部标题栏 -->
-      <div class="page-header">
-        <div class="nav-bar">
-          <div class="back-button" @click="goBack">
-            <van-icon name="arrow-left" size="20" color="#fff" />
-          </div>
-          <div class="page-title">充值中心</div>
-          <div class="right-placeholder"></div>
-        </div>
+    <!-- 头部导航 -->
+    <HeaderNav title="充值中心" />
+
+    <!-- 选项卡切换 -->
+    <div class="nav-tabs">
+      <div class="tab-item" :class="{ active: activeTab === 'video' }" @click="switchTab('video')">
+        视频充值
+      </div>
+      <div class="tab-item" :class="{ active: activeTab === 'game' }" @click="switchTab('game')">
+        游戏充值
       </div>
 
+    </div>
+
+    <!-- 固定顶部区域 -->
+    <div class="fixed-top-section">
       <!-- 钻石余额区域 -->
       <div class="diamond-balance">
         <div class="balance-content">
@@ -764,6 +780,7 @@ onMounted(async () => {
   flex-shrink: 0;
   background-color: #111;
   border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  margin-top: 100px;
 }
 
 /* 可滚动内容区域 */
@@ -773,36 +790,46 @@ onMounted(async () => {
   padding-bottom: 80px;
 }
 
-/* 页面标题 */
-.page-header {
-  background: #222;
+/* 导航标签 */
+.nav-tabs {
+  position: fixed;
+  top: 50px;
+  left: 0;
+  right: 0;
+  display: flex;
+  justify-content: space-around;
+  width: 100%;
+  border-bottom: 1px solid #222;
+  background-color: #111;
+  z-index: 99;
 }
 
-.nav-bar {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  height: 44px;
-  padding: 0 15px;
-}
-
-.back-button {
-  width: 44px;
-  height: 44px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
+.tab-item {
+  flex: 1;
+  padding: 12px 0;
+  font-size: 16px;
+  color: #ccc;
+  position: relative;
   cursor: pointer;
+  text-align: center;
 }
 
-.page-title {
-  font-size: 18px;
+.tab-item.active {
+  color: #ff9500;
   font-weight: bold;
-  color: #fff;
+  font-size: 18px;
 }
 
-.right-placeholder {
-  width: 44px;
+.tab-item.active::after {
+  content: '';
+  position: absolute;
+  bottom: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 20px;
+  height: 3px;
+  background-color: #ff9500;
+  border-radius: 3px;
 }
 
 /* 钻石余额区域 */

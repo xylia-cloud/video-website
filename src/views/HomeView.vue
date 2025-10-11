@@ -3,10 +3,12 @@
 import VideoList from '@/components/VideoList.vue';
 import { ref, onMounted, onBeforeUnmount, computed, onActivated } from 'vue';
 import { getRecommendVideos } from '@/api/video';
-import { fetchRecommendVideos, fetchTypesList, fetchAds, fetchTags } from '@/api/fetch-api';
+import { fetchRecommendVideos, fetchTypesList, fetchAds, fetchTags, touristLogin, getUserInfo, isLoggedIn } from '@/api/fetch-api';
 import type { TypeItem } from '@/api/fetch-api';
 import { BASE_URL, VIDEO_CATEGORIES, DEFAULT_PAGE_SIZE } from '@/utils/config';
 import { useRouter, useRoute } from 'vue-router';
+import { getDeviceIMEI } from '@/utils/device';
+import { showToast } from 'vant';
 
 // 使用路由
 const router = useRouter();
@@ -40,6 +42,8 @@ interface VideoItem {
   class?: string;     // 视频分类
   time?: string;      // 发布时间
   points?: string;    // 视频价格
+  isAd?: boolean;     // 是否为广告
+  link?: string;      // 广告链接
 }
 
 
@@ -267,15 +271,20 @@ const switchType = (typeId: number) => {
   const firstTypeId = typesList.value.length > 0 ? typesList.value[0].type_id : 1;
   const isFirstTab = typeId === firstTypeId;
 
-  // 获取对应的广告数据
-  fetchListAds();
-
   if (isFirstTab) {
     // 第一个标签立即加载，如果没有缓存数据
     if (!tabStates.value[typeId]) {
-      fetchRecommendVideosData(1, typeId);
+      // 先获取广告数据，然后再获取视频数据
+      fetchListAds().then(() => {
+        fetchRecommendVideosData(1, typeId);
+      });
+    } else {
+      // 如果有缓存数据，仍然需要获取广告数据以备后续使用
+      fetchListAds();
     }
   } else {
+    // 其他标签也需要获取广告数据
+    fetchListAds();
     // 其他标签，如果没有缓存数据，等待滚动触发懒加载
     if (!tabStates.value[typeId]) {
       isFirstLoad.value = true;
@@ -302,20 +311,31 @@ const updateTabCache = (tabId: number) => {
   // 记录当前滚动位置
   const scrollPosition = window.scrollY || document.documentElement.scrollTop;
 
+  // 对于首页标签，缓存时需要过滤掉广告，只保存纯视频数据
+  const firstTypeId = typesList.value.length > 0 ? typesList.value[0].type_id : 1;
+  const isFirstTab = tabId === firstTypeId;
+
+  let videosToCache = [...videoData.value];
+  if (isFirstTab) {
+    // 首页标签：只缓存非广告的视频数据
+    videosToCache = videoData.value.filter(item => !item.isAd);
+    console.log(`首页标签缓存: 原始数据${videoData.value.length}条，过滤广告后${videosToCache.length}条`);
+  }
+
   // 更新指定标签的缓存状态
   tabStates.value[tabId] = {
     scrollPosition: scrollPosition,
     currentPage: currentPage.value,
     totalPages: totalPages.value,
     hasMoreVideos: hasMoreVideos.value,
-    videos: [...videoData.value], // 创建视频数据的副本
+    videos: videosToCache, // 缓存过滤后的视频数据
     lastUpdateTime: Date.now() // 记录缓存时间
   };
 
   // 同时保存到sessionStorage进行持久化
   saveSessionData();
 
-  console.log(`更新标签${tabId}的缓存: 页码=${currentPage.value}, 总页数=${totalPages.value}, 数据长度=${videoData.value.length}, 滚动位置=${scrollPosition}`);
+  console.log(`更新标签${tabId}的缓存: 页码=${currentPage.value}, 总页数=${totalPages.value}, 缓存数据长度=${videosToCache.length}, 滚动位置=${scrollPosition}`);
 };
 
 // 保存当前标签状态（主要用于切换标签时）
@@ -340,7 +360,7 @@ const fetchLatestVideosData = async (page: number = 1) => {
     // 调用接口获取最新视频，tid不为1时按发布时间排序
     const result = await fetchRecommendVideos({
       mid: 1,
-      limit: DEFAULT_PAGE_SIZE,
+      limit: 10, // 最新视频只显示10条
       page: page,
       tid: 2 // tid不是1的时候，请求的就是按发布时间排序的视频列表
     });
@@ -505,8 +525,11 @@ const processDataWithAds = (processedData: VideoItem[], page: number): VideoItem
   const finalData = [...processedData];
 
   // 只有第一页且有广告时才处理
+  console.log('📢 [processDataWithAds] 检查广告插入条件 - page:', page, 'listAds.length:', listAds.value.length);
+  console.log('📢 [processDataWithAds] 广告数据详情:', listAds.value);
+
   if (page === 1 && listAds.value.length > 0) {
-    console.log('📢 [processDataWithAds] 处理广告插入，广告数据长度:', listAds.value.length);
+    console.log('📢 [processDataWithAds] ✅ 开始处理广告插入，广告数据长度:', listAds.value.length);
     console.log('📢 [processDataWithAds] 输入视频数据长度:', processedData.length);
 
     // 使用前三个广告
@@ -901,6 +924,7 @@ const listAds = ref<ListAd[]>([]);
 
 // 获取列表广告数据
 const fetchListAds = async () => {
+  console.log('🎯 [fetchListAds] 开始获取列表广告数据...');
   try {
     // 请求首页单图广告数据(ad_type=2)
     const result = await fetchAds({
@@ -908,7 +932,10 @@ const fetchListAds = async () => {
       ad_type: 2  // 单图类型
     });
 
-    console.log('获取列表广告数据:', result);
+    console.log('🎯 [fetchListAds] API返回结果:', result);
+    console.log('🎯 [fetchListAds] result.code:', result?.code);
+    console.log('🎯 [fetchListAds] result.data:', result?.data);
+    console.log('🎯 [fetchListAds] result.data.length:', result?.data?.length);
 
     // 处理API返回的广告数据
     if (result && result.code === 1 && result.data && Array.isArray(result.data) && result.data.length > 0) {
@@ -1040,6 +1067,9 @@ onMounted(async () => {
   // 处理邀请码参数
   handleInviteCode();
 
+  // 首先执行游客登录（如果需要的话）
+  await performTouristLogin();
+
 
   // 获取类型列表数据
   await fetchTypesData();
@@ -1086,7 +1116,23 @@ onMounted(async () => {
     currentPage.value = currentTabCache.currentPage;
     totalPages.value = currentTabCache.totalPages;
     hasMoreVideos.value = currentTabCache.hasMoreVideos;
-    videoData.value = [...currentTabCache.videos];
+
+    // 对于首页标签，需要重新处理广告插入
+    if (isFirstTab) {
+      console.log('首页标签使用缓存数据，重新处理广告插入');
+      // 从缓存数据中过滤出非广告的视频数据
+      const videosWithoutAds = currentTabCache.videos.filter(item => !item.isAd);
+      console.log('缓存中的纯视频数据长度:', videosWithoutAds.length);
+
+      // 重新插入最新的广告数据
+      const finalData = processDataWithAds(videosWithoutAds, 1);
+      videoData.value = finalData;
+      console.log('重新插入广告后的数据长度:', finalData.length);
+    } else {
+      // 非首页标签直接使用缓存数据
+      videoData.value = [...currentTabCache.videos];
+    }
+
     isFirstLoad.value = false; // 重要：标记为非首次加载
 
     // 恢复滚动位置
@@ -1214,6 +1260,60 @@ const restoreSessionData = () => {
   }
   return false;
 };
+
+// 游客登录函数
+const performTouristLogin = async () => {
+  console.log('=== 首页游客登录开始 ===');
+
+  // 检查本地是否已有用户信息
+  const localUserInfo = getUserInfo();
+
+  if (localUserInfo) {
+    console.log('✅ 本地已有用户信息，跳过游客登录');
+    return;
+  }
+
+  // 检查是否已登录
+  if (isLoggedIn()) {
+    console.log('✅ 用户已登录，跳过游客登录');
+    return;
+  }
+
+  try {
+    console.log('🔄 开始游客登录流程...');
+
+    const deviceIMEI = getDeviceIMEI();
+    console.log('📱 使用设备IMEI进行游客登录:', deviceIMEI);
+
+    const result = await touristLogin(deviceIMEI);
+    console.log('📥 游客登录API响应:', result);
+
+    if (result.code === 1 && result.data) {
+      // 游客登录成功，保存用户信息
+      console.log('✅ 游客登录成功，用户信息已保存到本地');
+
+      showToast({
+        message: '已获取游客信息',
+        duration: 1000
+      });
+    } else {
+      // 游客登录失败
+      console.error('❌ 游客登录失败:', result);
+      showToast({
+        message: '获取游客信息失败',
+        duration: 2000
+      });
+    }
+  } catch (error) {
+    console.error('❌ 游客登录异常:', error);
+    showToast({
+      message: '获取游客信息失败',
+      duration: 2000
+    });
+  }
+
+  console.log('=== 首页游客登录结束 ===');
+};
 </script>
 
 <template>
@@ -1279,6 +1379,28 @@ const restoreSessionData = () => {
         <img :src="singleAd.imageUrl" :alt="singleAd.title" @error="handleImageError($event, singleAd)" />
       </div>
 
+      <!-- 最新视频列表（仅首页标签显示） -->
+      <div v-if="isFirstTabActive">
+        <!-- 最新标题 -->
+        <div class="section-title">最新</div>
+        <div v-if="isLoadingLatest || latestVideoData.length === 0" class="loading-state">
+          <van-loading type="spinner" color="#ff9500" />
+          <div class="loading-text">{{ isLoadingLatest ? '加载最新视频中...' : '加载中...' }}</div>
+        </div>
+        <div v-else-if="hasLatestError" class="error-state">
+          <van-icon name="warning-o" size="24" color="#ff9500" />
+          <div class="error-text">加载失败，请稍后再试</div>
+          <div v-if="latestErrorMessage" class="error-detail">{{ latestErrorMessage }}</div>
+        </div>
+        <VideoList v-else :videos="latestVideoData" />
+
+        <!-- 最新视频换一批按钮 -->
+        <div v-if="latestVideoData.length > 0 && !isLoadingLatest" class="refresh-btn" @click="refreshLatestVideos">
+          <van-icon name="replay" />
+          <span>换一批</span>
+        </div>
+      </div>
+
       <!-- 最热视频列表（仅首页标签显示标题） -->
       <div v-if="isFirstTabActive">
         <!-- 最热标题 -->
@@ -1313,28 +1435,6 @@ const restoreSessionData = () => {
           <div v-if="errorMessage" class="error-detail">{{ errorMessage }}</div>
         </div>
         <VideoList v-else :videos="videoData" />
-      </div>
-
-      <!-- 最新视频列表（仅首页标签显示） -->
-      <div v-if="isFirstTabActive">
-        <!-- 最新标题 -->
-        <div class="section-title">最新</div>
-        <div v-if="isLoadingLatest || latestVideoData.length === 0" class="loading-state">
-          <van-loading type="spinner" color="#ff9500" />
-          <div class="loading-text">{{ isLoadingLatest ? '加载最新视频中...' : '加载中...' }}</div>
-        </div>
-        <div v-else-if="hasLatestError" class="error-state">
-          <van-icon name="warning-o" size="24" color="#ff9500" />
-          <div class="error-text">加载失败，请稍后再试</div>
-          <div v-if="latestErrorMessage" class="error-detail">{{ latestErrorMessage }}</div>
-        </div>
-        <VideoList v-else :videos="latestVideoData" />
-
-        <!-- 最新视频换一批按钮 -->
-        <div v-if="latestVideoData.length > 0 && !isLoadingLatest" class="refresh-btn" @click="refreshLatestVideos">
-          <van-icon name="replay" />
-          <span>换一批</span>
-        </div>
       </div>
 
       <!-- 加载更多状态（仅非第一个标签显示） -->

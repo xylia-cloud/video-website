@@ -43,7 +43,6 @@ RewriteRule ^.*$ index.html [QSA,L]
     AddOutputFilterByType DEFLATE application/x-javascript
     AddOutputFilterByType DEFLATE application/json
 </IfModule>
-
 # 缓存静态资源
 <IfModule mod_expires.c>
     ExpiresActive On

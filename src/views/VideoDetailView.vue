@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref, onMounted, computed, onBeforeUnmount, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
-import { fetchVideoDetail, fetchRecommendVideos, fetchDetailRecommend, updateVideoHits, updateVideoDigg, updateUserLog, getUserInfo, isLoggedIn, setUserInfo, fetchUserDatas, fetchAds, userLogin, registerUser, createAuthHeaders } from '@/api/fetch-api';
+import { fetchVideoDetail, fetchRecommendVideos, fetchDetailRecommend, updateVideoHits, updateVideoDigg, updateUserLog, getUserInfo, isLoggedIn, setUserInfo, fetchUserDatas, fetchAds, userLogin, registerUser, createAuthHeaders, fetchUserPoints } from '@/api/fetch-api';
 import type { VideoDetail } from '@/api/fetch-api';
 import { BASE_URL } from '@/utils/config';
 // 导入Vant组件
@@ -76,10 +76,50 @@ const userInfo = ref<any>(null);
 // 是否正在获取用户信息
 const isLoadingUserInfo = ref(false);
 
-// 用户积分
+// 用户积分和VIP相关数据
+const userVideoNums = ref(0); // 观影次数
+const isVip = ref('0'); // VIP状态
+const vipEndtime = ref(''); // VIP到期时间
+
 const userPoints = computed(() => {
-  if (!userInfo.value) return 0;
-  return userInfo.value.user_points || 0;
+  return userVideoNums.value || 0;
+});
+
+// VIP状态显示文本
+const vipStatusDisplay = computed(() => {
+  console.log('🔍 VIP状态显示计算 - isVip:', isVip.value, '类型:', typeof isVip.value, 'vipEndtime:', vipEndtime.value);
+
+  if (Number(isVip.value) === 1) {
+    if (vipEndtime.value) {
+      // 解析日期字符串或时间戳
+      let endDate;
+      if (typeof vipEndtime.value === 'string' && vipEndtime.value.includes('-')) {
+        // 字符串格式：2025-10-09 16:48:13
+        endDate = new Date(vipEndtime.value);
+      } else {
+        // 时间戳格式
+        endDate = new Date(parseInt(vipEndtime.value) * 1000);
+      }
+      const now = new Date();
+
+      console.log('📅 VIP时间检查 - 原始值:', vipEndtime.value, '解析后:', endDate, '当前时间:', now, '是否过期:', endDate <= now);
+
+      if (endDate > now) {
+        // VIP未过期
+        const year = endDate.getFullYear();
+        const month = String(endDate.getMonth() + 1).padStart(2, '0');
+        const day = String(endDate.getDate()).padStart(2, '0');
+        return `VIP到期：${year}-${month}-${day}`;
+      } else {
+        // VIP已过期，显示积分
+        return `观影次数：${userVideoNums.value}`;
+      }
+    } else {
+      return 'VIP已开通';
+    }
+  } else {
+    return `观影次数：${userVideoNums.value}`;
+  }
 });
 
 // 判断是否免费视频
@@ -367,33 +407,62 @@ const fetchChargeOptions = async () => {
 const showChargeDialog = async () => {
   console.log('🔥 开始显示充值弹窗');
 
-  // 先获取充值选项
-  await fetchChargeOptions();
+  // 显示加载提示
+  showToast({
+    message: '加载中...',
+    position: 'top',
+    duration: 0, // 不自动消失
+    className: 'custom-toast-loading',
+    icon: 'loading',
+  });
 
-  console.log('🔥 获取到的充值选项:', chargeOptions.value);
+  try {
+    // 先获取充值选项
+    await fetchChargeOptions();
 
-  // 默认选中第四个选项（索引为3）
-  if (chargeOptions.value.length >= 4) {
-    selectedChargeOption.value = chargeOptions.value[3];
-    console.log('✅ 默认选中第四个充值选项:', selectedChargeOption.value);
-  } else if (chargeOptions.value.length > 0) {
-    // 如果没有第四个选项，选中最后一个
-    selectedChargeOption.value = chargeOptions.value[chargeOptions.value.length - 1];
-    console.log('✅ 默认选中最后一个充值选项:', selectedChargeOption.value);
-  } else {
-    selectedChargeOption.value = null;
-    console.log('❌ 没有可用的充值选项');
+    console.log('🔥 获取到的充值选项:', chargeOptions.value);
+
+    // 关闭加载提示
+    closeToast();
+
+    // 默认选中第四个选项（索引为3）
+    if (chargeOptions.value.length >= 4) {
+      selectedChargeOption.value = chargeOptions.value[3];
+      console.log('✅ 默认选中第四个充值选项:', selectedChargeOption.value);
+    } else if (chargeOptions.value.length > 0) {
+      // 如果没有第四个选项，选中最后一个
+      selectedChargeOption.value = chargeOptions.value[chargeOptions.value.length - 1];
+      console.log('✅ 默认选中最后一个充值选项:', selectedChargeOption.value);
+    } else {
+      selectedChargeOption.value = null;
+      console.log('❌ 没有可用的充值选项');
+    }
+
+    console.log('🔥 设置 showChargeModal = true');
+    showChargeModal.value = true;
+    console.log('🔥 当前 showChargeModal 状态:', showChargeModal.value);
+
+    // 额外调试：等一下再检查状态
+    setTimeout(() => {
+      console.log('🔥 延迟检查 showChargeModal 状态:', showChargeModal.value);
+      console.log('🔥 DOM中是否存在充值弹窗元素:', document.querySelector('.charge-modal-overlay'));
+    }, 100);
+
+  } catch (error) {
+    console.error('🚫 获取充值选项失败:', error);
+
+    // 关闭加载提示
+    closeToast();
+
+    // 显示错误提示
+    showToast({
+      message: '获取充值选项失败，请稍后再试',
+      position: 'top',
+      duration: 3000,
+      className: 'custom-toast-error',
+      icon: 'cross',
+    });
   }
-
-  console.log('🔥 设置 showChargeModal = true');
-  showChargeModal.value = true;
-  console.log('🔥 当前 showChargeModal 状态:', showChargeModal.value);
-
-  // 额外调试：等一下再检查状态
-  setTimeout(() => {
-    console.log('🔥 延迟检查 showChargeModal 状态:', showChargeModal.value);
-    console.log('🔥 DOM中是否存在充值弹窗元素:', document.querySelector('.charge-modal-overlay'));
-  }, 100);
 };
 
 // 测试函数：直接显示充值弹窗（用于调试）
@@ -421,32 +490,64 @@ const refreshUserPoints = async () => {
   try {
     // 显示加载提示
     showToast({
-      message: '正在刷新积分...',
+      message: '充值中...',
       position: 'top',
       duration: 0, // 不自动消失
       className: 'custom-toast-loading',
       icon: 'loading',
     });
 
-    // 获取最新的用户信息
-    await getUserRealTimeInfo();
+    // 调用获取积分接口
+    const pointsResult = await fetchUserPoints();
 
     // 关闭加载提示
     closeToast();
 
-    // 显示成功提示
-    showToast({
-      message: '积分刷新成功！',
-      position: 'top',
-      duration: 2000,
-      className: 'custom-toast-success',
-      icon: 'success',
-    });
+    if (pointsResult.code === 1 && pointsResult.data) {
+      // 更新用户积分信息
+      const userInfo = getUserInfo();
+      if (userInfo) {
+        // 更新本地存储的用户信息
+        userInfo.user_points = pointsResult.data.points;
+        userInfo.points = pointsResult.data.points;
+        userInfo.video_nums = pointsResult.data.video_nums;
+        userInfo.is_vip = pointsResult.data.is_vip;
+        if (pointsResult.data.endtime) {
+          userInfo.endtime = pointsResult.data.endtime;
+        }
+        setUserInfo(userInfo);
+
+        // 更新页面显示的数据
+        userVideoNums.value = pointsResult.data.video_nums;
+        isVip.value = pointsResult.data.is_vip || 0;
+        vipEndtime.value = pointsResult.data.endtime || '';
+      }
+
+      // 显示成功提示
+      showToast({
+        message: `当前观看次数：${pointsResult.data.video_nums}`,
+        position: 'top',
+        duration: 2000,
+        className: 'custom-toast-success',
+        icon: 'success',
+      });
+
+      console.log('✅ 积分刷新完成，当前积分:', pointsResult.data.points);
+      console.log('✅ 积分详情:', pointsResult.data);
+
+    } else {
+      // 显示失败提示
+      showToast({
+        message: pointsResult.msg || '积分刷新失败',
+        position: 'top',
+        duration: 3000,
+        className: 'custom-toast-error',
+        icon: 'cross',
+      });
+    }
 
     // 关闭充值完成弹窗
     showChargeCompleteDialog.value = false;
-
-    console.log('✅ 积分刷新完成，当前积分:', userPoints.value);
 
   } catch (error) {
     console.error('❌ 刷新积分失败:', error);
@@ -501,25 +602,51 @@ const confirmCharge = async () => {
     const buyUrl = `${BASE_URL}/index.php/ajax/buy.html`;
     console.log('🔍 充值接口请求URL:', buyUrl);
 
-    // 获取包含认证信息的请求头
-    const authHeaders = createAuthHeaders(true) as any; // 充值需要认证
+    // 获取用户信息
+    const userInfo = getUserInfo();
+    if (!userInfo) {
+      closeToast();
+      showToast({
+        message: '用户信息不存在，请刷新页面重试',
+        position: 'top',
+        duration: 3000,
+        className: 'custom-toast-error',
+        icon: 'cross',
+      });
+      return;
+    }
 
-    // 构建请求参数，包含type、reqTime和token
+    // 兼容游客用户和正式用户的数据结构
+    const uid = userInfo.user_id || userInfo.id;
+    if (!uid) {
+      closeToast();
+      showToast({
+        message: '用户ID不存在，请重新登录',
+        position: 'top',
+        duration: 3000,
+        className: 'custom-toast-error',
+        icon: 'cross',
+      });
+      return;
+    }
+
+    // 获取包含认证信息的请求头（token和reqTime会在请求头中）
+    const authHeaders = createAuthHeaders(true) as any;
+
+    // 构建请求体参数 - 只需要 uid 和 type
+    // token 和 reqTime 已经在请求头中，PHP代理会转发这些请求头
     const formData = new URLSearchParams();
+    formData.append('uid', uid.toString());
     formData.append('type', selectedChargeOption.value.type.toString());
 
-    // 从请求头中提取reqTime和token，添加到请求体
-    if (authHeaders.reqTime) {
-      formData.append('reqTime', authHeaders.reqTime.toString());
-    }
-    if (authHeaders.token) {
-      formData.append('token', authHeaders.token.toString());
-    }
-
-    console.log('📝 充值参数:', {
-      type: selectedChargeOption.value.type,
-      reqTime: authHeaders.reqTime,
-      token: authHeaders.token ? '***已设置***' : '未设置'
+    console.log('📝 充值参数:');
+    console.log('  请求头:', {
+      token: authHeaders.token ? '***已设置***' : '未设置',
+      reqTime: authHeaders.reqTime
+    });
+    console.log('  请求体:', {
+      uid: uid,
+      type: selectedChargeOption.value.type
     });
 
     const response = await fetch(buyUrl, {
@@ -973,8 +1100,10 @@ const handleVideoEnded = () => {
 
 // 获取用户实时信息
 const getUserRealTimeInfo = async () => {
-  if (!isLoggedIn()) {
-    console.log('用户未登录，无法获取实时信息');
+  // 获取用户信息（游客用户也可以获取）
+  const currentUserInfo = getUserInfo();
+  if (!currentUserInfo) {
+    console.log('没有用户信息，无法获取实时信息');
     return null;
   }
 
@@ -1006,9 +1135,18 @@ const getUserRealTimeInfo = async () => {
           user_nick_name: result.data.user_nick_name,
           group_id: result.data.group_id,
           group_name: result.data.group_name,
-          user_portrait: result.data.user_portrait
+          user_portrait: result.data.user_portrait,
+          // 同步VIP相关字段
+          video_nums: result.data.video_nums || currentUserInfo.video_nums || 0,
+          is_vip: result.data.is_vip || currentUserInfo.is_vip || '0',
+          endtime: result.data.endtime || currentUserInfo.endtime || ''
         };
         setUserInfo(updatedUserInfo);
+
+        // 更新页面显示的VIP数据
+        userVideoNums.value = updatedUserInfo.video_nums;
+        isVip.value = updatedUserInfo.is_vip;
+        vipEndtime.value = updatedUserInfo.endtime;
       }
 
       console.log('更新用户实时积分:', result.data.user_points);
@@ -1079,8 +1217,8 @@ const proceedToPlay = async () => {
     return;
   }
 
-  // 如果是付费视频且用户已登录
-  if (!isFreeVideo.value && isLoggedIn()) {
+  // 如果是付费视频，直接继续付费流程（游客用户也可以观看）
+  if (!isFreeVideo.value) {
     // 继续正常付费流程
 
     // 检查是否需要显示安全提示
@@ -1094,68 +1232,99 @@ const proceedToPlay = async () => {
     continuePlay();
     return;
   }
-
-  // 如果是付费视频且未登录，直接显示登录/注册弹窗
-  // 默认显示登录选项卡，如果是从分享链接进入，则显示注册选项卡
-  const defaultTab = isFromShare.value ? 'register' : 'login';
-  showAuthenticationModal(defaultTab);
 };
 
 // 继续播放流程
 const continuePlay = async () => {
-  // 获取用户最新积分信息
-  console.log('正在获取用户最新积分信息...');
-  const latestUserInfo = await getUserRealTimeInfo();
+  // 显示加载状态
+  showToast({
+    message: '加载中',
+    duration: 0,
+    forbidClick: true
+  });
 
-  // 根据is_watched字段判断是否需要扣费
-  // is_watched为1表示已观看，直接播放
-  if (isWatched.value) {
-    // 已观看过，直接播放
-    console.log('用户已观看过此视频，直接播放');
-    startVideoPlayback();
-    return;
-  }
+  try {
+    // 获取用户最新积分信息
+    console.log('正在获取用户最新积分信息...');
+    const latestUserInfo = await getUserRealTimeInfo();
 
-  // 未观看过，检查是否需要付费
-  if (isNeedPay.value && pointsNeeded.value > 0) {
-    // 付费视频，需要弹窗确认扣费
-    console.log('付费视频且未观看，弹窗确认扣费');
+    // 同时获取最新的VIP和积分状态
+    await fetchLatestPointsInfo();
 
-    // 获取当前积分余额（优先使用最新获取的实时数据）
-    const currentPoints = latestUserInfo?.user_points !== undefined
-      ? latestUserInfo.user_points
-      : userPoints.value;
+    // 关闭加载提示
+    closeToast();
 
-    // 检查积分余额
-    console.log('🔥 积分检查 - 当前积分:', currentPoints, '需要积分:', pointsNeeded.value);
-    if (currentPoints < pointsNeeded.value) {
-      console.log('🔥 积分不足，显示充值弹窗');
-      // 显示充值选项弹窗
-      await showChargeDialog();
+    // 根据is_watched字段判断是否需要扣费
+    // is_watched为1表示已观看，直接播放
+    if (isWatched.value) {
+      // 已观看过，直接播放
+      console.log('用户已观看过此视频，直接播放');
+      startVideoPlayback();
       return;
-    } else {
-      console.log('🔥 积分充足，继续播放流程');
     }
 
-    // 积分足够，弹窗确认扣费
-    showDialog({
-      title: '付费确认',
-      message: `观看此视频需要扣除 ${pointsNeeded.value} 积分，确认观看吗？`,
-      confirmButtonText: `扣除${pointsNeeded.value}积分观看`,
-      cancelButtonText: '取消',
-      showCancelButton: true,
-      confirmButtonColor: '#ff9500'
-    }).then(() => {
-      // 用户确认扣费，开始播放视频
-      console.log('用户确认扣费，开始播放视频');
-      deductPointsAndPlay();
-    }).catch(() => {
-      // 用户取消扣费
+    // 未观看过，检查是否需要付费
+    if (isNeedPay.value && pointsNeeded.value > 0) {
+      // 付费视频，首先检查VIP状态
+      console.log('付费视频且未观看，开始VIP和积分检查');
+
+      // 1. 优先检查VIP状态
+      const currentIsVip = Number(isVip.value) === 1;
+
+      console.log('🎯 VIP状态检查 - isVip原始值:', isVip.value, '类型:', typeof isVip.value, '是否VIP:', currentIsVip);
+
+      if (currentIsVip) {
+        // VIP用户，直接播放（不判断到期时间）
+        console.log('✅ VIP用户，直接播放视频');
+        startVideoPlayback();
+        return;
+      } else {
+        console.log('❌ 非VIP用户，继续积分检查流程');
+      }
+
+      // 2. 非VIP用户，检查积分余额
+      const currentPoints = latestUserInfo?.user_points !== undefined
+        ? latestUserInfo.user_points
+        : userPoints.value;
+
+      // 检查积分余额
+      console.log('🔥 积分检查 - 当前积分:', currentPoints, '需要积分:', pointsNeeded.value);
+      if (currentPoints < pointsNeeded.value) {
+        console.log('🔥 积分不足，显示充值弹窗');
+        // 显示充值选项弹窗
+        await showChargeDialog();
+        return;
+      } else {
+        console.log('🔥 积分充足，继续播放流程');
+      }
+
+      // 积分足够，弹窗确认扣费
+      showDialog({
+        title: '付费确认',
+        message: `观看此视频需要扣除 1 观影次数，确认观看吗？`,
+        confirmButtonText: `扣除 1 观影次数观看`,
+        cancelButtonText: '取消',
+        showCancelButton: true,
+        confirmButtonColor: '#ff9500'
+      }).then(() => {
+        // 用户确认扣费，开始播放视频
+        console.log('用户确认扣费，开始播放视频');
+        deductPointsAndPlay();
+      }).catch(() => {
+        // 用户取消扣费
+      });
+    } else {
+      // 免费视频，直接播放
+      console.log('免费视频，直接播放');
+      startVideoPlayback();
+    }
+  } catch (error) {
+    console.error('❌ 播放权限检查失败:', error);
+    closeToast();
+    showToast({
+      message: '检查播放权限失败，请稍后重试',
+      icon: 'fail'
     });
-  } else {
-    // 免费视频，直接播放
-    console.log('免费视频，直接播放');
-    startVideoPlayback();
   }
 };
 
@@ -1896,20 +2065,75 @@ const handleCollect = async () => {
 
 // 获取用户信息
 const fetchUserInfo = async () => {
-  if (!isLoggedIn()) {
-    console.log('用户未登录');
-    return;
-  }
+  // 游客用户也可以获取用户信息
+  console.log('获取用户信息（包括游客用户）');
+
+  // 显示加载状态
+  showToast({
+    message: '加载中',
+    duration: 0,
+    forbidClick: true
+  });
 
   // 首先从本地获取用户信息
   const info = getUserInfo();
   if (info) {
     userInfo.value = info;
     console.log('视频详情页获取本地用户信息:', info);
+
+    // 初始化VIP相关数据
+    userVideoNums.value = info.video_nums || 0;
+    isVip.value = info.is_vip || 0;
+    vipEndtime.value = info.endtime || '';
   }
 
   // 获取实时用户信息
   await getUserRealTimeInfo();
+
+  // 关闭加载提示
+  closeToast();
+};
+
+// 获取最新的积分和VIP信息
+const fetchLatestPointsInfo = async () => {
+  try {
+    // 显示加载状态
+    showToast({
+      message: '加载中',
+      duration: 0,
+      forbidClick: true
+    });
+
+    const pointsResult = await fetchUserPoints();
+    if (pointsResult.code === 1 && pointsResult.data) {
+      // 更新用户积分信息
+      const userInfo = getUserInfo();
+      if (userInfo) {
+        // 更新本地存储的用户信息
+        userInfo.user_points = pointsResult.data.points;
+        userInfo.points = pointsResult.data.points;
+        userInfo.video_nums = pointsResult.data.video_nums;
+        userInfo.is_vip = pointsResult.data.is_vip;
+        if (pointsResult.data.endtime) {
+          userInfo.endtime = pointsResult.data.endtime;
+        }
+        setUserInfo(userInfo);
+
+        // 更新页面显示的数据
+        userVideoNums.value = pointsResult.data.video_nums;
+        isVip.value = pointsResult.data.is_vip || 0;
+        vipEndtime.value = pointsResult.data.endtime || '';
+
+        console.log('✅ 视频详情页积分信息获取成功:', pointsResult.data);
+      }
+    }
+  } catch (error) {
+    console.error('❌ 视频详情页获取积分信息失败:', error);
+    // 静默失败，不显示错误提示，避免影响页面正常加载
+  } finally {
+    // 关闭加载提示
+    closeToast();
+  }
 };
 
 // 跳转到登录页
@@ -1938,7 +2162,7 @@ onBeforeUnmount(() => {
   window.removeEventListener('scroll', handleScroll);
 });
 
-onMounted(() => {
+onMounted(async () => {
   // 尝试解析URL中的邀请码
   const urlInviteCode = parseUrlInviteCode();
   if (urlInviteCode) {
@@ -1958,9 +2182,13 @@ onMounted(() => {
   console.log('路由查询参数:', route.query);
   console.log('计算得到的邀请码:', inviteCode.value);
 
+  // 获取页面数据
   fetchVideoDetailData();
   fetchUserInfo();
   fetchListAds(); // 获取广告数据
+
+  // 获取最新的积分和VIP信息
+  fetchLatestPointsInfo();
 
   // 添加滚动事件监听
   window.addEventListener('scroll', handleScroll);
@@ -2274,10 +2502,9 @@ const handleAdClick = (ad: ListAd) => {
       <div class="video-main">
         <!-- 观看限制提示 -->
         <div class="watch-limit-box">
-          <div class="watch-text" v-if="isLoggedIn()">积分余额：{{ userPoints }}</div>
+          <div class="watch-text" v-if="isLoggedIn()">{{ vipStatusDisplay }}</div>
           <div class="watch-text" v-else>登录后查看积分</div>
-          <div class="watch-text">领取更多积分</div>
-          <div class="share-btn" @click="shareVideo" v-if="isLoggedIn()">分享获取</div>
+          <div class="share-btn" @click="shareVideo" v-if="isLoggedIn()">分享获取积分</div>
           <div class="share-btn" @click="goToLogin" v-else>登录</div>
         </div>
 

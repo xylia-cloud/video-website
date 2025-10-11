@@ -76,6 +76,11 @@
           </div>
         </div>
         <div class="popup-content">
+          <!-- 游客默认密码提示 -->
+          <div class="guest-pwd-tip" v-if="isGuest">
+            <van-icon name="info-o" size="14" color="#ff9500" />
+            <span>游客默认密码为：88888888</span>
+          </div>
           <div class="input-row">
             <input v-model="oldPwd" type="password" class="pwd-input" placeholder="请输入原密码" />
           </div>
@@ -175,6 +180,21 @@ const birthdayPopupVisible = ref(false);
 const tempYear = ref(new Date().getFullYear());
 const tempMonth = ref(new Date().getMonth() + 1);
 const tempDay = ref(new Date().getDate());
+
+// 计算属性：是否为游客
+const isGuest = computed(() => {
+  const guestFlag = localStorage.getItem('isGuest');
+  console.log('🔍 EditProfileView - isGuest 计算属性:', {
+    guestFlag: guestFlag,
+    isGuest: guestFlag === 'true'
+  });
+  return guestFlag === 'true';
+});
+
+// 计算属性：获取 localStorage 中的 isGuest 值（用于调试）
+const guestFlagDebug = computed(() => {
+  return localStorage.getItem('isGuest');
+});
 
 // 计算属性：年份选项
 const years = computed(() => {
@@ -548,8 +568,18 @@ const changePassword = async () => {
 };
 
 onMounted(() => {
-  // 检查登录状态
-  if (!isLoggedIn()) {
+  // 获取用户资料（支持游客和正式用户）
+  const userInfo = getUserInfo();
+  const isGuest = localStorage.getItem('isGuest') === 'true';
+
+  console.log('编辑资料页面加载:', {
+    hasUserInfo: !!userInfo,
+    isGuest: isGuest,
+    isLoggedIn: isLoggedIn()
+  });
+
+  // 如果既没有用户信息也没有登录，则跳转到登录页
+  if (!userInfo && !isLoggedIn()) {
     showToast({
       message: '请先登录',
       duration: 2000
@@ -558,34 +588,47 @@ onMounted(() => {
     return;
   }
 
-  // 获取用户资料
-  const userInfo = getUserInfo();
   if (userInfo) {
-    userId.value = userInfo.user_name;
-    nickname.value = userInfo.user_nick_name || userInfo.user_name || '';
+    // 游客用户和正式用户使用不同的字段
+    if (isGuest) {
+      // 游客用户
+      userId.value = userInfo.user_nicename || userInfo.id || '';
+      nickname.value = userInfo.user_nicename || '';
+      sex.value = userInfo.sex ? parseInt(userInfo.sex) : 0;
+      birthday.value = userInfo.birthday || '';
 
-    // 初始化新字段
-    sex.value = userInfo.sex ? parseInt(userInfo.sex) : 0;
-    birthday.value = userInfo.birthday || '';
-
-    // 处理头像URL
-    if (userInfo.user_portrait) {
-      const portrait = userInfo.user_portrait;
-      if (portrait.startsWith('http')) {
-        avatarUrl.value = portrait;
-      } else if (portrait.startsWith('/')) {
-        avatarUrl.value = `${BASE_URL}${portrait}`;
+      // 游客头像
+      if (userInfo.avatar) {
+        avatarUrl.value = userInfo.avatar;
       } else {
-        avatarUrl.value = `${BASE_URL}/${portrait}`;
+        avatarUrl.value = new URL('@/assets/img/img-avatar-default.png', import.meta.url).href;
       }
     } else {
-      avatarUrl.value = new URL('@/assets/img/img-avatar-default.png', import.meta.url).href;
+      // 正式用户
+      userId.value = userInfo.user_name;
+      nickname.value = userInfo.user_nick_name || userInfo.user_name || '';
+      sex.value = userInfo.sex ? parseInt(userInfo.sex) : 0;
+      birthday.value = userInfo.birthday || '';
+
+      // 处理头像URL
+      if (userInfo.user_portrait) {
+        const portrait = userInfo.user_portrait;
+        if (portrait.startsWith('http')) {
+          avatarUrl.value = portrait;
+        } else if (portrait.startsWith('/')) {
+          avatarUrl.value = `${BASE_URL}${portrait}`;
+        } else {
+          avatarUrl.value = `${BASE_URL}/${portrait}`;
+        }
+      } else {
+        avatarUrl.value = new URL('@/assets/img/img-avatar-default.png', import.meta.url).href;
+      }
     }
   } else {
     avatarUrl.value = new URL('@/assets/img/img-avatar-default.png', import.meta.url).href;
   }
 
-  console.log('页面加载完成');
+  console.log('页面加载完成，用户类型:', isGuest ? '游客' : '正式用户');
 });
 
 onActivated(() => {
@@ -752,6 +795,22 @@ onBeforeUnmount(() => {
   flex: 1;
   display: flex;
   flex-direction: column;
+}
+
+.guest-pwd-tip {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 10px 15px;
+  margin-bottom: 15px;
+  background-color: rgba(255, 149, 0, 0.1);
+  border-radius: 8px;
+  font-size: 13px;
+  color: #ff9500;
+}
+
+.guest-pwd-tip span {
+  flex: 1;
 }
 
 .confirm-button {

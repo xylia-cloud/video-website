@@ -6,6 +6,7 @@ import {
   VIDEO_CATEGORIES,
   NEW_API_BASE_URL,
 } from '@/utils/config'
+import { showTopLoading, hideTopLoading } from '@/utils/topLoading'
 
 // 定义参数接口
 interface VideoParams {
@@ -70,31 +71,72 @@ export interface TagItem {
 }
 
 /**
+ * API请求包装器，自动处理顶部loading效果
+ * @param apiFunction 要执行的API函数
+ * @param showLoading 是否显示loading效果，默认为true
+ */
+const withTopLoading = async <T>(
+  apiFunction: () => Promise<T>,
+  showLoading: boolean = true,
+): Promise<T> => {
+  if (showLoading) {
+    showTopLoading()
+  }
+
+  try {
+    const result = await apiFunction()
+    return result
+  } finally {
+    if (showLoading) {
+      hideTopLoading()
+    }
+  }
+}
+
+/**
  * 获取视频详情
  * @param vodId 视频ID
  */
 export const fetchVideoDetail = async (vodId: string | number) => {
-  if (!vodId) {
-    throw new Error('视频ID不能为空')
-  }
+  return withTopLoading(async () => {
+    if (!vodId) {
+      throw new Error('视频ID不能为空')
+    }
 
-  console.log(`正在获取视频详情，ID: ${vodId}`)
+    console.log(`正在获取视频详情，ID: ${vodId}`)
 
-  // 获取包含token和时间戳的请求头（视频详情不强制要求登录）
-  const headers = createAuthHeaders(false)
+    // 获取用户信息（游客用户也可以获取视频详情）
+    const userInfo = getUserInfo()
 
-  // 发起GET请求
-  const response = await fetch(`${BASE_URL}/index.php/ajax/details.html?vod_id=${vodId}`, {
-    method: 'GET',
-    headers,
+    // 构建请求URL，如果有用户信息则添加用户参数
+    let requestUrl = `${BASE_URL}/index.php/ajax/details.html?vod_id=${vodId}`
+
+    if (userInfo) {
+      // 兼容游客用户和正式用户的数据结构
+      const userId = userInfo.user_id || userInfo.id
+      const token = userInfo.token
+
+      if (userId && token) {
+        requestUrl += `&uid=${userId}&token=${token}`
+      }
+    }
+
+    // 获取包含时间戳的请求头
+    const headers = createAuthHeaders(false)
+
+    // 发起GET请求
+    const response = await fetch(requestUrl, {
+      method: 'GET',
+      headers,
+    })
+
+    if (!response.ok) {
+      const errorText = await response.text()
+      throw new Error(`HTTP error! Status: ${response.status}, Response: ${errorText}`)
+    }
+
+    return await response.json()
   })
-
-  if (!response.ok) {
-    const errorText = await response.text()
-    throw new Error(`HTTP error! Status: ${response.status}, Response: ${errorText}`)
-  }
-
-  return await response.json()
 }
 
 /**
@@ -530,6 +572,12 @@ const TOKEN_EXPIRE_DURATION = 12 * 60 * 60 * 1000 // 12小时
 export const setUserInfo = (userInfo: UserInfo) => {
   const expireTime = Date.now() + TOKEN_EXPIRE_DURATION
 
+  // 清理重复的用户信息键（如果存在）
+  if (localStorage.getItem('userInfo')) {
+    console.log('🧹 检测到重复的userInfo键，正在清理...')
+    localStorage.removeItem('userInfo')
+  }
+
   localStorage.setItem(USER_INFO_KEY, JSON.stringify(userInfo))
   localStorage.setItem(TOKEN_KEY, userInfo.token)
   localStorage.setItem(TOKEN_EXPIRE_KEY, expireTime.toString())
@@ -604,9 +652,15 @@ export const getTokenExpireTimeString = (): string => {
 
 // 清除用户登录信息和所有缓存
 export const clearUserInfo = () => {
+  console.log('🗑️ clearUserInfo 被调用，调用堆栈:', new Error().stack)
   localStorage.removeItem(USER_INFO_KEY)
   localStorage.removeItem(TOKEN_KEY)
   localStorage.removeItem(TOKEN_EXPIRE_KEY)
+  localStorage.removeItem('isGuest') // 清除游客标记
+  localStorage.removeItem('deviceIMEI') // 清除设备IMEI（可选，保留可以避免重复生成）
+
+  // 清理重复的用户信息键
+  localStorage.removeItem('userInfo') // 清除重复的userInfo键
 }
 
 // 清除所有本地缓存数据
@@ -833,6 +887,88 @@ export const userLogin = async (params: {
 }
 
 /**
+ * 游客登录接口
+ * @param imei 设备IMEI号
+ * @returns 游客登录结果
+ */
+export const touristLogin = async (imei: string) => {
+  return withTopLoading(async () => {
+    if (!imei) {
+      throw new Error('IMEI不能为空')
+    }
+
+    console.log('正在进行游客登录...')
+
+    // 构建表单数据
+    const formData = new URLSearchParams()
+    formData.append('service', 'Login.TouristLogin')
+    formData.append('IMEI', imei)
+
+    console.log('正在发送游客登录请求到:', NEW_API_BASE_URL, '数据:', formData.toString())
+
+    // 获取基础请求头，设置为表单格式
+    const headers = {
+      Accept: 'application/json, text/plain, */*',
+      'Content-Type': 'application/x-www-form-urlencoded',
+      'User-Agent':
+        'Mozilla/5.0 (iPhone; CPU iPhone OS 16_6 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.6 Mobile/15E148 Safari/604.1',
+    }
+
+    // 发起POST请求
+    const response = await fetch(NEW_API_BASE_URL, {
+      method: 'POST',
+      body: formData.toString(),
+      headers,
+    })
+
+    if (!response.ok) {
+      const errorText = await response.text()
+      throw new Error(`HTTP error! Status: ${response.status}, Response: ${errorText}`)
+    }
+
+    const responseText = await response.text()
+    console.log('游客登录API原始响应:', responseText)
+
+    let result
+    try {
+      result = JSON.parse(responseText)
+    } catch (e) {
+      console.error('游客登录API返回的JSON解析失败:', e)
+      throw new Error('游客登录API返回的数据格式不正确')
+    }
+
+    console.log('游客登录结果:', result)
+
+    // 处理游客登录结果
+    if (result.ret === 200 && result.data && result.data.info) {
+      const userInfo = result.data.info
+
+      // 保存游客用户信息到本地存储，包括过期时间
+      const expireTime = Date.now() + TOKEN_EXPIRE_DURATION
+      localStorage.setItem(USER_INFO_KEY, JSON.stringify(userInfo))
+      localStorage.setItem(TOKEN_KEY, userInfo.token)
+      localStorage.setItem(TOKEN_EXPIRE_KEY, expireTime.toString())
+      localStorage.setItem('isGuest', 'true') // 标记为游客用户
+
+      console.log('游客登录成功，已保存用户信息，过期时间:', new Date(expireTime).toLocaleString())
+
+      return {
+        code: 1,
+        data: userInfo,
+        msg: '游客登录成功',
+      }
+    } else {
+      // 游客登录失败
+      return {
+        code: 0,
+        data: null,
+        msg: result?.msg || '游客登录失败',
+      }
+    }
+  })
+}
+
+/**
  * 用户退出登录
  */
 export const userLogout = async () => {
@@ -841,8 +977,16 @@ export const userLogout = async () => {
 
     // 获取当前用户信息
     const userInfo = getUserInfo()
-    if (!userInfo || !userInfo.user_id || !userInfo.token) {
+    if (!userInfo || !userInfo.token) {
       console.log('没有用户信息，直接清除缓存')
+      clearAllCache()
+      return true
+    }
+
+    // 兼容游客用户和正式用户的数据结构
+    const uid = userInfo.user_id || userInfo.id
+    if (!uid) {
+      console.log('用户ID不存在，直接清除缓存')
       clearAllCache()
       return true
     }
@@ -850,7 +994,7 @@ export const userLogout = async () => {
     // 构建表单数据
     const formData = new URLSearchParams()
     formData.append('service', 'login.logout')
-    formData.append('uid', String(userInfo.user_id))
+    formData.append('uid', String(uid))
     formData.append('token', userInfo.token)
 
     console.log('正在发送退出登录表单请求到:', NEW_API_BASE_URL, '数据:', formData.toString())
@@ -966,14 +1110,20 @@ export const updateUserPortrait = async (params: { file?: File; imgdata?: string
 
   // 获取用户信息
   const userInfo = getUserInfo()
-  if (!userInfo || !userInfo.user_id || !userInfo.token) {
+  if (!userInfo || !userInfo.token) {
     throw new Error('用户信息不完整，请重新登录')
+  }
+
+  // 兼容游客用户和正式用户的数据结构
+  const uid = userInfo.user_id || userInfo.id
+  if (!uid) {
+    throw new Error('用户ID不存在，请重新登录')
   }
 
   // 创建查询参数对象 - 基础参数放在URL中
   const queryParams = new URLSearchParams()
   queryParams.append('service', 'user.updateAvatar')
-  queryParams.append('uid', userInfo.user_id.toString())
+  queryParams.append('uid', uid.toString())
   queryParams.append('token', userInfo.token)
 
   // 创建 FormData 对象用于文件上传
@@ -1071,8 +1221,14 @@ export const updateUserInfo = async (params: {
 
   // 获取用户信息
   const userInfo = getUserInfo()
-  if (!userInfo || !userInfo.user_id || !userInfo.token) {
+  if (!userInfo || !userInfo.token) {
     throw new Error('用户信息不完整，请重新登录')
+  }
+
+  // 兼容游客用户和正式用户的数据结构
+  const uid = userInfo.user_id || userInfo.id
+  if (!uid) {
+    throw new Error('用户ID不存在，请重新登录')
   }
 
   console.log('正在更新用户信息...')
@@ -1084,7 +1240,7 @@ export const updateUserInfo = async (params: {
     // 修改密码接口
     const queryParams = new URLSearchParams()
     queryParams.append('service', 'user.updatePass')
-    queryParams.append('uid', userInfo.user_id.toString())
+    queryParams.append('uid', uid.toString())
     queryParams.append('token', userInfo.token)
     queryParams.append('oldpass', params.user_pwd!)
     queryParams.append('pass', params.user_pwd1!)
@@ -1135,7 +1291,7 @@ export const updateUserInfo = async (params: {
     // 修改个人信息接口
     const queryParams = new URLSearchParams()
     queryParams.append('service', 'user.updateFields')
-    queryParams.append('uid', userInfo.user_id.toString())
+    queryParams.append('uid', uid.toString())
     queryParams.append('token', userInfo.token)
 
     // 构建fields JSON字符串，包含所有字段
@@ -1418,12 +1574,17 @@ export const createChargeOrder = async (params: {
   try {
     // 获取用户信息
     const userInfo = getUserInfo()
-    if (!userInfo || !userInfo.user_id || !userInfo.token) {
+    if (!userInfo || !userInfo.token) {
       throw new Error('用户未登录，请先登录')
     }
 
-    const uid = userInfo.user_id
+    // 兼容游客用户和正式用户的数据结构
+    const uid = userInfo.user_id || userInfo.id
     const token = userInfo.token
+
+    if (!uid) {
+      throw new Error('用户ID不存在，请重新登录')
+    }
 
     console.log('创建充值订单参数:', { uid, token, ...params })
 
@@ -1514,13 +1675,14 @@ export const fetchPointsDetails = async (params: {
 export const fetchUserDatas = async (params: { vod_id?: number | string } = {}) => {
   console.log('获取用户观看数据')
 
-  // 检查是否需要登录
-  if (!checkLoginRequired()) {
-    throw new Error('请先登录再查看观看数据')
+  // 获取用户信息（游客用户也可以查看观看数据）
+  const userInfo = getUserInfo()
+  if (!userInfo) {
+    throw new Error('用户信息不存在')
   }
 
-  // 获取包含时间戳的请求头（强制要求认证）
-  const headers = createAuthHeaders(true)
+  // 获取包含时间戳的请求头（不强制要求认证）
+  const headers = createAuthHeaders(false)
 
   try {
     if (params.vod_id) {
@@ -1628,9 +1790,15 @@ export const fetchUserProfit = async () => {
     throw new Error('用户信息不存在')
   }
 
+  // 兼容游客用户和正式用户的数据结构
+  const uid = userInfo.user_id || userInfo.id
+  if (!uid) {
+    throw new Error('用户ID不存在')
+  }
+
   const queryParams = new URLSearchParams({
     service: 'user.getProfit',
-    uid: String(userInfo.user_id),
+    uid: String(uid),
     token: userInfo.token,
   })
 
@@ -1681,9 +1849,15 @@ export const fetchUserAccountList = async () => {
     throw new Error('用户信息不存在')
   }
 
+  // 兼容游客用户和正式用户的数据结构
+  const uid = userInfo.user_id || userInfo.id
+  if (!uid) {
+    throw new Error('用户ID不存在')
+  }
+
   const queryParams = new URLSearchParams({
     service: 'user.getUserAccountList',
-    uid: String(userInfo.user_id),
+    uid: String(uid),
     token: userInfo.token,
   })
 
@@ -1739,9 +1913,15 @@ export const addUserAccount = async (params: {
     throw new Error('用户信息不存在')
   }
 
+  // 兼容游客用户和正式用户的数据结构
+  const uid = userInfo.user_id || userInfo.id
+  if (!uid) {
+    throw new Error('用户ID不存在')
+  }
+
   const queryParams = new URLSearchParams({
     service: 'user.setUserAccount',
-    uid: String(userInfo.user_id),
+    uid: String(uid),
     token: userInfo.token,
     type: String(params.type),
     account_bank: params.account_bank,
@@ -1796,9 +1976,15 @@ export const deleteUserAccount = async (accountId: number) => {
     throw new Error('用户信息不存在')
   }
 
+  // 兼容游客用户和正式用户的数据结构
+  const uid = userInfo.user_id || userInfo.id
+  if (!uid) {
+    throw new Error('用户ID不存在')
+  }
+
   const queryParams = new URLSearchParams({
     service: 'user.delUserAccount',
-    uid: String(userInfo.user_id),
+    uid: String(uid),
     token: userInfo.token,
     id: String(accountId),
   })
@@ -1850,9 +2036,15 @@ export const submitWithdraw = async (params: { accountid: number; cashvote: numb
     throw new Error('用户信息不存在')
   }
 
+  // 兼容游客用户和正式用户的数据结构
+  const uid = userInfo.user_id || userInfo.id
+  if (!uid) {
+    throw new Error('用户ID不存在')
+  }
+
   const queryParams = new URLSearchParams({
     service: 'user.setCash',
-    uid: String(userInfo.user_id),
+    uid: String(uid),
     token: userInfo.token,
     accountid: String(params.accountid),
     cashvote: String(params.cashvote),
@@ -1931,14 +2123,22 @@ export const fetchGameRecord = async (params: { p?: number } = {}) => {
     throw new Error('用户信息不存在')
   }
 
+  // 兼容游客用户和正式用户的数据结构
+  const userId = userInfo.user_id || userInfo.id
+  const token = userInfo.token
+
+  if (!userId || !token) {
+    throw new Error('用户信息不完整')
+  }
+
   console.log('正在获取游戏记录...')
 
   // 构建请求参数
   const queryParams = new URLSearchParams({
     service: 'Gameapi.Getrecord',
     lang: 'zh_cn',
-    uid: String(userInfo.user_id),
-    token: userInfo.token,
+    uid: String(userId),
+    token: token,
     p: String(params.p || 1),
   })
 
@@ -2099,6 +2299,12 @@ export const fetchAccountDetails = async () => {
     throw new Error('用户信息不存在')
   }
 
+  // 兼容游客用户和正式用户的数据结构
+  const uid = userInfo.user_id || userInfo.id
+  if (!uid) {
+    throw new Error('用户ID不存在')
+  }
+
   console.log('正在获取账目明细...')
 
   // 构建请求参数
@@ -2107,7 +2313,7 @@ export const fetchAccountDetails = async () => {
   })
 
   const formData = new URLSearchParams({
-    uid: String(userInfo.user_id),
+    uid: String(uid),
     token: userInfo.token,
   })
 
@@ -2227,4 +2433,270 @@ export const fetchFollowsList = async (params: {
     console.error('获取关注列表失败:', error)
     throw error
   }
+}
+
+/**
+ * 获取用户积分信息
+ * @returns 用户积分信息
+ */
+export const fetchUserPoints = async () => {
+  return withTopLoading(async () => {
+    // 获取用户信息
+    const userInfo = getUserInfo()
+    if (!userInfo) {
+      throw new Error('用户信息不存在')
+    }
+
+    // 兼容游客用户和正式用户的数据结构
+    const userId = userInfo.user_id || userInfo.id
+    const token = userInfo.token
+
+    if (!userId || !token) {
+      throw new Error('用户信息不完整')
+    }
+
+    console.log('正在获取用户积分信息...')
+
+    // 🔧 完全模仿Gameapi.Getrecord的成功模式：POST请求，所有参数在URL中，body为空
+    const queryParams = new URLSearchParams()
+    queryParams.append('service', 'User.GetPoints')
+    queryParams.append('uid', String(userId))
+    queryParams.append('token', token)
+    queryParams.append('lang', 'zh_cn')
+
+    // 构建完整URL，模仿: /proxy.php?target=user/?service=User.GetPoints&uid=xxx&token=xxx&lang=zh_cn
+    const separator = NEW_API_BASE_URL.includes('?') ? '&' : '?'
+    const requestUrl = `${NEW_API_BASE_URL}${separator}${queryParams.toString()}`
+
+    const headers = {
+      Accept: 'application/json, text/plain, */*',
+      'User-Agent':
+        'Mozilla/5.0 (iPhone; CPU iPhone OS 16_6 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.6 Mobile/15E148 Safari/604.1',
+    }
+
+    console.log('📝 获取积分请求 (模仿Gameapi.Getrecord):', {
+      url: requestUrl,
+      method: 'POST',
+      contentLength: 0,
+    })
+
+    try {
+      const response = await fetch(requestUrl, {
+        method: 'POST',
+        headers,
+        // 不设置body，保持Content-Length: 0，完全模仿Gameapi.Getrecord
+      })
+
+      if (!response.ok) {
+        const errorText = await response.text()
+        throw new Error(`HTTP error! Status: ${response.status}, Response: ${errorText}`)
+      }
+
+      const result = await response.json()
+      console.log('获取积分信息返回:', result)
+
+      if (result && result.ret === 200 && result.data) {
+        if (result.data.code === 0) {
+          return {
+            code: 1,
+            data: {
+              points: result.data.info.points,
+              video_nums: result.data.info.video_nums,
+              is_vip: result.data.info.is_vip,
+              endtime: result.data.info.endtime,
+            },
+            msg: result.data.msg || '获取成功',
+          }
+        } else {
+          return {
+            code: 0,
+            data: null,
+            msg: result.data.msg || '获取失败',
+          }
+        }
+      } else {
+        return {
+          code: 0,
+          data: null,
+          msg: result?.msg || '获取失败',
+        }
+      }
+    } catch (error) {
+      console.error('获取积分信息失败:', error)
+      throw error
+    }
+  })
+}
+
+/**
+ * 获取视频充值记录
+ * @param params page: 页码 (可选，默认1), limit: 每页数量 (可选，默认10)
+ */
+export const fetchVideoChargeLog = async (params: { page?: number; limit?: number } = {}) => {
+  return withTopLoading(async () => {
+    // 获取用户信息
+    const userInfo = getUserInfo()
+    if (!userInfo) {
+      throw new Error('用户信息不存在')
+    }
+
+    // 兼容游客用户和正式用户的数据结构
+    const userId = userInfo.user_id || userInfo.id
+    const token = userInfo.token
+
+    if (!userId || !token) {
+      throw new Error('用户信息不完整')
+    }
+
+    console.log('正在获取视频充值记录...')
+
+    // 构建请求参数
+    const queryParams = new URLSearchParams({
+      service: 'User.ChargeLog',
+    })
+
+    const formData = new URLSearchParams({
+      uid: String(userId),
+      token: token,
+      page: String(params.page || 1),
+      limit: String(params.limit || 10),
+    })
+
+    const headers = {
+      'Content-Type': 'application/x-www-form-urlencoded',
+      Accept: 'application/json, text/plain, */*',
+      'User-Agent':
+        'Mozilla/5.0 (iPhone; CPU iPhone OS 16_6 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.6 Mobile/15E148 Safari/604.1',
+    }
+
+    try {
+      const response = await fetch(`${NEW_API_BASE_URL}/?${queryParams.toString()}`, {
+        method: 'POST',
+        headers,
+        body: formData.toString(),
+      })
+
+      if (!response.ok) {
+        const errorText = await response.text()
+        throw new Error(`HTTP error! Status: ${response.status}, Response: ${errorText}`)
+      }
+
+      const result = await response.json()
+      console.log('获取视频充值记录返回:', result)
+
+      if (result && result.ret === 200 && result.data) {
+        if (result.data.code === 0) {
+          return {
+            code: 1,
+            data: result.data.info,
+            msg: result.data.msg || '获取成功',
+          }
+        } else {
+          return {
+            code: 0,
+            data: null,
+            msg: result.data.msg || '获取失败',
+          }
+        }
+      } else {
+        return {
+          code: 0,
+          data: null,
+          msg: result?.msg || '获取失败',
+        }
+      }
+    } catch (error) {
+      console.error('获取视频充值记录失败:', error)
+      throw error
+    }
+  })
+}
+
+/**
+ * 获取游戏充值记录
+ * @param params page: 页码 (可选，默认1), limit: 每页数量 (可选，默认10)
+ */
+export const fetchGameChargeLog = async (params: { page?: number; limit?: number } = {}) => {
+  return withTopLoading(async () => {
+    // 获取用户信息
+    const userInfo = getUserInfo()
+    if (!userInfo) {
+      throw new Error('用户信息不存在')
+    }
+
+    // 兼容游客用户和正式用户的数据结构
+    const userId = userInfo.user_id || userInfo.id
+    const token = userInfo.token
+
+    if (!userId || !token) {
+      throw new Error('用户信息不完整')
+    }
+
+    console.log('正在获取游戏充值记录...')
+
+    // 构建请求参数 - 使用正确的游戏充值记录接口
+    const formData = new URLSearchParams({
+      service: 'Charge.GetChargeList',
+      lang: 'zh_cn',
+      uid: String(userId),
+      token: token,
+      page: String(params.page || 1),
+      pagesize: String(params.limit || 10),
+    })
+
+    const headers = {
+      'Content-Type': 'application/x-www-form-urlencoded',
+      Accept: 'application/json, text/plain, */*',
+      'User-Agent':
+        'Mozilla/5.0 (iPhone; CPU iPhone OS 16_6 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.6 Mobile/15E148 Safari/604.1',
+    }
+
+    try {
+      const response = await fetch(NEW_API_BASE_URL, {
+        method: 'POST',
+        headers,
+        body: formData.toString(),
+      })
+
+      if (!response.ok) {
+        const errorText = await response.text()
+        throw new Error(`HTTP error! Status: ${response.status}, Response: ${errorText}`)
+      }
+
+      const result = await response.json()
+      console.log('获取游戏充值记录返回:', result)
+
+      if (result && result.ret === 200 && result.data) {
+        if (result.data.code === 0 && result.data.info) {
+          // 游戏充值记录的数据结构：data.info.data 是数组，data.info.total 是总数
+          return {
+            code: 1,
+            data: {
+              list: result.data.info.data || [],
+              total: parseInt(result.data.info.total || '0'),
+              page: params.page || 1,
+              // 计算总页数
+              pagecount: Math.ceil(parseInt(result.data.info.total || '0') / (params.limit || 10)),
+            },
+            msg: result.data.msg || '获取成功',
+          }
+        } else {
+          return {
+            code: 0,
+            data: null,
+            msg: result.data.msg || '获取失败',
+          }
+        }
+      } else {
+        return {
+          code: 0,
+          data: null,
+          msg: result?.msg || '获取失败',
+        }
+      }
+    } catch (error) {
+      console.error('获取游戏充值记录失败:', error)
+      throw error
+    }
+  })
 }

@@ -2,11 +2,12 @@
 import { RouterView } from 'vue-router'
 import { onMounted } from 'vue'
 import { isLoggedIn, isTokenExpired, forceLogin } from '@/api/fetch-api'
+import TopLoading from '@/components/TopLoading.vue'
 
 // 应用启动时检查TOKEN状态（仅记录，不强制登录）
 onMounted(() => {
   console.log('应用启动，检查TOKEN状态...')
-  
+
   // 延迟检查，仅用于日志记录，不强制用户登录
   setTimeout(() => {
     if (isTokenExpired()) {
@@ -22,7 +23,8 @@ onMounted(() => {
 
 <template>
   <div class="app-container">
-  <RouterView />
+    <TopLoading />
+    <RouterView />
   </div>
 </template>
 
@@ -33,7 +35,8 @@ onMounted(() => {
   padding: 0;
 }
 
-html, body {
+html,
+body {
   font-family: 'PingFang SC', 'Helvetica Neue', Helvetica, 'Hiragino Sans GB', 'Microsoft YaHei', '微软雅黑', Arial, sans-serif;
   background-color: #222;
   color: #333;

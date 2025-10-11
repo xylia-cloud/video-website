@@ -4,7 +4,7 @@ import { ref, onMounted, computed } from 'vue';
 import html2canvas from 'html2canvas';
 import { showToast } from 'vant';
 import { useRouter } from 'vue-router';
-import { userLogout, getUserInfo, isLoggedIn, fetchAds, fetchNotices, type NoticeGroup } from '@/api/fetch-api';
+import { userLogout, getUserInfo, isLoggedIn, fetchAds, fetchNotices, fetchUserPoints, setUserInfo, type NoticeGroup } from '@/api/fetch-api';
 import { BASE_URL } from '@/utils/config';
 import { generateCustomerServiceUrl } from '@/utils/rsa';
 
@@ -15,8 +15,16 @@ const showCredential = ref(false);
 const userId = ref('');
 const isLoggingOut = ref(false);
 
+// 控制游客提示弹窗
+const showGuestTip = ref(false);
+
 // 用户信息
 const userInfo = ref<any>(null);
+
+// 积分和VIP相关数据
+const userVideoNums = ref(0); // 观影次数
+const isVip = ref('0'); // VIP状态
+const vipEndtime = ref(''); // VIP到期时间
 
 // 广告数据
 const profileAds = ref<any[]>([]);
@@ -31,11 +39,17 @@ const noticeText = ref('');
 
 // 处理头像URL
 const avatarUrl = computed(() => {
-  if (!userInfo.value || !userInfo.value.user_portrait) {
+  if (!userInfo.value) {
     return new URL('@/assets/img/img-avatar-default.png', import.meta.url).href;
   }
 
-  const portrait = userInfo.value.user_portrait;
+  // 游客用户使用avatar字段，正式用户使用user_portrait字段
+  const portrait = userInfo.value.avatar || userInfo.value.user_portrait;
+
+  if (!portrait) {
+    return new URL('@/assets/img/img-avatar-default.png', import.meta.url).href;
+  }
+
   if (portrait.startsWith('http')) {
     return portrait;
   } else if (portrait.startsWith('/')) {
@@ -62,13 +76,19 @@ const processAdImageUrl = (imgPath: string): string => {
 const displayName = computed(() => {
   if (!userInfo.value) return '';
 
-  // 优先显示昵称，没有则显示用户名
-  return userInfo.value.user_nick_name || userInfo.value.user_name || '';
+  // 游客用户使用user_nicename，正式用户使用user_nick_name或user_name
+  return userInfo.value.user_nicename || userInfo.value.user_nick_name || userInfo.value.user_name || '';
 });
 
 // 用户账号显示
 const userAccount = computed(() => {
   if (!userInfo.value) return '';
+
+  // 游客用户显示ID，正式用户显示用户名
+  if (userInfo.value.isyouke === '1') {
+    return `游客ID: ${userInfo.value.id}`;
+  }
+
   return userInfo.value.user_name || '';
 });
 
@@ -78,11 +98,77 @@ const groupName = computed(() => {
   return userInfo.value.group_name || '普通会员';
 });
 
-// 用户积分
+// 用户积分（观影次数）
 const userPoints = computed(() => {
-  if (!userInfo.value) return 0;
-  return userInfo.value.user_points || 0;
+  return userVideoNums.value || 0;
 });
+
+// 观影次数
+const watchCount = computed(() => {
+  if (!userInfo.value) return 0;
+  return userInfo.value.watch_count || 0;
+});
+
+// VIP到期时间
+const vipExpireTime = computed(() => {
+  if (isVip.value === '1') {
+    if (vipEndtime.value) {
+      // 格式化时间戳为可读日期
+      const endDate = new Date(parseInt(vipEndtime.value) * 1000);
+      const now = new Date();
+
+      if (endDate > now) {
+        // VIP未过期
+        const year = endDate.getFullYear();
+        const month = String(endDate.getMonth() + 1).padStart(2, '0');
+        const day = String(endDate.getDate()).padStart(2, '0');
+        return `${year}-${month}-${day}`;
+      } else {
+        // VIP已过期
+        return '已过期';
+      }
+    } else {
+      return '已开通';
+    }
+  } else {
+    return '未开通';
+  }
+});
+
+// 获取积分和VIP信息
+const fetchPointsAndVipInfo = async () => {
+  try {
+    const pointsResult = await fetchUserPoints();
+    if (pointsResult.code === 1 && pointsResult.data) {
+      // 更新用户积分信息
+      const localUserInfo = getUserInfo();
+      if (localUserInfo) {
+        // 更新本地存储的用户信息
+        localUserInfo.user_points = pointsResult.data.points;
+        localUserInfo.points = pointsResult.data.points;
+        localUserInfo.video_nums = pointsResult.data.video_nums;
+        localUserInfo.is_vip = pointsResult.data.is_vip;
+        if (pointsResult.data.endtime) {
+          localUserInfo.endtime = pointsResult.data.endtime;
+        }
+
+        // 保存到本地存储
+        setUserInfo(localUserInfo);
+
+        // 更新页面显示的数据
+        userInfo.value = localUserInfo;
+        userVideoNums.value = pointsResult.data.video_nums;
+        isVip.value = pointsResult.data.is_vip || '0';
+        vipEndtime.value = pointsResult.data.endtime || '';
+
+        console.log('✅ 个人中心积分信息获取成功:', pointsResult.data);
+      }
+    }
+  } catch (error) {
+    console.error('❌ 个人中心获取积分信息失败:', error);
+    // 静默失败，不显示错误提示
+  }
+};
 
 // 获取广告数据
 const fetchProfileAd = async () => {
@@ -180,28 +266,66 @@ const handleAdImageError = (event: Event, ad: any) => {
 };
 
 // 自动显示账户凭证（2秒后）
-onMounted(() => {
-  // 检查登录状态
-  if (!isLoggedIn()) {
+onMounted(async () => {
+  console.log('=== ProfileView onMounted 开始 ===');
+
+  // 优先从本地获取用户信息（无论是游客还是正式用户）
+  const localUserInfo = getUserInfo();
+
+  // 根据用户数据判断是否为游客（而不是依赖本地存储标记）
+  const isGuest = localUserInfo && localUserInfo.isyouke === '1';
+
+  console.log('📦 本地用户信息检查:', {
+    hasLocalUserInfo: !!localUserInfo,
+    isGuest: isGuest,
+    isyouke: localUserInfo?.isyouke,
+    userInfo: localUserInfo
+  });
+
+  if (localUserInfo) {
+    // 本地有用户信息，直接使用（游客或正式用户）
+    console.log('✅ 使用本地缓存的用户信息 - 类型:', isGuest ? '游客' : '正式用户');
+    userInfo.value = localUserInfo;
+    userId.value = isGuest
+      ? (localUserInfo.user_nicename || localUserInfo.id)
+      : localUserInfo.user_name;
+
+    // 初始化积分和VIP数据
+    userVideoNums.value = localUserInfo.video_nums || 0;
+    isVip.value = localUserInfo.is_vip || '0';
+    vipEndtime.value = localUserInfo.endtime || '';
+
+    // 只有真正的游客用户才显示提示弹窗
+    if (isGuest) {
+      console.log('🎯 检测到游客用户 (isyouke=1)，准备显示提示弹窗');
+      setTimeout(() => {
+        showGuestTip.value = true;
+        console.log('🎬 弹窗已显示');
+      }, 500); // 延迟500ms显示，让页面先加载
+    } else {
+      console.log('✅ 检测到正式用户 (isyouke!=1)，不显示游客弹窗');
+    }
+  } else {
+    // 本地没有用户信息，跳转到登录页
+    console.log('❌ 本地没有用户信息，跳转到登录页');
     showToast({
       message: '请先登录',
       duration: 2000
     });
     router.push('/login');
-  } else {
-    const info = getUserInfo();
-    if (info) {
-      userInfo.value = info;
-      userId.value = info.user_name;
-      console.log('当前用户信息:', info);
-    }
+    return;
   }
+
+  console.log('=== ProfileView onMounted 结束 ===');
 
   // 获取广告数据
   fetchProfileAd();
 
   // 获取公告数据
   fetchNoticeData();
+
+  // 获取最新的积分和VIP信息
+  fetchPointsAndVipInfo();
 });
 
 // 退出登录
@@ -271,6 +395,17 @@ const saveCredential = async () => {
 // 关闭凭证弹窗
 const closeCredential = () => {
   showCredential.value = false;
+};
+
+// 关闭游客提示弹窗
+const closeGuestTip = () => {
+  showGuestTip.value = false;
+};
+
+// 跳转到完善信息页面
+const goToCompleteProfile = () => {
+  showGuestTip.value = false;
+  router.push('/edit-profile');
 };
 
 // 跳转到编辑资料页面
@@ -348,11 +483,43 @@ const goToGameRecord = () => {
 // };
 
 // 跳转到人工客服
+// 跳转到我的代理页面
+const goToMyAgent = () => {
+  showToast('我的代理功能开发中...');
+  // router.push('/my-agent');
+};
+
+// 跳转到我的收藏页面
+const goToMyCollection = () => {
+  router.push('/collection');
+};
+
+// 跳转到已购影片页面
+const goToPurchasedVideos = () => {
+  showToast('已购影片功能开发中...');
+  // router.push('/purchased-videos');
+};
+
+// 跳转到推广记录页面
+const goToPromotionRecord = () => {
+  showToast('推广记录功能开发中...');
+  // router.push('/promotion-record');
+};
+
+// 跳转到账户凭证页面
+const goToAccountCredential = () => {
+  showCredential.value = true;
+};
+
 const goToCustomerService = () => {
   try {
     // 获取当前用户信息
     const currentUserInfo = getUserInfo();
-    if (!currentUserInfo || !currentUserInfo.user_id) {
+
+    // 兼容游客用户和正式用户的数据结构
+    const userId = currentUserInfo?.user_id || currentUserInfo?.id;
+
+    if (!currentUserInfo || !userId) {
       showToast({
         message: '请先登录后再使用客服功能',
         duration: 2000
@@ -366,7 +533,7 @@ const goToCustomerService = () => {
     });
 
     // 生成加密的客服链接
-    const customerServiceUrl = generateCustomerServiceUrl(currentUserInfo.user_id);
+    const customerServiceUrl = generateCustomerServiceUrl(userId);
 
     // 在新窗口中打开客服链接
     window.open(customerServiceUrl, '_blank');
@@ -398,6 +565,7 @@ const goToCustomerService = () => {
         </div>
       </div>
       <div class="user-arrow">
+        <div>我的信息</div>
         <van-icon name="arrow" size="20" color="#ccc" />
       </div>
     </div>
@@ -410,9 +578,12 @@ const goToCustomerService = () => {
     <!-- u8d26u6237u4fe1u606f -->
     <div class="account-info">
       <div class="info-item">
-        <img src="@/assets/img/icon-zhje.svg" alt="">
-        <span>积分余额</span>
-        <span class="info-value">{{ userPoints }}</span>
+        <span>观影次数</span>
+        <span class="info-value">{{ userPoints || '0' }}</span>
+      </div>
+      <div class="info-item">
+        <span>VIP到期时间</span>
+        <span class="info-value">{{ vipExpireTime || '未开通' }}</span>
       </div>
     </div>
 
@@ -421,7 +592,8 @@ const goToCustomerService = () => {
     <!-- u5e38u7528u529fu80fdu533au57df -->
     <div class="common-section">
       <div class="common-grid">
-        <div class="common-item" @click="goToFollowList">
+        <!-- 隐藏的功能项 -->
+        <!-- <div class="common-item" @click="goToFollowList">
           <div class="common-icon">
             <img src="@/assets/img/icon-guanzhu.svg" alt="" />
           </div>
@@ -438,31 +610,37 @@ const goToCustomerService = () => {
             <img src="@/assets/img/icon-wdzj.svg" alt="" />
           </div>
           <div class="common-name">看片足迹</div>
-        </div>
-        <div class="common-item" @click="goToShareFriends">
+        </div> -->
+
+        <div class="common-item" @click="goToVipRecharge">
           <div class="common-icon">
-            <img src="@/assets/img/icon-tuiguang.svg" alt="" />
+            <img src="@/assets/img/icon-chongzhi2.svg" alt="" />
           </div>
-          <div class="common-name">推广</div>
+          <div class="common-name">充值</div>
         </div>
-        <div class="common-item" @click="goToWallet">
-          <div class="common-icon">
-            <img src="@/assets/img/icon-zscz.svg" alt="" />
-          </div>
-          <div class="common-name">钱包</div>
-        </div>
+
         <div class="common-item" @click="goToWithdraw">
           <div class="common-icon">
             <img src="@/assets/img/icon-tixian2.svg" alt="" />
           </div>
           <div class="common-name">提现</div>
         </div>
-        <div class="common-item" @click="goToVipRecharge">
+
+        <div class="common-item" @click="goToShareFriends">
           <div class="common-icon">
-            <img src="@/assets/img/icon-chongzhi2.svg" alt="" />
+            <img src="@/assets/img/icon-tuiguang.svg" alt="" />
           </div>
-          <div class="common-name">充值工具</div>
+          <div class="common-name">推广</div>
         </div>
+
+        <!-- <div class="common-item" @click="goToWallet">
+          <div class="common-icon">
+            <img src="@/assets/img/icon-zscz.svg" alt="" />
+          </div>
+          <div class="common-name">钱包</div>
+        </div> -->
+
+
 
         <div class="common-item" @click="goToCustomerService">
           <div class="common-icon">
@@ -488,11 +666,22 @@ const goToCustomerService = () => {
 
     <!-- 记录列表 -->
     <div class="record-list-section">
-      <div class="record-item" @click="goToAccountDetails">
+
+      <div class="record-item" @click="goToPurchasedVideos">
         <div class="record-icon">
-          <img src="@/assets/img/icon-zmmx.svg" alt="账目明细" />
+          <img src="@/assets/img/icon-ygyp.svg" alt="已购影片" />
         </div>
-        <div class="record-name">账目明细</div>
+        <div class="record-name">已购影片</div>
+        <div class="record-arrow">
+          <van-icon name="arrow" size="16" color="#ccc" />
+        </div>
+      </div>
+
+      <div class="record-item" @click="goToMyCollection">
+        <div class="record-icon">
+          <img src="@/assets/img/icon-wdsc.svg" alt="我的收藏" />
+        </div>
+        <div class="record-name">我的收藏</div>
         <div class="record-arrow">
           <van-icon name="arrow" size="16" color="#ccc" />
         </div>
@@ -512,7 +701,38 @@ const goToCustomerService = () => {
         <div class="record-icon">
           <img src="@/assets/img/icon-tzjl.svg" alt="投注记录" />
         </div>
-        <div class="record-name">投注记录</div>
+        <div class="record-name">游戏记录</div>
+        <div class="record-arrow">
+          <van-icon name="arrow" size="16" color="#ccc" />
+        </div>
+      </div>
+
+      <div class="record-item" @click="goToMyAgent">
+        <div class="record-icon">
+          <img src="@/assets/img/icon-wddl.svg" alt="我的代理" />
+        </div>
+        <div class="record-name">我的代理</div>
+        <div class="record-arrow">
+          <van-icon name="arrow" size="16" color="#ccc" />
+        </div>
+      </div>
+
+      <div class="record-item" @click="goToPromotionRecord">
+        <div class="record-icon">
+          <img src="@/assets/img/icon-tgjl.svg" alt="推广记录" />
+        </div>
+        <div class="record-name">推广记录</div>
+        <div class="record-arrow">
+          <van-icon name="arrow" size="16" color="#ccc" />
+        </div>
+      </div>
+
+
+      <div class="record-item" @click="goToAccountCredential">
+        <div class="record-icon">
+          <img src="@/assets/img/icon-zhpz2.svg" alt="账户凭证" />
+        </div>
+        <div class="record-name">账户凭证</div>
         <div class="record-arrow">
           <van-icon name="arrow" size="16" color="#ccc" />
         </div>
@@ -553,6 +773,45 @@ const goToCustomerService = () => {
       </router-link>
     </div>
 
+    <!-- 游客提示弹窗 -->
+    <div class="guest-tip-overlay" v-if="showGuestTip" @click.self="closeGuestTip">
+      <div class="guest-tip-container">
+        <div class="guest-tip-header">
+          <h2>完善个人信息</h2>
+          <div class="guest-tip-close" @click="closeGuestTip">
+            <van-icon name="cross" size="20" color="#999" />
+          </div>
+        </div>
+        <div class="guest-tip-content">
+          <div class="guest-tip-icon">
+            <van-icon name="user-o" size="60" color="#ff9500" />
+          </div>
+          <div class="guest-tip-title">您当前是游客身份</div>
+          <div class="guest-tip-desc">
+            完善个人信息后，可以享受更多功能和服务
+          </div>
+          <!-- 游客默认密码提示 -->
+          <div class="guest-pwd-tip-box">
+            <van-icon name="info-o" size="14" color="#ff9500" />
+            <span>游客默认密码：88888888 请尽快修改</span>
+          </div>
+          <ul class="guest-tip-features">
+            <li>✓ 保存观看记录和收藏</li>
+            <li>✓ 获取积分和奖励</li>
+            <li>✓ 升级VIP会员</li>
+          </ul>
+        </div>
+        <div class="guest-tip-buttons">
+          <button class="guest-tip-btn guest-tip-btn-secondary" @click="closeGuestTip">
+            稍后再说
+          </button>
+          <button class="guest-tip-btn guest-tip-btn-primary" @click="goToCompleteProfile">
+            立即完善
+          </button>
+        </div>
+      </div>
+    </div>
+
     <!-- 账户凭证弹窗 -->
     <div class="credential-overlay" v-if="showCredential" @click.self="closeCredential">
       <div class="credential-container" id="credential-card">
@@ -564,7 +823,7 @@ const goToCustomerService = () => {
         </div>
         <div class="credential-content">
           <div class="credential-avatar">
-            <img src="@/assets/img/icon-avatar-default.svg" alt="头像" />
+            <img :src="avatarUrl" alt="头像" />
           </div>
           <div class="credential-user-id">{{ userAccount }}</div>
           <div class="credential-qrcode">
@@ -589,8 +848,7 @@ const goToCustomerService = () => {
             </svg>
           </div>
           <div class="credential-website">永久网址: ym01.ch</div>
-          <div class="credential-desc">我的一账户凭证</div>
-          <div class="credential-tip">扫描账户凭证二维码可自动登录</div>
+          <div class="credential-desc">我的一账户凭证<br />网站失联凭此截图去官网恢复账号</div>
         </div>
         <div class="credential-button" @click="saveCredential">
           保存
@@ -664,6 +922,18 @@ export default {
   font-size: 14px;
 }
 
+.user-arrow {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 4px;
+}
+
+.user-arrow div {
+  font-size: 14px;
+  color: #fff;
+}
+
 /* VIPu5361u7247 */
 .vip-card {
   text-align: center;
@@ -719,24 +989,26 @@ export default {
 }
 
 .info-item {
+  flex: 1;
   display: flex;
+  flex-direction: column;
   align-items: center;
+  text-align: center;
   color: #ccc;
   font-size: 14px;
 }
 
+
 .info-value {
-  margin-left: 5px;
+  margin-top: 5px;
   color: #fff;
   font-weight: bold;
-  flex: 1;
-  text-align: right;
 }
 
 .info-item img {
   width: 20px;
   height: 20px;
-  margin-right: 8px;
+  margin-bottom: 5px;
 }
 
 /* u529fu80fdu5361u7247 */
@@ -1023,6 +1295,156 @@ export default {
   font-size: 12px;
 }
 
+/* 游客提示弹窗 */
+.guest-tip-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(0, 0, 0, 0.7);
+  z-index: 1001;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+.guest-tip-container {
+  width: 85%;
+  max-width: 360px;
+  background-color: #222;
+  border-radius: 15px;
+  overflow: hidden;
+  animation: slideUp 0.3s ease-out;
+}
+
+@keyframes slideUp {
+  from {
+    transform: translateY(50px);
+    opacity: 0;
+  }
+
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+.guest-tip-header {
+  position: relative;
+  padding: 20px;
+  text-align: center;
+  border-bottom: 1px solid #333;
+}
+
+.guest-tip-header h2 {
+  margin: 0;
+  font-size: 18px;
+  font-weight: bold;
+  color: #fff;
+}
+
+.guest-tip-close {
+  position: absolute;
+  right: 15px;
+  top: 50%;
+  transform: translateY(-50%);
+  cursor: pointer;
+}
+
+.guest-tip-content {
+  padding: 30px 20px;
+  text-align: center;
+}
+
+.guest-tip-icon {
+  margin-bottom: 20px;
+}
+
+.guest-tip-title {
+  font-size: 20px;
+  font-weight: bold;
+  color: #fff;
+  margin-bottom: 10px;
+}
+
+.guest-tip-desc {
+  font-size: 14px;
+  color: #999;
+  margin-bottom: 20px;
+  line-height: 1.6;
+}
+
+.guest-pwd-tip-box {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 10px 15px;
+  margin-bottom: 20px;
+  background-color: rgba(255, 149, 0, 0.1);
+  border-radius: 8px;
+  font-size: 13px;
+  color: #ff9500;
+}
+
+.guest-pwd-tip-box span {
+  font-weight: 500;
+}
+
+.guest-tip-features {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  text-align: left;
+}
+
+.guest-tip-features li {
+  font-size: 14px;
+  color: #ccc;
+  padding: 8px 0;
+  border-bottom: 1px solid #333;
+}
+
+.guest-tip-features li:last-child {
+  border-bottom: none;
+}
+
+.guest-tip-buttons {
+  display: flex;
+  gap: 10px;
+  padding: 0 20px 20px;
+}
+
+.guest-tip-btn {
+  flex: 1;
+  padding: 12px 0;
+  border: none;
+  border-radius: 8px;
+  font-size: 16px;
+  font-weight: bold;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.guest-tip-btn-secondary {
+  background-color: #333;
+  color: #999;
+}
+
+.guest-tip-btn-secondary:hover {
+  background-color: #444;
+}
+
+.guest-tip-btn-primary {
+  background-color: #ff9500;
+  color: #fff;
+}
+
+.guest-tip-btn-primary:hover {
+  background-color: #ff8800;
+}
+
 /* 账户凭证弹窗 */
 .credential-overlay {
   position: fixed;
@@ -1038,8 +1460,8 @@ export default {
 }
 
 .credential-container {
-  width: 85%;
-  max-width: 320px;
+  width: 90%;
+  max-width: 360px;
   background-color: #222;
   border-radius: 15px;
   overflow: hidden;
@@ -1121,6 +1543,7 @@ export default {
 .credential-desc {
   color: #999;
   margin-bottom: 10px;
+  text-align: center;
 }
 
 .credential-tip {
