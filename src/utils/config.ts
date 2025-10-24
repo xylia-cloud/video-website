@@ -3,39 +3,30 @@
  * 集中管理应用的配置项，便于维护和环境切换
  */
 
-// 🎬 视频相关API - 直接使用PHP代理
+// 🎬 视频相关API - 使用NGINX反向代理
 export const BASE_URL = (() => {
   console.log('🔍 BASE_URL初始化检测:')
   console.log('  import.meta.env.DEV:', import.meta.env.DEV)
   console.log('  import.meta.env.MODE:', import.meta.env.MODE)
   console.log('  import.meta.env.PROD:', import.meta.env.PROD)
 
-  if (import.meta.env.DEV) {
-    // 开发环境：使用Vite代理
-    console.log('  ✅ 检测到开发环境，使用 /api 代理')
-    return '/api'
-  } else {
-    // 生产环境：直接使用PHP代理，绕过NGINX重写
-    console.log('  ✅ 检测到生产环境，直接使用PHP代理')
-    const proxyUrl = '/proxy.php?target=video&path='
-    console.log('  🎯 使用直接PHP代理:', proxyUrl)
-    return proxyUrl
-  }
+  // 所有环境都使用NGINX反向代理
+  const proxyUrl = '/api'
+  console.log('  ✅ 使用NGINX反向代理:', proxyUrl)
+  console.log('  🎯 环境:', import.meta.env.DEV ? '开发(Vite代理)' : '生产(NGINX代理)')
+  return proxyUrl
 })()
 
 // API代理前缀 - 与BASE_URL保持一致
 export const API_PREFIX = BASE_URL
 
-// 👤 用户相关API - 直接使用PHP代理
+// 👤 用户相关API - 使用NGINX反向代理
 export const NEW_API_BASE_URL = (() => {
-  if (import.meta.env.DEV) {
-    // 开发环境：使用Vite代理
-    return '/userapi'
-  } else {
-    // 生产环境：直接使用PHP代理，绕过NGINX重写
-    console.log('  ✅ 用户API直接使用PHP代理')
-    return '/proxy.php?target=user'
-  }
+  // 所有环境都使用NGINX反向代理（注意结尾有斜杠，避免301重定向）
+  const proxyUrl = '/livevideo/'
+  console.log('  ✅ 用户API使用NGINX反向代理:', proxyUrl)
+  console.log('  🎯 环境:', import.meta.env.DEV ? '开发(Vite代理)' : '生产(NGINX代理)')
+  return proxyUrl
 })()
 
 // 🔧 调试信息（开发和生产环境都显示）
@@ -43,9 +34,9 @@ console.log('🌍 API配置信息:')
 console.log('  📺 视频API (jiji1.tv):', BASE_URL)
 console.log('  👤 用户API (live.88tv.co):', NEW_API_BASE_URL)
 console.log('  🔄 环境:', import.meta.env.DEV ? '开发环境' : '生产环境')
+console.log('  🎯 代理方式:', import.meta.env.DEV ? 'Vite代理' : 'NGINX反向代理')
 if (typeof window !== 'undefined' && window.location) {
   console.log('  🌐 当前域名:', window.location.hostname)
-  console.log('  🎯 部署类型:', window.location.hostname === 'jiji1.tv' ? '直接部署' : '代理部署')
 }
 
 // 分页配置

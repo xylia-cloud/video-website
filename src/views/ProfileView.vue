@@ -1,481 +1,510 @@
 <script setup lang="ts">
 // 个人中心页面逻辑
-import { ref, onMounted, computed } from 'vue';
-import html2canvas from 'html2canvas';
-import { showToast } from 'vant';
-import { useRouter } from 'vue-router';
-import { userLogout, getUserInfo, isLoggedIn, fetchAds, fetchNotices, fetchUserPoints, setUserInfo, type NoticeGroup } from '@/api/fetch-api';
-import { BASE_URL } from '@/utils/config';
-import { generateCustomerServiceUrl } from '@/utils/rsa';
+import { ref, onMounted, computed } from 'vue'
+import html2canvas from 'html2canvas'
+import { showToast } from 'vant'
+import { useRouter } from 'vue-router'
+import {
+  userLogout,
+  getUserInfo,
+  isLoggedIn,
+  fetchAds,
+  fetchNotices,
+  fetchUserPoints,
+  setUserInfo,
+  applyAgent,
+  type NoticeGroup,
+} from '@/api/fetch-api'
+import { BASE_URL } from '@/utils/config'
+import { generateCustomerServiceUrl } from '@/utils/rsa'
+import QRCode from 'qrcode'
 
-const router = useRouter();
+const router = useRouter()
 
 // 控制账户凭证弹窗显示
-const showCredential = ref(false);
-const userId = ref('');
-const isLoggingOut = ref(false);
+const showCredential = ref(false)
+const userId = ref('')
+const isLoggingOut = ref(false)
+const qrcodeDataUrl = ref('') // 二维码数据URL
+const credentialTimestamp = ref('') // 凭证生成时间戳
 
 // 控制游客提示弹窗
-const showGuestTip = ref(false);
+const showGuestTip = ref(false)
+
+// 控制申请代理弹窗
+const showAgentDialog = ref(false)
+const isApplyingAgent = ref(false)
 
 // 用户信息
-const userInfo = ref<any>(null);
+const userInfo = ref<any>(null)
 
 // 积分和VIP相关数据
-const userVideoNums = ref(0); // 观影次数
-const isVip = ref('0'); // VIP状态
-const vipEndtime = ref(''); // VIP到期时间
+const userVideoNums = ref(0) // 观影次数
+const isVip = ref('0') // VIP状态
+const vipEndtime = ref('') // VIP到期时间
 
 // 广告数据
-const profileAds = ref<any[]>([]);
-const isAdLoading = ref(false);
-const hasAdError = ref(false);
+const profileAds = ref<any[]>([])
+const isAdLoading = ref(false)
+const hasAdError = ref(false)
 
 // 公告数据
-const notices = ref<NoticeGroup[]>([]);
-const isNoticeLoading = ref(false);
-const hasNoticeError = ref(false);
-const noticeText = ref('');
+const notices = ref<NoticeGroup[]>([])
+const isNoticeLoading = ref(false)
+const hasNoticeError = ref(false)
+const noticeText = ref('')
 
 // 处理头像URL
 const avatarUrl = computed(() => {
   if (!userInfo.value) {
-    return new URL('@/assets/img/img-avatar-default.png', import.meta.url).href;
+    return new URL('@/assets/img/img-avatar-default.png', import.meta.url).href
   }
 
   // 游客用户使用avatar字段，正式用户使用user_portrait字段
-  const portrait = userInfo.value.avatar || userInfo.value.user_portrait;
+  const portrait = userInfo.value.avatar || userInfo.value.user_portrait
 
   if (!portrait) {
-    return new URL('@/assets/img/img-avatar-default.png', import.meta.url).href;
+    return new URL('@/assets/img/img-avatar-default.png', import.meta.url).href
   }
 
   if (portrait.startsWith('http')) {
-    return portrait;
+    return portrait
   } else if (portrait.startsWith('/')) {
-    return `${BASE_URL}${portrait}`;
+    return `${BASE_URL}${portrait}`
   } else {
-    return `${BASE_URL}/${portrait}`;
+    return `${BASE_URL}/${portrait}`
   }
-});
+})
 
 // 处理广告图片URL
 const processAdImageUrl = (imgPath: string): string => {
-  if (!imgPath) return '';
+  if (!imgPath) return ''
 
   if (imgPath.startsWith('http')) {
-    return imgPath;
+    return imgPath
   } else if (imgPath.startsWith('/')) {
-    return `${BASE_URL}${imgPath}`;
+    return `${BASE_URL}${imgPath}`
   } else {
-    return `${BASE_URL}/${imgPath}`;
+    return `${BASE_URL}/${imgPath}`
   }
-};
+}
 
 // 用户ID或昵称显示
 const displayName = computed(() => {
-  if (!userInfo.value) return '';
+  if (!userInfo.value) return ''
 
-  // 游客用户使用user_nicename，正式用户使用user_nick_name或user_name
-  return userInfo.value.user_nicename || userInfo.value.user_nick_name || userInfo.value.user_name || '';
-});
+  // 🔥 统一使用 user_nick_name 字段（游客和正式用户已统一）
+  return userInfo.value.user_nick_name || userInfo.value.user_name || ''
+})
 
 // 用户账号显示
 const userAccount = computed(() => {
-  if (!userInfo.value) return '';
+  if (!userInfo.value) return ''
 
   // 游客用户显示ID，正式用户显示用户名
   if (userInfo.value.isyouke === '1') {
-    return `游客ID: ${userInfo.value.id}`;
+    return `游客ID: ${userInfo.value.id}`
   }
 
-  return userInfo.value.user_name || '';
-});
+  return userInfo.value.user_name || ''
+})
+
+// 用户名（不是昵称）- 用于账户凭证显示
+const userName = computed(() => {
+  if (!userInfo.value) return ''
+
+  // 优先使用 user_name（账号），如果没有则使用 user_login 或 id
+  return userInfo.value.user_name || userInfo.value.user_login || userInfo.value.id || ''
+})
 
 // 会员组名称
 const groupName = computed(() => {
-  if (!userInfo.value) return '普通会员';
-  return userInfo.value.group_name || '普通会员';
-});
+  if (!userInfo.value) return '普通会员'
+  return userInfo.value.group_name || '普通会员'
+})
 
 // 用户积分（观影次数）
 const userPoints = computed(() => {
-  return userVideoNums.value || 0;
-});
+  return userVideoNums.value || 0
+})
 
 // 观影次数
 const watchCount = computed(() => {
-  if (!userInfo.value) return 0;
-  return userInfo.value.watch_count || 0;
-});
+  if (!userInfo.value) return 0
+  return userInfo.value.watch_count || 0
+})
 
 // VIP到期时间
 const vipExpireTime = computed(() => {
   if (isVip.value === '1') {
     if (vipEndtime.value) {
       // 格式化时间戳为可读日期
-      const endDate = new Date(parseInt(vipEndtime.value) * 1000);
-      const now = new Date();
+      const endDate = new Date(parseInt(vipEndtime.value) * 1000)
+      const now = new Date()
 
       if (endDate > now) {
         // VIP未过期
-        const year = endDate.getFullYear();
-        const month = String(endDate.getMonth() + 1).padStart(2, '0');
-        const day = String(endDate.getDate()).padStart(2, '0');
-        return `${year}-${month}-${day}`;
+        const year = endDate.getFullYear()
+        const month = String(endDate.getMonth() + 1).padStart(2, '0')
+        const day = String(endDate.getDate()).padStart(2, '0')
+        return `${year}-${month}-${day}`
       } else {
         // VIP已过期
-        return '已过期';
+        return '已过期'
       }
     } else {
-      return '已开通';
+      return '已开通'
     }
   } else {
-    return '未开通';
+    return '未开通'
   }
-});
+})
 
 // 获取积分和VIP信息
 const fetchPointsAndVipInfo = async () => {
   try {
-    const pointsResult = await fetchUserPoints();
+    const pointsResult = await fetchUserPoints()
     if (pointsResult.code === 1 && pointsResult.data) {
       // 更新用户积分信息
-      const localUserInfo = getUserInfo();
+      const localUserInfo = getUserInfo()
       if (localUserInfo) {
         // 更新本地存储的用户信息
-        localUserInfo.user_points = pointsResult.data.points;
-        localUserInfo.points = pointsResult.data.points;
-        localUserInfo.video_nums = pointsResult.data.video_nums;
-        localUserInfo.is_vip = pointsResult.data.is_vip;
+        localUserInfo.user_points = pointsResult.data.points
+        localUserInfo.points = pointsResult.data.points
+        localUserInfo.video_nums = pointsResult.data.video_nums
+        localUserInfo.is_vip = pointsResult.data.is_vip
         if (pointsResult.data.endtime) {
-          localUserInfo.endtime = pointsResult.data.endtime;
+          localUserInfo.endtime = pointsResult.data.endtime
         }
 
         // 保存到本地存储
-        setUserInfo(localUserInfo);
+        setUserInfo(localUserInfo)
 
         // 更新页面显示的数据
-        userInfo.value = localUserInfo;
-        userVideoNums.value = pointsResult.data.video_nums;
-        isVip.value = pointsResult.data.is_vip || '0';
-        vipEndtime.value = pointsResult.data.endtime || '';
+        userInfo.value = localUserInfo
+        userVideoNums.value = pointsResult.data.video_nums
+        isVip.value = pointsResult.data.is_vip || '0'
+        vipEndtime.value = pointsResult.data.endtime || ''
 
-        console.log('✅ 个人中心积分信息获取成功:', pointsResult.data);
+        console.log('✅ 个人中心积分信息获取成功:', pointsResult.data)
       }
     }
   } catch (error) {
-    console.error('❌ 个人中心获取积分信息失败:', error);
+    console.error('❌ 个人中心获取积分信息失败:', error)
     // 静默失败，不显示错误提示
   }
-};
+}
 
 // 获取广告数据
 const fetchProfileAd = async () => {
-  isAdLoading.value = true;
-  hasAdError.value = false;
+  isAdLoading.value = true
+  hasAdError.value = false
 
   try {
     // 请求个人中心页面的广告数据 (ad_pos: 5 表示个人中心页面)
     const result = await fetchAds({
       ad_pos: 5, // 个人中心页面位置
-      ad_type: 2 // 广告类型
-    });
+      ad_type: 2, // 广告类型
+    })
 
-    console.log('获取个人中心页面广告数据:', result);
+    console.log('获取个人中心页面广告数据:', result)
 
-    if (result && result.code === 1 && result.data && Array.isArray(result.data) && result.data.length > 0) {
+    if (
+      result &&
+      result.code === 1 &&
+      result.data &&
+      Array.isArray(result.data) &&
+      result.data.length > 0
+    ) {
       // 显示所有广告
       profileAds.value = result.data.map((ad: any) => ({
         id: ad.id || 0,
         imageUrl: processAdImageUrl(ad.ad_img || ''),
         title: ad.ad_name || '广告',
-        link: ad.ad_url || ''
-      }));
+        link: ad.ad_url || '',
+      }))
 
-      console.log(`获取到${result.data.length}张广告，全部显示:`, profileAds.value);
+      console.log(`获取到${result.data.length}张广告，全部显示:`, profileAds.value)
     } else {
-      console.log('没有获取到个人中心页面广告数据');
-      profileAds.value = [];
+      console.log('没有获取到个人中心页面广告数据')
+      profileAds.value = []
     }
   } catch (error) {
-    console.error('获取个人中心页面广告失败:', error);
-    hasAdError.value = true;
-    profileAds.value = [];
+    console.error('获取个人中心页面广告失败:', error)
+    hasAdError.value = true
+    profileAds.value = []
   } finally {
-    isAdLoading.value = false;
+    isAdLoading.value = false
   }
-};
+}
 
 // 获取公告数据
 const fetchNoticeData = async () => {
-  isNoticeLoading.value = true;
-  hasNoticeError.value = false;
+  isNoticeLoading.value = true
+  hasNoticeError.value = false
 
   try {
-    const result = await fetchNotices();
-    console.log('获取公告数据:', result);
+    const result = await fetchNotices()
+    console.log('获取公告数据:', result)
 
     if (result && result.code === 1 && result.data && Array.isArray(result.data)) {
-      notices.value = result.data;
+      notices.value = result.data
       // 只取首页公告的第一条（最新的一条）
-      const homeNoticeGroup = result.data.find((group: NoticeGroup) => group.id === 1);
+      const homeNoticeGroup = result.data.find((group: NoticeGroup) => group.id === 1)
 
       if (homeNoticeGroup && homeNoticeGroup.list && homeNoticeGroup.list.length > 0) {
         // 只取第一条公告
-        noticeText.value = homeNoticeGroup.list[0].content;
+        noticeText.value = homeNoticeGroup.list[0].content
       }
       // 如果没有获取到公告，保持默认文本不变
     } else {
-      console.log('没有获取到公告数据，保持默认公告显示');
-      notices.value = [];
+      console.log('没有获取到公告数据，保持默认公告显示')
+      notices.value = []
     }
   } catch (error) {
-    console.error('获取公告失败:', error);
-    hasNoticeError.value = true;
-    notices.value = [];
+    console.error('获取公告失败:', error)
+    hasNoticeError.value = true
+    notices.value = []
   } finally {
-    isNoticeLoading.value = false;
+    isNoticeLoading.value = false
   }
-};
+}
 
 // 处理广告点击
 const handleAdClick = (ad: any) => {
-  if (!ad || !ad.link) return;
+  if (!ad || !ad.link) return
 
-  console.log(`个人中心广告点击: ${ad.title}, 链接: ${ad.link}`);
+  console.log(`个人中心广告点击: ${ad.title}, 链接: ${ad.link}`)
 
   // 如果是内部链接，使用路由跳转
   if (ad.link.startsWith('/')) {
-    router.push(ad.link);
+    router.push(ad.link)
   } else {
     // 外部链接，使用window.open打开
-    window.open(ad.link, '_blank');
+    window.open(ad.link, '_blank')
   }
-};
+}
 
 // 处理广告图片加载错误
 const handleAdImageError = (event: Event, ad: any) => {
-  console.error(`个人中心广告图片加载失败: ${ad?.imageUrl}`);
+  console.error(`个人中心广告图片加载失败: ${ad?.imageUrl}`)
 
   // 图片加载失败时从数组中移除该广告
-  const index = profileAds.value.findIndex(item => item.id === ad.id);
+  const index = profileAds.value.findIndex((item) => item.id === ad.id)
   if (index > -1) {
-    profileAds.value.splice(index, 1);
+    profileAds.value.splice(index, 1)
   }
-};
+}
 
 // 自动显示账户凭证（2秒后）
 onMounted(async () => {
-  console.log('=== ProfileView onMounted 开始 ===');
+  console.log('=== ProfileView onMounted 开始 ===')
 
   // 优先从本地获取用户信息（无论是游客还是正式用户）
-  const localUserInfo = getUserInfo();
+  const localUserInfo = getUserInfo()
 
-  // 根据用户数据判断是否为游客（而不是依赖本地存储标记）
-  const isGuest = localUserInfo && localUserInfo.isyouke === '1';
+  // 🔥 根据本地存储判断是否为游客用户
+  const isGuest = localStorage.getItem('isGuest') === 'true'
 
   console.log('📦 本地用户信息检查:', {
     hasLocalUserInfo: !!localUserInfo,
     isGuest: isGuest,
+    isGuestFromStorage: localStorage.getItem('isGuest'),
     isyouke: localUserInfo?.isyouke,
-    userInfo: localUserInfo
-  });
+    userInfo: localUserInfo,
+  })
 
   if (localUserInfo) {
     // 本地有用户信息，直接使用（游客或正式用户）
-    console.log('✅ 使用本地缓存的用户信息 - 类型:', isGuest ? '游客' : '正式用户');
-    userInfo.value = localUserInfo;
-    userId.value = isGuest
-      ? (localUserInfo.user_nicename || localUserInfo.id)
-      : localUserInfo.user_name;
+    console.log('✅ 使用本地缓存的用户信息 - 类型:', isGuest ? '游客' : '正式用户')
+    userInfo.value = localUserInfo
+    // 🔥 统一使用 user_name 字段（游客和正式用户已统一）
+    userId.value = localUserInfo.user_name || localUserInfo.user_id || localUserInfo.id || ''
 
     // 初始化积分和VIP数据
-    userVideoNums.value = localUserInfo.video_nums || 0;
-    isVip.value = localUserInfo.is_vip || '0';
-    vipEndtime.value = localUserInfo.endtime || '';
+    userVideoNums.value = localUserInfo.video_nums || 0
+    isVip.value = localUserInfo.is_vip || '0'
+    vipEndtime.value = localUserInfo.endtime || ''
 
     // 只有真正的游客用户才显示提示弹窗
     if (isGuest) {
-      console.log('🎯 检测到游客用户 (isyouke=1)，准备显示提示弹窗');
+      console.log('🎯 检测到游客用户 (isyouke=1)，准备显示提示弹窗')
       setTimeout(() => {
-        showGuestTip.value = true;
-        console.log('🎬 弹窗已显示');
-      }, 500); // 延迟500ms显示，让页面先加载
+        showGuestTip.value = true
+        console.log('🎬 弹窗已显示')
+      }, 500) // 延迟500ms显示，让页面先加载
     } else {
-      console.log('✅ 检测到正式用户 (isyouke!=1)，不显示游客弹窗');
+      console.log('✅ 检测到正式用户 (isyouke!=1)，不显示游客弹窗')
     }
   } else {
     // 本地没有用户信息，跳转到登录页
-    console.log('❌ 本地没有用户信息，跳转到登录页');
+    console.log('❌ 本地没有用户信息，跳转到登录页')
     showToast({
       message: '请先登录',
-      duration: 2000
-    });
-    router.push('/login');
-    return;
+      duration: 2000,
+    })
+    router.push('/login')
+    return
   }
 
-  console.log('=== ProfileView onMounted 结束 ===');
+  console.log('=== ProfileView onMounted 结束 ===')
 
   // 获取广告数据
-  fetchProfileAd();
+  fetchProfileAd()
 
   // 获取公告数据
-  fetchNoticeData();
+  fetchNoticeData()
 
   // 获取最新的积分和VIP信息
-  fetchPointsAndVipInfo();
-});
+  fetchPointsAndVipInfo()
+})
 
 // 退出登录
 const handleLogout = async () => {
-  if (isLoggingOut.value) return;
+  if (isLoggingOut.value) return
 
   try {
-    isLoggingOut.value = true;
+    isLoggingOut.value = true
     showToast({
       message: '正在退出登录...',
-      duration: 2000
-    });
+      duration: 2000,
+    })
 
-    const success = await userLogout();
+    const success = await userLogout()
 
     if (success) {
       showToast({
         message: '已退出登录',
-        duration: 2000
-      });
+        duration: 2000,
+      })
       // 退出后返回登录页
       setTimeout(() => {
-        router.push('/login');
-      }, 1000);
+        router.push('/login')
+      }, 1000)
     } else {
       showToast({
         message: '退出登录失败，请重试',
-        duration: 2000
-      });
+        duration: 2000,
+      })
     }
   } catch (error) {
-    console.error('退出登录错误:', error);
+    console.error('退出登录错误:', error)
     showToast({
       message: '退出登录时发生错误',
-      duration: 2000
-    });
+      duration: 2000,
+    })
   } finally {
-    isLoggingOut.value = false;
+    isLoggingOut.value = false
   }
-};
+}
 
 // 保存凭证截图
 const saveCredential = async () => {
   try {
-    const element = document.getElementById('credential-card');
+    const element = document.getElementById('credential-card')
     if (element) {
-      const canvas = await html2canvas(element);
-      const link = document.createElement('a');
-      link.download = '账户凭证.png';
-      link.href = canvas.toDataURL('image/png');
-      link.click();
+      const canvas = await html2canvas(element)
+      const link = document.createElement('a')
+      link.download = '账户凭证.png'
+      link.href = canvas.toDataURL('image/png')
+      link.click()
       showToast({
         message: '凭证已保存',
-        duration: 2000
-      });
+        duration: 2000,
+      })
     }
   } catch (error) {
-    console.error('保存凭证失败', error);
+    console.error('保存凭证失败', error)
     showToast({
       message: '保存失败，请重试',
-      duration: 2000
-    });
+      duration: 2000,
+    })
   }
-  showCredential.value = false;
-};
+  showCredential.value = false
+}
 
 // 关闭凭证弹窗
 const closeCredential = () => {
-  showCredential.value = false;
-};
+  showCredential.value = false
+}
 
 // 关闭游客提示弹窗
 const closeGuestTip = () => {
-  showGuestTip.value = false;
-};
+  showGuestTip.value = false
+}
 
 // 跳转到完善信息页面
 const goToCompleteProfile = () => {
-  showGuestTip.value = false;
-  router.push('/edit-profile');
-};
+  showGuestTip.value = false
+  router.push('/edit-profile')
+}
 
 // 跳转到编辑资料页面
 const goToEditProfile = () => {
-  router.push('/edit-profile');
-};
+  router.push('/edit-profile')
+}
 
 // 跳转到分享好友页面
 const goToShareFriends = () => {
-  router.push('/share-friends');
-};
+  router.push('/share-friends')
+}
 
 // 跳转到充值金币页面
 const goToRecharge = () => {
-  router.push('/recharge');
-};
+  router.push('/recharge')
+}
 
 // 跳转到账户钱包页面
 const goToWallet = () => {
-  router.push('/wallet');
-};
+  router.push('/wallet')
+}
 
 // 跳转到账目明细页面
 const goToAccountDetails = () => {
-  router.push('/account-details');
-};
+  router.push('/account-details')
+}
 
 // 跳转到提现页面
 const goToWithdraw = () => {
-  router.push('/withdraw');
-};
+  router.push('/withdraw')
+}
 
 // 跳转到VIP充值页面
 const goToVipRecharge = () => {
-  router.push('/vip-recharge');
-};
+  router.push('/vip-recharge')
+}
 
 // 跳转到充值记录页面
 const goToRechargeRecord = () => {
-  router.push('/recharge-record');
-};
+  router.push('/recharge-record')
+}
 
 // 跳转到关注列表页面
 const goToFollowList = () => {
-  router.push('/follow-list');
-};
+  router.push('/follow-list')
+}
 
 // 跳转到收藏页面
 const goToCollection = () => {
-  router.push('/collection');
-};
+  router.push('/collection')
+}
 
 // 跳转到看片足迹页面
 const goToWatchHistory = () => {
-  router.push('/watch-history');
-};
-
+  router.push('/watch-history')
+}
 
 // 跳转到游戏记录页面
 const goToGameRecord = () => {
   // 检查登录状态
   if (!isLoggedIn()) {
-    showToast('请先登录');
-    return;
+    showToast('请先登录')
+    return
   }
 
   // 跳转到游戏记录页面
-  router.push('/game-record');
-};
-
+  router.push('/game-record')
+}
 
 // 跳转到系统设置页面（暂时未使用）
 // const goToSettings = () => {
@@ -485,68 +514,131 @@ const goToGameRecord = () => {
 // 跳转到人工客服
 // 跳转到我的代理页面
 const goToMyAgent = () => {
-  showToast('我的代理功能开发中...');
-  // router.push('/my-agent');
-};
+  showAgentDialog.value = true
+}
 
 // 跳转到我的收藏页面
 const goToMyCollection = () => {
-  router.push('/collection');
-};
+  router.push('/collection')
+}
 
-// 跳转到已购影片页面
+// 跳转到已购影片页面（观看历史）
 const goToPurchasedVideos = () => {
-  showToast('已购影片功能开发中...');
-  // router.push('/purchased-videos');
-};
+  router.push('/watch-history')
+}
 
 // 跳转到推广记录页面
 const goToPromotionRecord = () => {
-  showToast('推广记录功能开发中...');
+  showToast('推广记录功能开发中...')
   // router.push('/promotion-record');
-};
+}
+
+// 生成二维码
+const generateQRCode = async (url: string) => {
+  try {
+    const qrCodeUrl = await QRCode.toDataURL(url, {
+      width: 200,
+      margin: 2,
+      color: {
+        dark: '#000000',
+        light: '#FFFFFF',
+      },
+    })
+    qrcodeDataUrl.value = qrCodeUrl
+  } catch (error) {
+    console.error('生成二维码失败:', error)
+    showToast({
+      message: '生成二维码失败',
+      duration: 2000,
+    })
+  }
+}
 
 // 跳转到账户凭证页面
-const goToAccountCredential = () => {
-  showCredential.value = true;
-};
+const goToAccountCredential = async () => {
+  // 生成当前时间戳作为防伪标识
+  const now = new Date()
+  credentialTimestamp.value = `${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, '0')}${String(now.getDate()).padStart(2, '0')}${String(now.getHours()).padStart(2, '0')}${String(now.getMinutes()).padStart(2, '0')}`
+
+  // 生成网址的二维码（可以根据实际需求修改网址）
+  const websiteUrl = window.location.origin || 'https://sese1188.cc'
+  await generateQRCode(websiteUrl)
+  showCredential.value = true
+}
 
 const goToCustomerService = () => {
   try {
     // 获取当前用户信息
-    const currentUserInfo = getUserInfo();
+    const currentUserInfo = getUserInfo()
 
     // 兼容游客用户和正式用户的数据结构
-    const userId = currentUserInfo?.user_id || currentUserInfo?.id;
+    const userId = currentUserInfo?.user_id || currentUserInfo?.id
 
     if (!currentUserInfo || !userId) {
       showToast({
         message: '请先登录后再使用客服功能',
-        duration: 2000
-      });
-      return;
+        duration: 2000,
+      })
+      return
     }
 
     showToast({
       message: '正在跳转客服...',
-      duration: 1000
-    });
+      duration: 1000,
+    })
 
     // 生成加密的客服链接
-    const customerServiceUrl = generateCustomerServiceUrl(userId);
+    const customerServiceUrl = generateCustomerServiceUrl(userId)
 
     // 在新窗口中打开客服链接
-    window.open(customerServiceUrl, '_blank');
+    window.open(customerServiceUrl, '_blank')
 
-    console.log('人工客服链接已生成并打开:', customerServiceUrl);
+    console.log('人工客服链接已生成并打开:', customerServiceUrl)
   } catch (error) {
-    console.error('跳转客服失败:', error);
+    console.error('跳转客服失败:', error)
     showToast({
       message: '客服功能暂时不可用，请稍后重试',
-      duration: 2000
-    });
+      duration: 2000,
+    })
   }
-};
+}
+
+// 关闭申请代理弹窗
+const closeAgentDialog = () => {
+  showAgentDialog.value = false
+}
+
+// 确认申请代理
+const confirmApplyAgent = async () => {
+  if (isApplyingAgent.value) return
+
+  try {
+    isApplyingAgent.value = true
+
+    const result = await applyAgent()
+
+    if (result.code === 1) {
+      showToast({
+        message: result.msg || '申请成功',
+        duration: 2000,
+      })
+      showAgentDialog.value = false
+    } else {
+      showToast({
+        message: result.msg || '申请失败，请重试',
+        duration: 2000,
+      })
+    }
+  } catch (error) {
+    console.error('申请代理失败:', error)
+    showToast({
+      message: '申请失败，请稍后重试',
+      duration: 2000,
+    })
+  } finally {
+    isApplyingAgent.value = false
+  }
+}
 </script>
 
 <template>
@@ -572,7 +664,7 @@ const goToCustomerService = () => {
 
     <!-- VIPu5361u7247 -->
     <div class="vip-card" @click="goToShareFriends">
-      <img src="@/assets/img/img-vip-enter.svg" alt="">
+      <img src="@/assets/img/img-vip-enter.svg" alt="" />
     </div>
 
     <!-- u8d26u6237u4fe1u606f -->
@@ -586,8 +678,6 @@ const goToCustomerService = () => {
         <span class="info-value">{{ vipExpireTime || '未开通' }}</span>
       </div>
     </div>
-
-
 
     <!-- u5e38u7528u529fu80fdu533au57df -->
     <div class="common-section">
@@ -640,15 +730,12 @@ const goToCustomerService = () => {
           <div class="common-name">钱包</div>
         </div> -->
 
-
-
         <div class="common-item" @click="goToCustomerService">
           <div class="common-icon">
             <img src="@/assets/img/icon-rgkf.svg" alt="" />
           </div>
           <div class="common-name">在线客服</div>
         </div>
-
       </div>
     </div>
 
@@ -666,7 +753,6 @@ const goToCustomerService = () => {
 
     <!-- 记录列表 -->
     <div class="record-list-section">
-
       <div class="record-item" @click="goToPurchasedVideos">
         <div class="record-icon">
           <img src="@/assets/img/icon-ygyp.svg" alt="已购影片" />
@@ -727,7 +813,6 @@ const goToCustomerService = () => {
         </div>
       </div>
 
-
       <div class="record-item" @click="goToAccountCredential">
         <div class="record-icon">
           <img src="@/assets/img/icon-zhpz2.svg" alt="账户凭证" />
@@ -744,8 +829,17 @@ const goToCustomerService = () => {
       <div v-if="isAdLoading" class="ad-loading">加载中...</div>
       <div v-else-if="hasAdError" class="ad-error">广告加载失败</div>
       <div v-else class="profile-ads-list">
-        <div v-for="ad in profileAds" :key="ad.id" class="profile-ad-banner" @click="handleAdClick(ad)">
-          <img :src="ad.imageUrl" :alt="ad.title" @error="(event) => handleAdImageError(event, ad)" />
+        <div
+          v-for="ad in profileAds"
+          :key="ad.id"
+          class="profile-ad-banner"
+          @click="handleAdClick(ad)"
+        >
+          <img
+            :src="ad.imageUrl"
+            :alt="ad.title"
+            @error="(event) => handleAdImageError(event, ad)"
+          />
         </div>
       </div>
     </div>
@@ -787,13 +881,11 @@ const goToCustomerService = () => {
             <van-icon name="user-o" size="60" color="#ff9500" />
           </div>
           <div class="guest-tip-title">您当前是游客身份</div>
-          <div class="guest-tip-desc">
-            完善个人信息后，可以享受更多功能和服务
-          </div>
+          <div class="guest-tip-desc">完善个人信息后，可以享受更多功能和服务</div>
           <!-- 游客默认密码提示 -->
           <div class="guest-pwd-tip-box">
             <van-icon name="info-o" size="14" color="#ff9500" />
-            <span>游客默认密码：88888888 请尽快修改</span>
+            <span>游客默认密码：12345678 请尽快修改</span>
           </div>
           <ul class="guest-tip-features">
             <li>✓ 保存观看记录和收藏</li>
@@ -822,36 +914,59 @@ const goToCustomerService = () => {
           </div>
         </div>
         <div class="credential-content">
-          <div class="credential-avatar">
-            <img :src="avatarUrl" alt="头像" />
+          <!-- 使用背景图片的凭证内容区 -->
+          <div class="credential-main-content">
+            <div class="credential-avatar">
+              <img :src="avatarUrl" alt="头像" />
+            </div>
+            <div class="credential-username">{{ userName }}</div>
+            <div class="credential-qrcode">
+              <!-- 使用本地二维码图片 -->
+              <img src="@/assets/img/qrcode-profile.png" alt="二维码" class="qrcode-img" />
+            </div>
+            <div class="credential-website">永久网址: sese1188.cc</div>
+            <div class="credential-desc">浏览器扫码恢复账号<br />唯一账户凭证请妥善保存</div>
           </div>
-          <div class="credential-user-id">{{ userAccount }}</div>
-          <div class="credential-qrcode">
-            <!-- 使用临时二维码，实际项目中应该使用API生成 -->
-            <svg viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg" class="qrcode-svg">
-              <!-- 简化的二维码图形 -->
-              <rect x="0" y="0" width="200" height="200" fill="white" />
-              <rect x="20" y="20" width="40" height="40" fill="black" />
-              <rect x="140" y="20" width="40" height="40" fill="black" />
-              <rect x="20" y="140" width="40" height="40" fill="black" />
-              <rect x="70" y="70" width="60" height="60" fill="black" />
-              <rect x="70" y="20" width="10" height="10" fill="black" />
-              <rect x="120" y="20" width="10" height="10" fill="black" />
-              <rect x="20" y="70" width="10" height="10" fill="black" />
-              <rect x="170" y="70" width="10" height="10" fill="black" />
-              <rect x="70" y="170" width="10" height="10" fill="black" />
-              <rect x="120" y="170" width="10" height="10" fill="black" />
-              <rect x="170" y="170" width="10" height="10" fill="black" />
-              <rect x="140" y="70" width="20" height="20" fill="black" />
-              <rect x="140" y="140" width="20" height="20" fill="black" />
-              <rect x="70" y="140" width="20" height="20" fill="black" />
-            </svg>
-          </div>
-          <div class="credential-website">永久网址: ym01.ch</div>
-          <div class="credential-desc">我的一账户凭证<br />网站失联凭此截图去官网恢复账号</div>
         </div>
-        <div class="credential-button" @click="saveCredential">
-          保存
+        <div class="credential-buttons">
+          <div class="credential-button credential-button-save" @click="saveCredential">保存</div>
+          <div class="credential-button credential-button-close" @click="closeCredential">关闭</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 申请代理弹窗 -->
+    <div class="agent-dialog-overlay" v-if="showAgentDialog" @click.self="closeAgentDialog">
+      <div class="agent-dialog-container">
+        <div class="agent-dialog-header">
+          <h2>申请代理</h2>
+          <div class="agent-dialog-close" @click="closeAgentDialog">
+            <van-icon name="cross" size="20" color="#999" />
+          </div>
+        </div>
+        <div class="agent-dialog-content">
+          <div class="agent-dialog-icon">
+            <van-icon name="user-circle-o" size="60" color="#ff9500" />
+          </div>
+          <div class="agent-dialog-title">申请成为代理</div>
+          <div class="agent-dialog-desc">成为代理后，您可以享受更多收益和特权</div>
+          <ul class="agent-dialog-features">
+            <li>✓ 获得推广佣金</li>
+            <li>✓ 享受专属优惠</li>
+            <li>✓ 获得更多权限</li>
+          </ul>
+        </div>
+        <div class="agent-dialog-buttons">
+          <button class="agent-dialog-btn agent-dialog-btn-secondary" @click="closeAgentDialog">
+            取消
+          </button>
+          <button
+            class="agent-dialog-btn agent-dialog-btn-primary"
+            @click="confirmApplyAgent"
+            :disabled="isApplyingAgent"
+          >
+            {{ isApplyingAgent ? '申请中...' : '确定' }}
+          </button>
         </div>
       </div>
     </div>
@@ -861,10 +976,8 @@ const goToCustomerService = () => {
 <script lang="ts">
 export default {
   data() {
-    return {
-
-    }
-  }
+    return {}
+  },
 }
 </script>
 
@@ -998,7 +1111,6 @@ export default {
   font-size: 14px;
 }
 
-
 .info-value {
   margin-top: 5px;
   color: #fff;
@@ -1099,7 +1211,7 @@ export default {
 
 /* 公告版块样式 */
 .notice-section {
-  background: #2C2C2C;
+  background: #2c2c2c;
   margin: 0 15px 15px;
   padding: 12px 16px;
   border-radius: 8px;
@@ -1153,7 +1265,7 @@ export default {
 
 /* 记录列表样式 */
 .record-list-section {
-  background: #2C2C2C;
+  background: #2c2c2c;
   margin: 0 15px 15px;
   border-radius: 8px;
   overflow: hidden;
@@ -1283,7 +1395,6 @@ export default {
 .tabbar-icon {
   width: 24px;
   height: 24px;
-
 }
 
 .nav-item.active,
@@ -1495,6 +1606,21 @@ export default {
   display: flex;
   flex-direction: column;
   align-items: center;
+  position: relative;
+  overflow: hidden;
+  background-image: url('@/assets/img/bg-certificate.jpeg');
+  background-position: center;
+  background-size: cover;
+  background-repeat: no-repeat;
+}
+
+.credential-main-content {
+  position: relative;
+  z-index: 2;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  width: 100%;
 }
 
 .credential-avatar {
@@ -1517,6 +1643,13 @@ export default {
   margin-bottom: 20px;
 }
 
+.credential-username {
+  font-size: 16px;
+  color: #fff;
+  margin-bottom: 20px;
+  font-weight: 500;
+}
+
 .credential-qrcode {
   width: 180px;
   height: 180px;
@@ -1532,6 +1665,17 @@ export default {
 .qrcode-svg {
   width: 100%;
   height: 100%;
+}
+
+.qrcode-img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+
+.qrcode-loading {
+  color: #333;
+  font-size: 14px;
 }
 
 .credential-website {
@@ -1551,14 +1695,163 @@ export default {
   font-size: 14px;
 }
 
+.credential-buttons {
+  display: flex;
+  gap: 10px;
+  padding: 15px;
+}
+
 .credential-button {
-  background-color: #ff9500;
+  flex: 1;
   color: #fff;
   padding: 12px 0;
   text-align: center;
   font-size: 16px;
   font-weight: bold;
   cursor: pointer;
-  margin-top: 10px;
+  border-radius: 8px;
+  transition: all 0.3s ease;
+}
+
+.credential-button-save {
+  background-color: #ff9500;
+}
+
+.credential-button-save:hover {
+  background-color: #ff8800;
+}
+
+.credential-button-close {
+  background-color: #444;
+}
+
+.credential-button-close:hover {
+  background-color: #555;
+}
+
+/* 申请代理弹窗样式 */
+.agent-dialog-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(0, 0, 0, 0.7);
+  z-index: 1002;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+.agent-dialog-container {
+  width: 85%;
+  max-width: 360px;
+  background-color: #222;
+  border-radius: 15px;
+  overflow: hidden;
+  animation: slideUp 0.3s ease-out;
+}
+
+.agent-dialog-header {
+  position: relative;
+  padding: 20px;
+  text-align: center;
+  border-bottom: 1px solid #333;
+}
+
+.agent-dialog-header h2 {
+  margin: 0;
+  font-size: 18px;
+  font-weight: bold;
+  color: #fff;
+}
+
+.agent-dialog-close {
+  position: absolute;
+  right: 15px;
+  top: 50%;
+  transform: translateY(-50%);
+  cursor: pointer;
+}
+
+.agent-dialog-content {
+  padding: 30px 20px;
+  text-align: center;
+}
+
+.agent-dialog-icon {
+  margin-bottom: 20px;
+}
+
+.agent-dialog-title {
+  font-size: 20px;
+  font-weight: bold;
+  color: #fff;
+  margin-bottom: 10px;
+}
+
+.agent-dialog-desc {
+  font-size: 14px;
+  color: #999;
+  margin-bottom: 20px;
+  line-height: 1.6;
+}
+
+.agent-dialog-features {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  text-align: left;
+}
+
+.agent-dialog-features li {
+  font-size: 14px;
+  color: #ccc;
+  padding: 8px 0;
+  border-bottom: 1px solid #333;
+}
+
+.agent-dialog-features li:last-child {
+  border-bottom: none;
+}
+
+.agent-dialog-buttons {
+  display: flex;
+  gap: 10px;
+  padding: 0 20px 20px;
+}
+
+.agent-dialog-btn {
+  flex: 1;
+  padding: 12px 0;
+  border: none;
+  border-radius: 8px;
+  font-size: 16px;
+  font-weight: bold;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.agent-dialog-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.agent-dialog-btn-secondary {
+  background-color: #333;
+  color: #999;
+}
+
+.agent-dialog-btn-secondary:hover:not(:disabled) {
+  background-color: #444;
+}
+
+.agent-dialog-btn-primary {
+  background-color: #ff9500;
+  color: #fff;
+}
+
+.agent-dialog-btn-primary:hover:not(:disabled) {
+  background-color: #ff8800;
 }
 </style>

@@ -13,6 +13,17 @@ export default defineConfig({
       '@': fileURLToPath(new URL('./src', import.meta.url)),
     },
   },
+  // 🔥 生产环境构建配置
+  build: {
+    // 移除生产环境的 console 和 debugger
+    minify: 'terser',
+    terserOptions: {
+      compress: {
+        drop_console: true, // 移除所有 console
+        drop_debugger: true, // 移除 debugger
+      },
+    },
+  },
   server: {
     host: '0.0.0.0', // 监听所有地址
     port: 3000, // 指定端口号
@@ -55,11 +66,11 @@ export default defineConfig({
           })
         },
       },
-      // 配置跨域代理 - 用户接口
-      '/userapi': {
+      // 配置跨域代理 - 用户接口（livevideo）
+      '/livevideo/': {
         target: 'https://live.88tv.co/appapi/',
         changeOrigin: true,
-        rewrite: (path) => path.replace(/^\/userapi/, ''),
+        rewrite: (path) => path.replace(/^\/livevideo\//, '/'),
         secure: false,
         timeout: 30000,
         proxyTimeout: 30000,
@@ -75,14 +86,6 @@ export default defineConfig({
           proxy.on('error', (err) => {
             console.error('用户API代理错误:', err)
           })
-          // 禁用详细的请求日志以避免控制台混乱
-          // proxy.on('proxyReq', (proxyReq, req) => {
-          //   console.log('发送用户API代理请求:', req.method, req.url)
-          //   // 为JSON请求设置Content-Type
-          //   if (req.headers['content-type'] === 'application/json') {
-          //     proxyReq.setHeader('Content-Type', 'application/json')
-          //   }
-          // })
           proxy.on('proxyRes', (proxyRes, req) => {
             // 只记录重定向和错误状态
             const statusCode = proxyRes.statusCode

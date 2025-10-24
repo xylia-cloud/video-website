@@ -557,6 +557,13 @@ export interface UserInfo {
   group_name?: string
   user_nick_name?: string
   rec_code?: string
+  // 🔥 新增：完整的用户信息字段
+  sex?: string // 性别：0=保密, 1=男, 2=女
+  birthday?: string // 生日：格式 YYYY-MM-DD
+  signature?: string // 个性签名
+  province?: string // 省份
+  city?: string // 城市
+  avatar_thumb?: string // 头像缩略图
   [key: string]: any // 添加索引签名
 }
 
@@ -851,7 +858,7 @@ export const userLogin = async (params: {
   let adaptedResult
 
   if (result && result.ret === 200 && result.data && result.data.code === 0) {
-    // 登录成功，转换数据格式
+    // 登录成功，转换数据格式，保存所有用户信息
     const userInfo: UserInfo = {
       user_id: parseInt(result.data.info.id),
       user_name: params.user_name, // 使用登录时的用户名
@@ -863,7 +870,16 @@ export const userLogin = async (params: {
       group_name: `等级${result.data.info.level || '1'}`,
       user_nick_name: result.data.info.user_nicename,
       rec_code: result.data.info.rec_code,
+      // 🔥 新增：保存完整的用户信息
+      sex: result.data.info.sex || '0',
+      birthday: result.data.info.birthday || '',
+      signature: result.data.info.signature || '',
+      province: result.data.info.province || '',
+      city: result.data.info.city || '',
+      avatar_thumb: result.data.info.avatar_thumb || '',
     }
+
+    console.log('💾 正在保存完整的用户信息到localStorage:', userInfo)
 
     // 保存到本地存储
     setUserInfo(userInfo)
@@ -899,12 +915,15 @@ export const touristLogin = async (imei: string) => {
 
     console.log('正在进行游客登录...')
 
-    // 构建表单数据
+    // 🔥 service参数在URL中，IMEI参数在表单body中（目标API只支持表单格式）
+    const url = `${NEW_API_BASE_URL}?service=Login.TouristLogin`
+
+    // 构建表单数据（目标API不支持JSON，必须使用表单格式）
     const formData = new URLSearchParams()
-    formData.append('service', 'Login.TouristLogin')
     formData.append('IMEI', imei)
 
-    console.log('正在发送游客登录请求到:', NEW_API_BASE_URL, '数据:', formData.toString())
+    console.log('正在发送游客登录请求到:', url)
+    console.log('表单body数据:', formData.toString())
 
     // 获取基础请求头，设置为表单格式
     const headers = {
@@ -914,8 +933,8 @@ export const touristLogin = async (imei: string) => {
         'Mozilla/5.0 (iPhone; CPU iPhone OS 16_6 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.6 Mobile/15E148 Safari/604.1',
     }
 
-    // 发起POST请求
-    const response = await fetch(NEW_API_BASE_URL, {
+    // 发起POST请求，body为表单格式
+    const response = await fetch(url, {
       method: 'POST',
       body: formData.toString(),
       headers,
@@ -941,7 +960,33 @@ export const touristLogin = async (imei: string) => {
 
     // 处理游客登录结果
     if (result.ret === 200 && result.data && result.data.info) {
-      const userInfo = result.data.info
+      const apiUserInfo = result.data.info
+
+      // 🔥 统一游客用户字段：将 user_nicename 映射为 user_nick_name
+      const userInfo = {
+        ...apiUserInfo,
+        // 统一昵称字段名（API返回的是user_nicename，统一为user_nick_name）
+        user_nick_name: apiUserInfo.user_nicename || apiUserInfo.user_nick_name || '',
+        user_id: parseInt(apiUserInfo.id) || 0,
+        user_name: apiUserInfo.user_nicename || apiUserInfo.id || '',
+        user_portrait: apiUserInfo.avatar || apiUserInfo.avatar_thumb || '',
+        token: apiUserInfo.token,
+        sex: apiUserInfo.sex || '0',
+        birthday: apiUserInfo.birthday || '',
+        signature: apiUserInfo.signature || '',
+        province: apiUserInfo.province || '',
+        city: apiUserInfo.city || '',
+        avatar: apiUserInfo.avatar || '',
+        avatar_thumb: apiUserInfo.avatar_thumb || '',
+        user_points: parseInt(apiUserInfo.score || '0'),
+        coin: parseFloat(apiUserInfo.coin || '0'),
+        rec_code: apiUserInfo.rec_code || '',
+      }
+
+      console.log('📋 游客登录API返回:', {
+        原始昵称字段: apiUserInfo.user_nicename,
+        统一后昵称字段: userInfo.user_nick_name,
+      })
 
       // 保存游客用户信息到本地存储，包括过期时间
       const expireTime = Date.now() + TOKEN_EXPIRE_DURATION
@@ -950,7 +995,8 @@ export const touristLogin = async (imei: string) => {
       localStorage.setItem(TOKEN_EXPIRE_KEY, expireTime.toString())
       localStorage.setItem('isGuest', 'true') // 标记为游客用户
 
-      console.log('游客登录成功，已保存用户信息，过期时间:', new Date(expireTime).toLocaleString())
+      console.log('💾 游客登录成功，已保存统一格式的用户信息到localStorage')
+      console.log('⏰ Token过期时间:', new Date(expireTime).toLocaleString())
 
       return {
         code: 1,
@@ -1204,6 +1250,7 @@ export const updateUserPortrait = async (params: { file?: File; imgdata?: string
  */
 export const updateUserInfo = async (params: {
   user_nick_name?: string
+  user_login?: string // 🔥 添加游客账号字段
   sex?: string
   birthday?: string
   user_pwd?: string
@@ -1294,6 +1341,13 @@ export const updateUserInfo = async (params: {
     queryParams.append('uid', uid.toString())
     queryParams.append('token', userInfo.token)
 
+    // 🔥 如果本地存储 isGuest 为 true（游客用户），则添加 isyouke=1 参数
+    const isGuestUser = localStorage.getItem('isGuest') === 'true'
+    if (isGuestUser) {
+      queryParams.append('isyouke', '1')
+      console.log('🎯 检测到游客用户，添加 isyouke=1 查询参数')
+    }
+
     // 构建fields JSON字符串，包含所有字段
     const fields: any = {
       user_nicename: params.user_nick_name || '',
@@ -1304,6 +1358,11 @@ export const updateUserInfo = async (params: {
       location: '', // 位置，暂时为空
       province: '', // 省份，暂时为空
       city: '', // 城市，暂时为空
+    }
+
+    // 🔥 如果传入了 user_login 字段（游客账号），则添加到 fields 中
+    if (params.user_login !== undefined) {
+      fields.user_login = params.user_login
     }
 
     // 保留旧字段的兼容性
@@ -1317,7 +1376,11 @@ export const updateUserInfo = async (params: {
       fields.user_phone = params.user_phone
     }
 
+    console.log('🔍 updateUserInfo - fields 对象:', fields)
     queryParams.append('fields', JSON.stringify(fields))
+
+    // 🔍 调试：显示完整的查询参数
+    console.log('🔍 updateUserInfo - 完整查询参数:', queryParams.toString())
 
     // 获取基础请求头
     const headers = {
@@ -1347,7 +1410,7 @@ export const updateUserInfo = async (params: {
         // 如果更新成功，更新本地存储的用户信息
         const currentUserInfo = getUserInfo()
         if (currentUserInfo) {
-          // 合并新的用户信息
+          // 合并新的用户信息（游客和正式用户已统一使用 user_nick_name）
           const updatedUserInfo = {
             ...currentUserInfo,
             user_nick_name: params.user_nick_name || currentUserInfo.user_nick_name,
@@ -1357,6 +1420,21 @@ export const updateUserInfo = async (params: {
             user_email: params.user_email || currentUserInfo.user_email,
             user_phone: params.user_phone || currentUserInfo.user_phone,
           }
+
+          // 🔥 如果是游客用户且传入了 user_login，则更新账号字段
+          if (params.user_login !== undefined) {
+            updatedUserInfo.user_name = params.user_login
+            // 使用类型断言来添加 user_login 字段
+            ;(updatedUserInfo as any).user_login = params.user_login
+          }
+
+          console.log('💾 更新本地用户信息:', {
+            old_user_nick_name: currentUserInfo.user_nick_name,
+            new_user_nick_name: updatedUserInfo.user_nick_name,
+            old_user_name: currentUserInfo.user_name,
+            new_user_name: updatedUserInfo.user_name,
+            user_login_updated: params.user_login !== undefined,
+          })
 
           // 保存到本地存储
           setUserInfo(updatedUserInfo)
@@ -2696,6 +2774,88 @@ export const fetchGameChargeLog = async (params: { page?: number; limit?: number
       }
     } catch (error) {
       console.error('获取游戏充值记录失败:', error)
+      throw error
+    }
+  })
+}
+
+// ========== 代理相关接口 ==========
+
+/**
+ * 申请代理接口
+ * @returns 申请代理结果
+ */
+export const applyAgent = async () => {
+  return withTopLoading(async () => {
+    // 检查是否需要登录
+    if (!checkLoginRequired()) {
+      throw new Error('请先登录再申请代理')
+    }
+
+    // 获取用户信息
+    const userInfo = getUserInfo()
+    if (!userInfo) {
+      throw new Error('用户信息不存在')
+    }
+
+    // 兼容游客用户和正式用户的数据结构
+    const userId = userInfo.user_id || userInfo.id
+    const token = userInfo.token
+
+    if (!userId || !token) {
+      throw new Error('用户信息不完整')
+    }
+
+    console.log('正在申请代理...')
+
+    try {
+      // 使用本地代理请求接口
+      const response = await fetch(`${NEW_API_BASE_URL}?service=User.Dodaili`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded',
+          Accept: 'application/json, text/plain, */*',
+          'User-Agent':
+            'Mozilla/5.0 (iPhone; CPU iPhone OS 16_6 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.6 Mobile/15E148 Safari/604.1',
+        },
+        body: new URLSearchParams({
+          uid: String(userId),
+          token: token,
+        }).toString(),
+      })
+
+      if (!response.ok) {
+        const errorText = await response.text()
+        throw new Error(`HTTP error! Status: ${response.status}, Response: ${errorText}`)
+      }
+
+      const result = await response.json()
+      console.log('申请代理返回:', result)
+
+      // 根据用户提供的返回数据格式进行处理
+      if (result && result.ret === 200 && result.data) {
+        if (result.data.code === 1) {
+          return {
+            code: 1,
+            data: result.data.info || [],
+            msg: result.data.msg || '申请成功',
+          }
+        } else {
+          return {
+            code: 0,
+            data: null,
+            msg: result.data.msg || '申请失败',
+          }
+        }
+      } else {
+        return {
+          code: 0,
+          data: null,
+          msg: result?.msg || '申请失败',
+        }
+      }
+    } catch (error) {
+      console.error('申请代理失败:', error)
       throw error
     }
   })

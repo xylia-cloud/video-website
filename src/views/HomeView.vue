@@ -276,7 +276,8 @@ const switchType = (typeId: number) => {
     if (!tabStates.value[typeId]) {
       // 先获取广告数据，然后再获取视频数据
       fetchListAds().then(() => {
-        fetchRecommendVideosData(1, typeId);
+        // 🔥 最热视频必须使用 tid=1，否则API只返回10条数据
+        fetchRecommendVideosData(1, VIDEO_CATEGORIES.ALL);
       });
     } else {
       // 如果有缓存数据，仍然需要获取广告数据以备后续使用
@@ -532,18 +533,18 @@ const processDataWithAds = (processedData: VideoItem[], page: number): VideoItem
     console.log('📢 [processDataWithAds] ✅ 开始处理广告插入，广告数据长度:', listAds.value.length);
     console.log('📢 [processDataWithAds] 输入视频数据长度:', processedData.length);
 
-    // 使用前三个广告
+    // 🔥 使用前3个广告
     const adsToUse = listAds.value.slice(0, 3);
     console.log('将使用的广告数量:', adsToUse.length);
 
-    // 减少显示一条视频，如果视频数量足够的话
-    if (finalData.length > DEFAULT_PAGE_SIZE / 2) {
-      // 移除最后一条视频，以便插入更多广告
-      finalData.pop();
-      console.log('减少一条视频后的数据长度:', finalData.length);
+    // 🔥 目标：17条视频 + 3条广告 = 20条
+    // 移除最后3条视频（20-3=17），为广告腾出位置
+    if (finalData.length >= 20) {
+      finalData.splice(17); // 只保留前17条视频
+      console.log('🔥 保留前17条视频，移除后的数据长度:', finalData.length);
     }
 
-    // 插入广告到预设位置
+    // 插入广告到预设位置（位置3、6、11）
     for (let i = 0; i < Math.min(adPositions.value.length, adsToUse.length); i++) {
       const position = adPositions.value[i];
       // 确保位置在有效范围内
@@ -553,7 +554,7 @@ const processDataWithAds = (processedData: VideoItem[], page: number): VideoItem
       }
     }
 
-    console.log('插入广告后的数据长度:', finalData.length);
+    console.log('🔥 插入广告后的最终数据长度:', finalData.length, '（目标：20条）');
     // 保存带广告的数据供后续使用
     videoDataWithAds.value = [...finalData];
   } else if (page === 1) {
@@ -639,10 +640,11 @@ const refreshVideos = () => {
         console.log('🔄 [换一批] 视频映射后数据长度:', processedData.length);
         console.log('🔄 [换一批] DEFAULT_PAGE_SIZE:', DEFAULT_PAGE_SIZE);
 
-        // 减少显示一条视频，如果视频数量足够的话
-        if (processedData.length > DEFAULT_PAGE_SIZE / 2) {
-          console.log('🔄 [换一批] 移除最后一条视频，当前长度:', processedData.length);
-          processedData.pop();
+        // 🔥 目标：17条视频 + 3条广告 = 20条
+        // 移除最后3条视频（20-3=17），为广告腾出位置
+        if (processedData.length >= 20) {
+          processedData.splice(17); // 只保留前17条视频
+          console.log('🔄 [换一批] 保留前17条视频，移除后的数据长度:', processedData.length);
         }
 
         // 直接使用之前保存的广告位置插入广告
@@ -654,7 +656,7 @@ const refreshVideos = () => {
             const position = adPositions.value[i];
             // 确保位置在有效范围内
             if (processedData.length >= position) {
-              console.log(`换一批后在位置${position}插入第${i + 1}个广告:`, adsToUse[i]);
+              console.log(`🔄 [换一批] 在位置${position}插入第${i + 1}个广告:`, adsToUse[i]);
               processedData.splice(position, 0, adsToUse[i]);
             }
           }
@@ -663,7 +665,7 @@ const refreshVideos = () => {
         // 更新视频数据
         videoData.value = processedData;
 
-        console.log('换一批后的数据长度:', videoData.value.length);
+        console.log('🔄 [换一批] 最终数据长度:', videoData.value.length, '（目标：20条）');
       })
       .catch((error) => {
         console.error('换一批加载数据失败:', error);
@@ -1146,7 +1148,11 @@ onMounted(async () => {
     } else {
       console.log('没有缓存，重新获取视频数据');
     }
-    fetchRecommendVideosData(1, activeTypeId.value); // 从第1页开始，使用当前活跃的标签ID
+
+    // 🔥 如果是首页标签，必须使用 tid=1，否则API只返回10条数据
+    const tidToUse = isFirstTab ? VIDEO_CATEGORIES.ALL : activeTypeId.value;
+    console.log('🔥 onMounted加载数据 - isFirstTab:', isFirstTab, 'tidToUse:', tidToUse);
+    fetchRecommendVideosData(1, tidToUse);
   }
 
   fetchTagsData();

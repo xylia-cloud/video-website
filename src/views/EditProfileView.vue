@@ -22,7 +22,10 @@
       <!-- 账号信息 -->
       <div class="form-item">
         <div class="item-label">账号：</div>
-        <div class="item-value">{{ userId }}</div>
+        <div class="item-input" v-if="isGuest">
+          <input type="text" v-model="userId" placeholder="请输入手机号码" />
+        </div>
+        <div class="item-value" v-else>{{ userId }}</div>
       </div>
 
       <!-- 昵称 -->
@@ -30,6 +33,7 @@
         <div class="item-label">昵称：</div>
         <div class="item-input">
           <input type="text" v-model="nickname" placeholder="请输入昵称" />
+          <div class="input-tip">如不修改则同步为手机号码</div>
         </div>
       </div>
 
@@ -79,13 +83,19 @@
           <!-- 游客默认密码提示 -->
           <div class="guest-pwd-tip" v-if="isGuest">
             <van-icon name="info-o" size="14" color="#ff9500" />
-            <span>游客默认密码为：88888888</span>
+            <span>游客默认密码为：12345678</span>
           </div>
           <div class="input-row">
             <input v-model="oldPwd" type="password" class="pwd-input" placeholder="请输入原密码" />
           </div>
           <div class="input-row">
-            <input v-model="newPwd" type="password" class="pwd-input" placeholder="请输入新密码" />
+            <input v-model="newPwd" type="password" class="pwd-input" placeholder="请输入新密码" @input="onNewPwdInput" />
+            <div class="input-tip" v-if="!pwdValidationMsg">密码需8位以上，包含大小写字母和数字</div>
+            <div class="pwd-validation"
+              :class="{ valid: pwdValidationMsg.includes('✓'), invalid: pwdValidationMsg && !pwdValidationMsg.includes('✓') }"
+              v-if="pwdValidationMsg">
+              {{ pwdValidationMsg }}
+            </div>
           </div>
           <div class="input-row">
             <input v-model="repeatPwd" type="password" class="pwd-input" placeholder="请重复新密码" />
@@ -171,6 +181,7 @@ const pwdPopupVisible = ref(false);
 const oldPwd = ref('');
 const newPwd = ref('');
 const repeatPwd = ref('');
+const pwdValidationMsg = ref(''); // 密码验证提示信息
 
 // 性别选择相关
 const sexPopupVisible = ref(false);
@@ -439,16 +450,30 @@ const saveProfile = async () => {
     });
 
     // 调用API保存数据，包含新字段
-    const result = await updateUserInfo({
+    const updateParams: any = {
       user_nick_name: nickname.value,
       sex: sex.value.toString(),
       birthday: birthday.value,
       user_pwd: '', // 原密码，不修改密码时传空字符串
       user_pwd1: '', // 新密码，不修改密码时传空字符串
       user_pwd2: ''  // 确认密码，不修改密码时传空字符串
-    });
+    };
+
+    // 🔥 只有游客用户才可以修改账号，使用 user_login 字段
+    if (isGuest.value) {
+      updateParams.user_login = userId.value;
+      console.log('🎯 游客修改账号，API会自动添加 isyouke=1 参数');
+    }
+
+    const result = await updateUserInfo(updateParams);
 
     if (result && result.code === 1) {
+      // 🔥 修改账号成功后，如果是游客用户，将本地存储的用户改为非游客用户
+      if (isGuest.value) {
+        localStorage.setItem('isGuest', 'false');
+        console.log('✅ 账号修改成功，将用户状态改为非游客用户 (isGuest=false)');
+      }
+
       showDialog({
         title: '提示',
         message: '保存成功',
@@ -483,6 +508,46 @@ const showChangePwdPopup = () => {
   oldPwd.value = '';
   newPwd.value = '';
   repeatPwd.value = '';
+  pwdValidationMsg.value = ''; // 重置验证提示
+};
+
+// 验证密码格式（8位以上，包含大小写字母和数字）
+const validatePassword = (password: string) => {
+  const hasUpperCase = /[A-Z]/.test(password);
+  const hasLowerCase = /[a-z]/.test(password);
+  const hasNumbers = /\d/.test(password);
+  const isLengthValid = password.length >= 8;
+
+  return hasUpperCase && hasLowerCase && hasNumbers && isLengthValid;
+};
+
+// 实时验证密码并返回提示信息
+const validatePasswordRealtime = (password: string) => {
+  if (!password) {
+    return '';
+  }
+
+  const hasUpperCase = /[A-Z]/.test(password);
+  const hasLowerCase = /[a-z]/.test(password);
+  const hasNumbers = /\d/.test(password);
+  const isLengthValid = password.length >= 8;
+
+  const missing = [];
+  if (!isLengthValid) missing.push('至少8位');
+  if (!hasUpperCase) missing.push('大写字母');
+  if (!hasLowerCase) missing.push('小写字母');
+  if (!hasNumbers) missing.push('数字');
+
+  if (missing.length > 0) {
+    return `还需要：${missing.join('、')}`;
+  }
+
+  return '✓ 密码强度符合要求';
+};
+
+// 监听新密码输入，实时验证
+const onNewPwdInput = () => {
+  pwdValidationMsg.value = validatePasswordRealtime(newPwd.value);
 };
 
 // 修改密码
@@ -502,6 +567,15 @@ const changePassword = async () => {
     showDialog({
       title: '提示',
       message: '请输入新密码',
+      confirmButtonText: '确定',
+      confirmButtonColor: '#ff9500'
+    });
+    return;
+  }
+  if (!validatePassword(newPwd.value)) {
+    showDialog({
+      title: '提示',
+      message: '新密码必须包含大小写字母和数字，且不少于8位',
       confirmButtonText: '确定',
       confirmButtonColor: '#ff9500'
     });
@@ -567,15 +641,19 @@ const changePassword = async () => {
   }
 };
 
-onMounted(() => {
-  // 获取用户资料（支持游客和正式用户）
-  const userInfo = getUserInfo();
-  const isGuest = localStorage.getItem('isGuest') === 'true';
+// 加载用户信息的通用函数
+const loadUserInfo = () => {
+  console.log('🔄 开始加载用户信息...');
 
-  console.log('编辑资料页面加载:', {
+  // 从localStorage获取用户资料（支持游客和正式用户）
+  const userInfo = getUserInfo();
+  const isGuestUser = localStorage.getItem('isGuest') === 'true';
+
+  console.log('📋 编辑资料页面 - 用户信息:', {
     hasUserInfo: !!userInfo,
-    isGuest: isGuest,
-    isLoggedIn: isLoggedIn()
+    isGuest: isGuestUser,
+    isLoggedIn: isLoggedIn(),
+    userInfo: userInfo
   });
 
   // 如果既没有用户信息也没有登录，则跳转到登录页
@@ -589,50 +667,65 @@ onMounted(() => {
   }
 
   if (userInfo) {
-    // 游客用户和正式用户使用不同的字段
-    if (isGuest) {
-      // 游客用户
-      userId.value = userInfo.user_nicename || userInfo.id || '';
-      nickname.value = userInfo.user_nicename || '';
-      sex.value = userInfo.sex ? parseInt(userInfo.sex) : 0;
-      birthday.value = userInfo.birthday || '';
+    console.log('👤 加载用户信息 - 类型:', isGuestUser ? '游客' : '正式用户');
 
-      // 游客头像
-      if (userInfo.avatar) {
-        avatarUrl.value = userInfo.avatar;
+    // 🔥 统一处理：游客和正式用户现在都使用相同的字段
+    userId.value = String(userInfo.user_name || userInfo.user_id || '');
+    nickname.value = userInfo.user_nick_name || userInfo.user_name || '';
+    sex.value = userInfo.sex ? parseInt(userInfo.sex) : 0;
+    birthday.value = userInfo.birthday || '';
+
+    // 统一头像处理
+    console.log('🖼️ 头像字段检查:', {
+      user_portrait: userInfo.user_portrait,
+      avatar: userInfo.avatar,
+      avatar_thumb: userInfo.avatar_thumb
+    });
+
+    // 优先使用 user_portrait，然后是 avatar
+    const avatarField = userInfo.user_portrait || userInfo.avatar || userInfo.avatar_thumb;
+
+    if (avatarField) {
+      if (avatarField.startsWith('http://') || avatarField.startsWith('https://')) {
+        avatarUrl.value = avatarField;
+        console.log('✅ 使用完整URL头像:', avatarUrl.value);
+      } else if (avatarField.startsWith('/')) {
+        avatarUrl.value = `${BASE_URL}${avatarField}`;
+        console.log('✅ 使用相对路径头像（带/）:', avatarUrl.value);
       } else {
-        avatarUrl.value = new URL('@/assets/img/img-avatar-default.png', import.meta.url).href;
+        avatarUrl.value = `${BASE_URL}/${avatarField}`;
+        console.log('✅ 使用相对路径头像（不带/）:', avatarUrl.value);
       }
     } else {
-      // 正式用户
-      userId.value = userInfo.user_name;
-      nickname.value = userInfo.user_nick_name || userInfo.user_name || '';
-      sex.value = userInfo.sex ? parseInt(userInfo.sex) : 0;
-      birthday.value = userInfo.birthday || '';
-
-      // 处理头像URL
-      if (userInfo.user_portrait) {
-        const portrait = userInfo.user_portrait;
-        if (portrait.startsWith('http')) {
-          avatarUrl.value = portrait;
-        } else if (portrait.startsWith('/')) {
-          avatarUrl.value = `${BASE_URL}${portrait}`;
-        } else {
-          avatarUrl.value = `${BASE_URL}/${portrait}`;
-        }
-      } else {
-        avatarUrl.value = new URL('@/assets/img/img-avatar-default.png', import.meta.url).href;
-      }
+      avatarUrl.value = new URL('@/assets/img/img-avatar-default.png', import.meta.url).href;
+      console.log('⚠️ 未找到头像，使用默认头像');
     }
+
+    console.log('✅ 用户信息加载完成:', {
+      userType: isGuestUser ? '游客' : '正式用户',
+      userId: userId.value,
+      nickname: nickname.value,
+      sex: sex.value,
+      birthday: birthday.value,
+      avatarUrl: avatarUrl.value
+    });
   } else {
+    console.log('⚠️ 未找到用户信息，使用默认头像');
     avatarUrl.value = new URL('@/assets/img/img-avatar-default.png', import.meta.url).href;
   }
 
-  console.log('页面加载完成，用户类型:', isGuest ? '游客' : '正式用户');
+  console.log('✅ 页面加载完成，用户类型:', isGuestUser ? '游客' : '正式用户');
+};
+
+onMounted(() => {
+  console.log('🎬 EditProfileView - onMounted 触发');
+  loadUserInfo();
 });
 
 onActivated(() => {
-  // 页面被激活
+  console.log('🎬 EditProfileView - onActivated 触发（页面被激活）');
+  // 页面被激活时重新加载用户信息（比如从其他页面返回时）
+  loadUserInfo();
 });
 
 onDeactivated(() => {
@@ -748,6 +841,28 @@ onBeforeUnmount(() => {
   color: #fff;
   font-size: 16px;
   outline: none;
+}
+
+.input-tip {
+  font-size: 12px;
+  color: #888;
+  margin-top: 5px;
+  line-height: 1.4;
+}
+
+.pwd-validation {
+  font-size: 12px;
+  margin-top: 5px;
+  line-height: 1.4;
+  transition: color 0.3s ease;
+}
+
+.pwd-validation.valid {
+  color: #52c41a;
+}
+
+.pwd-validation.invalid {
+  color: #ff9500;
 }
 
 .item-arrow {

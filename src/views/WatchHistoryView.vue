@@ -147,7 +147,7 @@ onMounted(() => {
 <template>
     <div class="watch-history-page">
         <!-- 头部导航 -->
-        <HeaderNav title="看片足迹" />
+        <HeaderNav title="已购影片" />
 
         <!-- 内容列表 -->
         <div class="content-list" v-if="!isEmpty">
@@ -170,7 +170,7 @@ onMounted(() => {
         <!-- 空状态 -->
         <div v-if="isEmpty" class="empty-state">
             <van-icon name="tv-o" size="48" color="#666" />
-            <p class="empty-text">暂无观看记录</p>
+            <p class="empty-text">暂无购买记录</p>
         </div>
     </div>
 </template>

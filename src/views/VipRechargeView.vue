@@ -242,20 +242,19 @@ const confirmCharge = async () => {
         if (result.code === 1) {
             // 检查是否返回了支付链接
             if (result.data && result.data.payUrl) {
-                // 打开支付页面
-                console.log('🔗 打开支付页面:', result.data.payUrl)
-                window.open(result.data.payUrl, '_blank')
+                // 打开支付页面 - 使用 window.location.href 替代 window.open 以兼容iOS
+                console.log('🔗 跳转到支付页面:', result.data.payUrl)
 
                 showToast({
-                    message: '请在新窗口完成支付',
+                    message: '正在跳转到支付页面...',
                     position: 'top',
-                    duration: 3000,
+                    duration: 2000,
                 })
 
-                // 延迟显示充值完成提示弹窗
+                // 延迟跳转，让用户看到提示
                 setTimeout(() => {
-                    showChargeCompletePrompt()
-                }, 1000)
+                    window.location.href = result.data.payUrl
+                }, 500)
 
             } else {
                 // 充值成功（无需跳转支付页面）
@@ -433,13 +432,14 @@ onMounted(async () => {
 
         <!-- 选项卡切换 -->
         <div class="nav-tabs">
-            <div class="tab-item" :class="{ active: activeTab === 'video' }" @click="switchTab('video')">
-                视频充值
+            <div class="tab-container">
+                <div class="tab-button" :class="{ active: activeTab === 'video' }" @click="switchTab('video')">
+                    视频充值
+                </div>
+                <div class="tab-button" :class="{ active: activeTab === 'game' }" @click="switchTab('game')">
+                    游戏充值
+                </div>
             </div>
-            <div class="tab-item" :class="{ active: activeTab === 'game' }" @click="switchTab('game')">
-                游戏充值
-            </div>
-
         </div>
 
         <!-- 主体内容 -->
@@ -463,6 +463,7 @@ onMounted(async () => {
 
             <!-- 充值选项列表 -->
             <div class="charge-options-list">
+                <h3>视频充值套餐</h3>
                 <!-- 加载状态 -->
                 <div v-if="isLoadingChargeOptions" class="loading-state">
                     <Loading type="spinner" color="#ff9500" />
@@ -482,14 +483,34 @@ onMounted(async () => {
                         @click="selectChargeOption(option)">
                         <!-- 套餐内容 -->
                         <div class="package-content">
-                            <div class="package-icon">
-                                <span class="icon-emoji">💰</span>
-                            </div>
                             <div class="package-info">
                                 <div class="package-name">{{ option.desc }}</div>
                             </div>
                             <div class="package-price">{{ option.price }}元</div>
                         </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 常见问题 -->
+            <div class="faq-section">
+                <h3>常见问题</h3>
+                <div class="faq-list">
+                    <div class="faq-item">
+                        <span class="faq-number">1.</span>
+                        <span class="faq-text">由于支付通道不稳定，若支付失败，请切换支付通道后重新购买。</span>
+                    </div>
+                    <div class="faq-item">
+                        <span class="faq-number">2.</span>
+                        <span class="faq-text">支付通道偶尔不可用，请稍后重试。</span>
+                    </div>
+                    <div class="faq-item">
+                        <span class="faq-number">3.</span>
+                        <span class="faq-text">会员可重复购买，时长叠加。</span>
+                    </div>
+                    <div class="faq-item">
+                        <span class="faq-number">4.</span>
+                        <span class="faq-text">如果确定支付成功但等待过久仍未到账，请联系客服反馈问题。</span>
                     </div>
                 </div>
             </div>
@@ -534,54 +555,52 @@ onMounted(async () => {
 }
 
 .vip-container {
-    padding: 120px 16px 100px;
+    padding: 150px 16px 100px;
 }
 
-/* 导航标签 */
+/* 🔥 导航选项卡 - 圆角按钮样式 */
 .nav-tabs {
     position: fixed;
     top: 50px;
     left: 0;
     right: 0;
-    display: flex;
-    justify-content: space-around;
     width: 100%;
-    border-bottom: 1px solid #222;
     background-color: #111;
     z-index: 99;
+    padding: 15px 20px;
 }
 
-.tab-item {
+.tab-container {
+    display: flex;
+    background-color: #333;
+    border-radius: 25px;
+    padding: 4px;
+    gap: 4px;
+}
+
+.tab-button {
     flex: 1;
     padding: 12px 0;
     font-size: 16px;
-    color: #ccc;
-    position: relative;
-    cursor: pointer;
+    font-weight: 500;
     text-align: center;
+    border-radius: 20px;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    color: #999;
+    background-color: transparent;
 }
 
-.tab-item.active {
-    color: #ff9500;
-    font-weight: bold;
-    font-size: 18px;
-}
-
-.tab-item.active::after {
-    content: '';
-    position: absolute;
-    bottom: 0;
-    left: 50%;
-    transform: translateX(-50%);
-    width: 20px;
-    height: 3px;
-    background-color: #ff9500;
-    border-radius: 3px;
+.tab-button.active {
+    background: linear-gradient(135deg, #ff9500 0%, #ff7700 100%);
+    color: #fff;
+    font-weight: 600;
+    box-shadow: 0 2px 8px rgba(255, 149, 0, 0.3);
 }
 
 /* 会员信息展示 */
 .member-info-section {
-    background: #222;
+    background: url('@/assets/img/bg-recharge.png') center/cover;
     border-radius: 12px;
     padding: 0 20px;
     margin-bottom: 24px;
@@ -648,6 +667,13 @@ onMounted(async () => {
     margin-bottom: 24px;
 }
 
+.charge-options-list h3 {
+    font-size: 15px;
+    color: #fff;
+    margin: 0 0 16px 0;
+    font-weight: 500;
+}
+
 .loading-state,
 .empty-state {
     display: flex;
@@ -665,10 +691,10 @@ onMounted(async () => {
 }
 
 .charge-option-item {
-    background-color: #222;
+    background: url('@/assets/img/bg-recharge.png') center/cover;
     border-radius: 12px;
     margin-bottom: 12px;
-    padding: 16px;
+    padding: 24px 16px;
     cursor: pointer;
     transition: all 0.3s ease;
     position: relative;
@@ -677,11 +703,14 @@ onMounted(async () => {
 
 .charge-option-item.selected {
     border-color: #ff9500;
-    background-color: #2a1f0a;
+    background: url('@/assets/img/bg-recharge.png') center/cover;
+    box-shadow: 0 0 15px rgba(255, 149, 0, 0.3);
 }
 
 .charge-option-item:hover {
-    background-color: #2a2a2a;
+    background: url('@/assets/img/bg-recharge.png') center/cover;
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
 }
 
 .recommend-tag {
@@ -721,7 +750,7 @@ onMounted(async () => {
 }
 
 .package-name {
-    font-size: 16px;
+    font-size: 18px;
     font-weight: 500;
     color: #fff;
     margin-bottom: 4px;
@@ -733,11 +762,49 @@ onMounted(async () => {
 }
 
 .package-price {
-    font-size: 18px;
+    font-size: 30px;
     font-weight: bold;
-    color: #ff9500;
+    color: #fff;
 }
 
+/* 🔥 常见问题 */
+.faq-section {
+    margin: 24px 0;
+}
+
+.faq-section h3 {
+    font-size: 15px;
+    color: #fff;
+    margin: 0 0 16px 0;
+    font-weight: 500;
+}
+
+.faq-list {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.faq-item {
+    display: flex;
+    align-items: flex-start;
+    gap: 8px;
+    line-height: 1.5;
+}
+
+.faq-number {
+    color: #ff9500;
+    font-weight: 500;
+    font-size: 14px;
+    flex-shrink: 0;
+    min-width: 20px;
+}
+
+.faq-text {
+    color: #ccc;
+    font-size: 14px;
+    line-height: 1.5;
+}
 
 /* 底部购买区域 */
 .purchase-section {
@@ -858,7 +925,7 @@ onMounted(async () => {
 /* 响应式设计 */
 @media (max-width: 375px) {
     .vip-container {
-        padding: 70px 12px 100px;
+        padding: 100px 12px 100px;
     }
 
     .member-info-section {
