@@ -529,8 +529,7 @@ const goToPurchasedVideos = () => {
 
 // 跳转到推广记录页面
 const goToPromotionRecord = () => {
-  showToast('推广记录功能开发中...')
-  // router.push('/promotion-record');
+  router.push('/promotion-record')
 }
 
 // 生成二维码

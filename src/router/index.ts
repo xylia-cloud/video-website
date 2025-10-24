@@ -27,6 +27,7 @@ import GameRecordView from '../views/GameRecordView.vue'
 import FollowListView from '../views/FollowListView.vue'
 import CollectionView from '../views/CollectionView.vue'
 import WatchHistoryView from '../views/WatchHistoryView.vue'
+import PromotionRecordView from '../views/PromotionRecordView.vue'
 
 const router = createRouter({
   history: createWebHashHistory(import.meta.env.BASE_URL),
@@ -199,6 +200,11 @@ const router = createRouter({
       path: '/account-details',
       name: 'accountDetails',
       component: AccountDetailsView,
+    },
+    {
+      path: '/promotion-record',
+      name: 'promotionRecord',
+      component: PromotionRecordView,
     },
   ],
 })
