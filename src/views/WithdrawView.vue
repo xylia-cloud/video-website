@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, onMounted, onUnmounted } from 'vue'
+import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { Icon, showToast, showDialog, showLoadingToast, closeToast } from 'vant'
 import HeaderNav from '@/components/HeaderNav.vue'
@@ -10,7 +10,7 @@ import {
   addUserAccount,
   deleteUserAccount,
   submitWithdraw,
-  getUserInfo
+  getUserInfo,
 } from '@/api/fetch-api'
 
 const router = useRouter()
@@ -61,7 +61,7 @@ const selectedWithdrawType = ref<WithdrawType | null>(null)
 const newAccount = ref({
   name: '',
   account: '',
-  account_bank: ''
+  account_bank: '',
 })
 
 // 提现成功弹窗
@@ -123,14 +123,13 @@ const closeAccountDropdown = () => {
   showAccountDropdown.value = false
 }
 
-
 // 从下拉框中选择添加账号类型
 const selectAddAccountType = (type: WithdrawType) => {
   selectedWithdrawType.value = type
   newAccount.value = {
     name: '',
     account: '',
-    account_bank: type.name === '银行卡' ? '' : type.name
+    account_bank: type.name === '银行卡' ? '' : type.name,
   }
   showAccountDropdown.value = false
   showAddAccountModal.value = true
@@ -160,7 +159,7 @@ const handleAddAccount = async () => {
       type: parseInt(selectedWithdrawType.value.type),
       account_bank: newAccount.value.account_bank,
       account: newAccount.value.account,
-      name: newAccount.value.name
+      name: newAccount.value.name,
     })
 
     closeToast()
@@ -188,7 +187,7 @@ const handleDeleteAccount = async (account: UserAccount) => {
       confirmButtonText: '删除',
       cancelButtonText: '取消',
       confirmButtonColor: '#ff4444',
-      showCancelButton: true
+      showCancelButton: true,
     })
 
     // 用户确认删除
@@ -250,7 +249,7 @@ const handleWithdraw = async () => {
 
     const result = await submitWithdraw({
       accountid: parseInt(selectedAccount.value.id),
-      cashvote: cashvote
+      cashvote: cashvote,
     })
 
     closeToast()
@@ -271,7 +270,7 @@ const handleWithdraw = async () => {
 
 // 获取账户类型名称
 const getAccountTypeName = (type: string) => {
-  const withdrawType = withdrawTypes.value.find(t => t.type === type)
+  const withdrawType = withdrawTypes.value.find((t) => t.type === type)
   return withdrawType?.name || '未知类型'
 }
 
@@ -293,7 +292,7 @@ const checkLoginStatus = () => {
       title: '未登录',
       message: '请先登录后再进行提现操作',
       confirmButtonText: '去登录',
-      confirmButtonColor: '#ff9500'
+      confirmButtonColor: '#ff9500',
     }).then(() => {
       router.push('/login')
     })
@@ -302,17 +301,20 @@ const checkLoginStatus = () => {
   return true
 }
 
+// 计算可提现金额（100的倍数）
+const withdrawableAmount = computed(() => {
+  if (!userProfit.value?.total) return '0'
+  const total = parseFloat(userProfit.value.total)
+  return Math.floor(total / 100) * 100
+})
+
 // 页面初始化
 onMounted(async () => {
   if (!checkLoginStatus()) return
 
   loading.value = true
   try {
-    await Promise.all([
-      loadWithdrawTypes(),
-      loadUserProfit(),
-      loadUserAccounts()
-    ])
+    await Promise.all([loadWithdrawTypes(), loadUserProfit(), loadUserAccounts()])
   } finally {
     loading.value = false
   }
@@ -342,11 +344,17 @@ onUnmounted(() => {
         <!-- 可提现余额卡片 -->
         <div class="balance-card">
           <div class="balance-info">
-            <div class="balance-label">可提现余额：</div>
-            <div class="balance-amount">{{ userProfit?.total || '0' }}</div>
-          </div>
-          <div class="coin-icon">
-            <img src="@/assets/img/icon-coin.png" alt="金币" />
+            <div class="balance-row">
+              <div class="balance-item">
+                <div class="balance-label">实际余额：</div>
+                <div class="balance-amount">{{ userProfit?.total || '0' }}</div>
+              </div>
+              <div class="balance-divider"></div>
+              <div class="balance-item">
+                <div class="balance-label">可提现余额：</div>
+                <div class="balance-amount highlight">{{ withdrawableAmount }}</div>
+              </div>
+            </div>
           </div>
         </div>
 
@@ -355,7 +363,9 @@ onUnmounted(() => {
           <div class="selection-title">提现金额</div>
           <div class="account-selection-title" @click.stop="toggleAccountDropdown">
             <span v-if="selectedAccount">
-              提现至{{ getAccountTypeName(selectedAccount.type) }}({{ selectedAccount.account.slice(-4) }})
+              提现至{{ getAccountTypeName(selectedAccount.type) }}({{
+                selectedAccount.account.slice(-4)
+              }})
             </span>
             <span v-else>选择提现账号</span>
             <Icon name="arrow" size="14" color="#ccc" />
@@ -365,14 +375,24 @@ onUnmounted(() => {
               <!-- 现有账号列表 -->
               <div v-if="userAccounts.length > 0" class="existing-accounts">
                 <div class="dropdown-section-title">选择账号</div>
-                <div v-for="account in userAccounts" :key="account.id" class="dropdown-account-item"
-                  :class="{ active: selectedAccount?.id === account.id }" @click="selectAccount(account)">
+                <div
+                  v-for="account in userAccounts"
+                  :key="account.id"
+                  class="dropdown-account-item"
+                  :class="{ active: selectedAccount?.id === account.id }"
+                  @click="selectAccount(account)"
+                >
                   <div class="account-info">
                     <div class="account-name">{{ account.name }}</div>
                     <div class="account-detail">{{ getAccountDisplayInfo(account) }}</div>
                   </div>
                   <div class="account-actions">
-                    <Icon name="delete" size="16" color="#ff4444" @click.stop="handleDeleteAccount(account)" />
+                    <Icon
+                      name="delete"
+                      size="16"
+                      color="#ff4444"
+                      @click.stop="handleDeleteAccount(account)"
+                    />
                   </div>
                 </div>
               </div>
@@ -380,9 +400,13 @@ onUnmounted(() => {
               <!-- 添加新账号选项 -->
               <div class="add-account-options">
                 <div class="dropdown-section-title">添加新账号</div>
-                <div v-for="type in withdrawTypes" :key="type.type" class="dropdown-add-item"
-                  @click="selectAddAccountType(type)">
-                  <img :src="type.icon" :alt="type.name" class="add-type-icon">
+                <div
+                  v-for="type in withdrawTypes"
+                  :key="type.type"
+                  class="dropdown-add-item"
+                  @click="selectAddAccountType(type)"
+                >
+                  <img :src="type.icon" :alt="type.name" class="add-type-icon" />
                   <span class="add-type-name">添加{{ type.name }}</span>
                   <Icon name="plus" size="14" color="#ff9500" />
                 </div>
@@ -395,15 +419,19 @@ onUnmounted(() => {
         <div class="amount-input-section">
           <div class="amount-input">
             <span class="currency-symbol">¥</span>
-            <input type="number" v-model="withdrawAmount" placeholder="请输入提现金额" min="0.3" step="0.1" />
+            <input
+              type="number"
+              v-model="withdrawAmount"
+              placeholder="请输入提现金额"
+              min="0.3"
+              step="0.1"
+            />
           </div>
         </div>
 
         <!-- 提现按钮 -->
         <div class="withdraw-button-container" v-if="selectedAccount && withdrawAmount">
-          <button class="withdraw-button" @click="handleWithdraw">
-            立即提现
-          </button>
+          <button class="withdraw-button" @click="handleWithdraw">立即提现</button>
         </div>
 
         <!-- 温馨提示 -->
@@ -416,7 +444,10 @@ onUnmounted(() => {
             <div class="tip-item">4. 提现需投注金额达到充值金额的400%，否则无法完成提现。</div>
             <div class="tip-item">（例如：充值100元，需投注400元方可提现。）</div>
             <div class="tip-item">5. 请确保正确填写开户银行、银行卡号和持卡人姓名。</div>
-            <div class="tip-item">6. 当您提现申请完成后，我们承诺，除非遇到非可控因素，我们将为您提供1分钟快速到账的提款服务。</div>
+            <div class="tip-item">
+              6.
+              当您提现申请完成后，我们承诺，除非遇到非可控因素，我们将为您提供1分钟快速到账的提款服务。
+            </div>
           </div>
         </div>
       </div>
@@ -435,7 +466,10 @@ onUnmounted(() => {
         </div>
         <div class="form-item">
           <label>账号</label>
-          <input v-model="newAccount.account" :placeholder="`请输入${selectedWithdrawType?.name}账号`" />
+          <input
+            v-model="newAccount.account"
+            :placeholder="`请输入${selectedWithdrawType?.name}账号`"
+          />
         </div>
         <div class="form-item" v-if="selectedWithdrawType?.name === '银行卡'">
           <label>银行名称</label>
@@ -496,6 +530,25 @@ onUnmounted(() => {
   flex: 1;
 }
 
+.balance-row {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 20px;
+}
+
+.balance-item {
+  flex: 1;
+  min-width: 0;
+}
+
+.balance-divider {
+  width: 1px;
+  height: 60px;
+  background: #333;
+  margin: 10px 0;
+}
+
 .balance-label {
   font-size: 14px;
   color: #ccc;
@@ -503,9 +556,24 @@ onUnmounted(() => {
 }
 
 .balance-amount {
-  font-size: 32px;
+  font-size: 24px;
   font-weight: bold;
   color: #fff;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.balance-amount.highlight {
+  color: #ff9500;
+  font-size: 24px;
+}
+
+.balance-tip {
+  font-size: 12px;
+  color: #888;
+  margin-top: 4px;
+  white-space: nowrap;
 }
 
 .coin-icon img {
