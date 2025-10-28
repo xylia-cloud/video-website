@@ -679,17 +679,21 @@ const confirmCharge = async () => {
     if (result.code === 1) {
       // 检查是否返回了支付链接
       if (result.data && result.data.payUrl) {
-        // 打开支付页面
-        console.log('🔗 打开支付页面:', result.data.payUrl)
-        window.open(result.data.payUrl, '_blank')
+        // 使用直接跳转方式打开支付页面
+        console.log('🔗 准备跳转到支付页面:', result.data.payUrl)
 
         showToast({
-          message: '请在新窗口完成支付',
+          message: '正在跳转到支付页面...',
           position: 'top',
-          duration: 3000,
+          duration: 2000,
           className: 'custom-toast-info',
           icon: 'info-o',
         })
+
+        // 延迟跳转，让用户看到提示
+        setTimeout(() => {
+          window.location.href = result.data.payUrl
+        }, 500)
 
         // 关闭充值弹窗
         showChargeModal.value = false
@@ -2496,6 +2500,21 @@ const handleAdClick = (ad: ListAd) => {
         ref="videoContainerRef"
         :class="['video-container', { 'video-floating': isVideoFloating && isPlaying }]"
       >
+        <!-- 四个矩形显示 -->
+        <div class="corner-rectangles">
+          <div class="corner-rectangle top-left">
+            <div class="shape-model"></div>
+          </div>
+          <div class="corner-rectangle top-right">
+            <div class="shape-model"></div>
+          </div>
+          <div class="corner-rectangle bottom-left">
+            <div class="shape-model"></div>
+          </div>
+          <div class="corner-rectangle bottom-right">
+            <div class="shape-model"></div>
+          </div>
+        </div>
         <!-- 视频广告弹窗 -->
         <div v-if="showVideoAd" class="video-ad-overlay">
           <div class="video-ad-modal">
@@ -2732,10 +2751,68 @@ const handleAdClick = (ad: ListAd) => {
   background-color: #000;
   transition: all 0.3s ease;
   overflow: hidden;
-  /* 裁剪超出部分，让圆形只显示四分之一 */
   /* iOS兼容性 */
   -webkit-transform: translateZ(0);
   transform: translateZ(0);
+
+  /* 四个矩形样式 */
+  .corner-rectangles {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    pointer-events: none;
+    z-index: 2;
+  }
+
+  .corner-rectangle {
+    position: absolute;
+    width: 80px;
+    height: 20px;
+
+    &::before {
+      content: '';
+      position: absolute;
+      top: -5px;
+      left: -5px;
+      right: -5px;
+      bottom: -5px;
+      background: rgba(255, 255, 255, 0.3);
+      backdrop-filter: blur(4px);
+      -webkit-backdrop-filter: blur(10px);
+      border-radius: 4px;
+      z-index: -1;
+    }
+
+    &.top-left {
+      top: 16px;
+      left: 16px;
+      border-right: none;
+      border-bottom: none;
+    }
+
+    &.top-right {
+      top: 16px;
+      right: 16px;
+      border-left: none;
+      border-bottom: none;
+    }
+
+    &.bottom-left {
+      bottom: 16px;
+      left: 16px;
+      border-right: none;
+      border-top: none;
+    }
+
+    &.bottom-right {
+      bottom: 16px;
+      right: 16px;
+      border-left: none;
+      border-top: none;
+    }
+  }
 }
 
 /* 视频浮动样式 */
