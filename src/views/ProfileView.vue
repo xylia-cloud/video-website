@@ -1,7 +1,6 @@
 <script setup lang="ts">
 // 个人中心页面逻辑
 import { ref, onMounted, computed } from 'vue'
-import html2canvas from 'html2canvas'
 import { showToast } from 'vant'
 import { useRouter } from 'vue-router'
 import {
@@ -396,31 +395,6 @@ const handleLogout = async () => {
   } finally {
     isLoggingOut.value = false
   }
-}
-
-// 保存凭证截图
-const saveCredential = async () => {
-  try {
-    const element = document.getElementById('credential-card')
-    if (element) {
-      const canvas = await html2canvas(element)
-      const link = document.createElement('a')
-      link.download = '账户凭证.png'
-      link.href = canvas.toDataURL('image/png')
-      link.click()
-      showToast({
-        message: '凭证已保存',
-        duration: 2000,
-      })
-    }
-  } catch (error) {
-    console.error('保存凭证失败', error)
-    showToast({
-      message: '保存失败，请重试',
-      duration: 2000,
-    })
-  }
-  showCredential.value = false
 }
 
 // 关闭凭证弹窗
@@ -919,17 +893,19 @@ const confirmApplyAgent = async () => {
               <img :src="avatarUrl" alt="头像" />
             </div>
             <div class="credential-username">{{ userName }}</div>
+            <div class="credential-id">ID：{{ userInfo?.user_id || userInfo?.id || '未知' }}</div>
             <div class="credential-qrcode">
               <!-- 使用本地二维码图片 -->
               <img src="@/assets/img/qrcode-profile.png" alt="二维码" class="qrcode-img" />
             </div>
             <div class="credential-website">永久网址: sese1188.cc</div>
-            <div class="credential-desc">浏览器扫码恢复账号<br />唯一账户凭证请妥善保存</div>
+            <div class="credential-desc">
+              账户凭证为唯一防失联和恢复账户依据<br />请截图妥善保存
+            </div>
           </div>
         </div>
         <div class="credential-buttons">
-          <div class="credential-button credential-button-save" @click="saveCredential">保存</div>
-          <div class="credential-button credential-button-close" @click="closeCredential">关闭</div>
+          <div class="credential-button" @click="closeCredential">关闭</div>
         </div>
       </div>
     </div>
@@ -1644,8 +1620,20 @@ export default {
 
 .credential-username {
   font-size: 16px;
-  color: #fff;
-  margin-bottom: 20px;
+  font-weight: bold;
+}
+
+.credential-id {
+  text-align: center;
+  margin: 5px 0 15px;
+  font-size: 14px;
+  color: rgba(255, 255, 255, 0.9);
+  background: rgba(255, 255, 255, 0.1);
+  padding: 4px 12px;
+  border-radius: 15px;
+  display: inline-block;
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
   font-weight: 500;
 }
 
@@ -1712,19 +1700,11 @@ export default {
   transition: all 0.3s ease;
 }
 
-.credential-button-save {
-  background-color: #ff9500;
-}
-
-.credential-button-save:hover {
-  background-color: #ff8800;
-}
-
-.credential-button-close {
+.credential-button {
   background-color: #444;
 }
 
-.credential-button-close:hover {
+.credential-button:hover {
   background-color: #555;
 }
 
