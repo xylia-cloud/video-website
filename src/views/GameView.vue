@@ -1,235 +1,250 @@
 <script setup lang="ts">
-import { ref, onMounted } from 'vue';
-import { NEW_API_BASE_URL } from '@/utils/config';
-import { getUserInfo, isLoggedIn, fetchNotices, type NoticeGroup } from '@/api/fetch-api';
-import { useRouter } from 'vue-router';
-import { showToast } from 'vant';
+import { ref, onMounted } from 'vue'
+import { NEW_API_BASE_URL } from '@/utils/config'
+import { getUserInfo, isLoggedIn, fetchNotices, type NoticeGroup } from '@/api/fetch-api'
+import { useRouter } from 'vue-router'
+import { showToast } from 'vant'
 
 // 顶级游戏分类接口
 interface TopGameCategory {
-  id: string;
-  name: string;
-  icon: string;
-  status: string;
-  paixu?: string;
-  biaoshi?: string | null;
-  code?: string | null;
-  istry?: string | null;
+  id: string
+  name: string
+  icon: string
+  status: string
+  paixu?: string
+  biaoshi?: string | null
+  code?: string | null
+  istry?: string | null
 }
 
 // 分页信息接口
 interface PaginationInfo {
-  currentPage: number; // 当前页码
-  totalCount: number; // 总条数
-  totalPages: number; // 总页数
-  pageSize: number; // 每页条数
+  currentPage: number // 当前页码
+  totalCount: number // 总条数
+  totalPages: number // 总页数
+  pageSize: number // 每页条数
 }
 
 // 一级游戏分类接口
 interface SubGameCategory {
-  id: string;
-  name: string;
-  icon: string;
-  topclass_id: string;
-  ismy?: number;
-  expanded?: boolean; // 是否展开
-  games?: Game[]; // 该分类下的游戏列表
-  loading?: boolean; // 是否正在加载游戏
-  pagination?: PaginationInfo; // 分页信息
-  jumpPage?: number; // 跳转页码输入值
+  id: string
+  name: string
+  icon: string
+  topclass_id: string
+  ismy?: number
+  expanded?: boolean // 是否展开
+  games?: Game[] // 该分类下的游戏列表
+  loading?: boolean // 是否正在加载游戏
+  pagination?: PaginationInfo // 分页信息
+  jumpPage?: number // 跳转页码输入值
 }
 
 // 游戏数据
 interface Game {
-  id: number;
-  name: string;
-  imageUrl: string;
-  biaoshi: string; // 必需字段，用于进入游戏
-  code?: string; // 可选字段
-  type?: string; // 可选字段
+  id: number
+  name: string
+  imageUrl: string
+  biaoshi: string // 必需字段，用于进入游戏
+  code?: string // 可选字段
+  type?: string // 可选字段
 }
 
 // 顶级游戏分类数据
-const topCategories = ref<TopGameCategory[]>([]);
-const selectedTopCategory = ref<string>('0');
-const isLoadingTopCategories = ref(false);
-const hasTopCategoriesError = ref(false);
+const topCategories = ref<TopGameCategory[]>([])
+const selectedTopCategory = ref<string>('0')
+const isLoadingTopCategories = ref(false)
+const hasTopCategoriesError = ref(false)
 
 // 二级游戏分类数据
-const secondaryCategories = ref<SubGameCategory[]>([]);
-const isLoadingSecondaryCategories = ref(false);
-const hasSecondaryCategoriesError = ref(false);
+const secondaryCategories = ref<SubGameCategory[]>([])
+const isLoadingSecondaryCategories = ref(false)
+const hasSecondaryCategoriesError = ref(false)
 
 // 二级分类分页数据
 const secondaryCategoriesPagination = ref({
   currentPage: 1,
   totalCount: 0,
   totalPages: 0,
-  pageSize: 12 // 后端每页返回12条数据
-});
-const secondaryCategoriesJumpPage = ref(1);
+  pageSize: 12, // 后端每页返回12条数据
+})
+const secondaryCategoriesJumpPage = ref(1)
 
 // 全屏加载状态
-const isGlobalLoading = ref(false);
+const isGlobalLoading = ref(false)
 
 // 用户余额数据
-const userBalance = ref(0);
-const gameBalance = ref(0);
+const userBalance = ref(0)
+const gameBalance = ref(0)
 
 // 用户登录状态
-const isUserLoggedIn = ref(false);
+const isUserLoggedIn = ref(false)
 
 // 公告相关状态
-const announcementText = ref('');
-const isLoadingNotice = ref(false);
-const hasNoticeError = ref(false);
+const announcementText = ref('')
+const isLoadingNotice = ref(false)
+const hasNoticeError = ref(false)
 
 // 获取充值公告数据
 const fetchRechargeNotice = async () => {
-  isLoadingNotice.value = true;
-  hasNoticeError.value = false;
+  isLoadingNotice.value = true
+  hasNoticeError.value = false
 
   try {
-    const result = await fetchNotices();
-    console.log('获取公告数据:', result);
+    const result = await fetchNotices()
+    console.log('获取公告数据:', result)
 
     if (result && result.code === 1 && result.data) {
       // 查找充值公告分组
-      const rechargeGroup = result.data.find((group: NoticeGroup) => group.name === '充值公告');
+      const rechargeGroup = result.data.find((group: NoticeGroup) => group.name === '充值公告')
 
       if (rechargeGroup && rechargeGroup.list && rechargeGroup.list.length > 0) {
         // 获取第一条充值公告的内容
-        const firstNotice = rechargeGroup.list[0];
-        announcementText.value = firstNotice.content;
+        const firstNotice = rechargeGroup.list[0]
+        announcementText.value = firstNotice.content
       } else {
-        announcementText.value = '暂无充值公告';
+        announcementText.value = '暂无充值公告'
       }
     } else {
-      hasNoticeError.value = true;
-      announcementText.value = '公告加载失败';
+      hasNoticeError.value = true
+      announcementText.value = '公告加载失败'
     }
   } catch (error) {
-    console.error('获取充值公告失败:', error);
-    hasNoticeError.value = true;
-    announcementText.value = '公告加载失败';
+    console.error('获取充值公告失败:', error)
+    hasNoticeError.value = true
+    announcementText.value = '公告加载失败'
   } finally {
-    isLoadingNotice.value = false;
+    isLoadingNotice.value = false
   }
-};
+}
 
 // 防重复请求标记
-const isTopCategoriesLoading = ref(false);
-const isSecondaryCategoriesLoading = ref(false);
+const isTopCategoriesLoading = ref(false)
+const isSecondaryCategoriesLoading = ref(false)
 
 // 获取顶级游戏分类数据
 const fetchTopCategories = async () => {
   // 防重复请求
   if (isTopCategoriesLoading.value) {
-    console.log('🔄 顶级分类正在加载中，跳过重复请求');
-    return;
+    console.log('🔄 顶级分类正在加载中，跳过重复请求')
+    return
   }
 
-  isTopCategoriesLoading.value = true;
-  isGlobalLoading.value = true;
-  isLoadingTopCategories.value = true;
-  hasTopCategoriesError.value = false;
+  isTopCategoriesLoading.value = true
+  isGlobalLoading.value = true
+  isLoadingTopCategories.value = true
+  hasTopCategoriesError.value = false
 
   try {
     // 构建查询参数
     const queryParams = new URLSearchParams({
-      service: 'caipiao.topclass'
+      service: 'caipiao.topclass',
       // 不传递pid参数，根据接口要求
-    });
+    })
 
     // 发起GET请求
     const response = await fetch(`${NEW_API_BASE_URL}/?${queryParams.toString()}`, {
       method: 'GET',
       headers: {
-        'Accept': 'application/json'
-      }
-    });
+        Accept: 'application/json',
+      },
+    })
 
     if (!response.ok) {
-      throw new Error(`HTTP error! Status: ${response.status}`);
+      throw new Error(`HTTP error! Status: ${response.status}`)
     }
 
-    const result = await response.json();
-    console.log('获取顶级游戏分类数据:', result);
+    const result = await response.json()
+    console.log('获取顶级游戏分类数据:', result)
 
-    if (result && result.ret === 200 && result.data && result.data.code === 0 && Array.isArray(result.data.info)) {
+    if (
+      result &&
+      result.ret === 200 &&
+      result.data &&
+      result.data.code === 0 &&
+      Array.isArray(result.data.info)
+    ) {
       // 按照paixu排序，并确保ID是字符串类型
-      const sortedCategories = [...result.data.info].map(category => ({
-        ...category,
-        id: String(category.id) // 确保ID是字符串类型
-      })).sort((a, b) => {
-        const paixuA = a.paixu ? parseInt(a.paixu) : 999;
-        const paixuB = b.paixu ? parseInt(b.paixu) : 999;
-        return paixuA - paixuB;
-      });
+      const sortedCategories = [...result.data.info]
+        .map((category) => ({
+          ...category,
+          id: String(category.id), // 确保ID是字符串类型
+        }))
+        .sort((a, b) => {
+          const paixuA = a.paixu ? parseInt(a.paixu) : 999
+          const paixuB = b.paixu ? parseInt(b.paixu) : 999
+          return paixuA - paixuB
+        })
 
-      topCategories.value = sortedCategories;
+      topCategories.value = sortedCategories
 
       // 默认选中第一个分类
       if (topCategories.value.length > 0) {
-        selectedTopCategory.value = String(topCategories.value[0].id);
+        selectedTopCategory.value = String(topCategories.value[0].id)
         // 加载第一个顶级分类的二级分类列表
-        fetchSecondaryCategories(selectedTopCategory.value);
+        fetchSecondaryCategories(selectedTopCategory.value)
       }
 
-      console.log('处理后的顶级游戏分类数据:', topCategories.value);
+      console.log('处理后的顶级游戏分类数据:', topCategories.value)
     } else {
-      console.log('没有获取到顶级游戏分类数据');
-      topCategories.value = [];
+      console.log('没有获取到顶级游戏分类数据')
+      topCategories.value = []
     }
   } catch (error) {
-    console.error('获取顶级游戏分类失败:', error);
-    hasTopCategoriesError.value = true;
-    topCategories.value = [];
+    console.error('获取顶级游戏分类失败:', error)
+    hasTopCategoriesError.value = true
+    topCategories.value = []
   } finally {
-    isLoadingTopCategories.value = false;
-    isGlobalLoading.value = false;
-    isTopCategoriesLoading.value = false;
+    isLoadingTopCategories.value = false
+    isGlobalLoading.value = false
+    isTopCategoriesLoading.value = false
   }
-};
+}
 
 // 获取二级游戏分类数据
 const fetchSecondaryCategories = async (topCategoryId: string, page: number = 1) => {
   // 防重复请求
-  const requestKey = `${topCategoryId}-${page}`;
+  const requestKey = `${topCategoryId}-${page}`
   if (isSecondaryCategoriesLoading.value) {
-    console.log('🔄 二级分类正在加载中，跳过重复请求:', requestKey);
-    return;
+    console.log('🔄 二级分类正在加载中，跳过重复请求:', requestKey)
+    return
   }
 
-  isSecondaryCategoriesLoading.value = true;
-  isGlobalLoading.value = true;
-  isLoadingSecondaryCategories.value = true;
-  hasSecondaryCategoriesError.value = false;
+  isSecondaryCategoriesLoading.value = true
+  isGlobalLoading.value = true
+  isLoadingSecondaryCategories.value = true
+  hasSecondaryCategoriesError.value = false
 
   try {
     // 构建查询参数
     const queryParams = new URLSearchParams({
       service: 'caipiao.twoclass',
-      pid: topCategoryId
-    });
+      pid: topCategoryId,
+    })
 
     // 发起POST请求
     const response = await fetch(`${NEW_API_BASE_URL}/?${queryParams.toString()}`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/x-www-form-urlencoded',
-        'Accept': 'application/json'
-      }
-    });
+        Accept: 'application/json',
+      },
+    })
 
     if (!response.ok) {
-      throw new Error(`HTTP error! Status: ${response.status}`);
+      throw new Error(`HTTP error! Status: ${response.status}`)
     }
 
-    const result = await response.json();
-    console.log('获取二级游戏分类数据:', result);
+    const result = await response.json()
+    console.log('获取二级游戏分类数据:', result)
 
-    if (result && result.ret === 200 && result.data && result.data.code === 0 && result.data.info && Array.isArray(result.data.info.data)) {
+    if (
+      result &&
+      result.ret === 200 &&
+      result.data &&
+      result.data.code === 0 &&
+      result.data.info &&
+      Array.isArray(result.data.info.data)
+    ) {
       // 处理二级分类数据
       const allCategories = result.data.info.data.map((item: Record<string, unknown>) => ({
         id: String(item.id || ''),
@@ -240,68 +255,72 @@ const fetchSecondaryCategories = async (topCategoryId: string, page: number = 1)
         expanded: false, // 默认不展开
         games: [], // 初始化游戏列表
         loading: false, // 初始化加载状态
-        pagination: { // 初始化分页信息
+        pagination: {
+          // 初始化分页信息
           currentPage: 1,
           totalCount: 0,
           totalPages: 0,
-          pageSize: 12
-        }
-      }));
+          pageSize: 12,
+        },
+      }))
 
       // 直接使用后端返回的数据，不进行前端分页
-      secondaryCategories.value = allCategories;
+      secondaryCategories.value = allCategories
 
       // 从后端响应中获取分页信息
-      const totalCount = parseInt(result.data.info.total || '0');
-      const pageSize = 12; // 后端每页返回12条
-      const totalPages = Math.ceil(totalCount / pageSize);
+      const totalCount = parseInt(result.data.info.total || '0')
+      const pageSize = 12 // 后端每页返回12条
+      const totalPages = Math.ceil(totalCount / pageSize)
 
       // 更新分页信息
       secondaryCategoriesPagination.value = {
         currentPage: page,
         totalCount,
         totalPages,
-        pageSize
-      };
-      console.log('处理后的二级游戏分类数据:', allCategories);
-      console.log('二级分类数量:', allCategories.length);
-      console.log('分页信息:', secondaryCategoriesPagination.value);
-
+        pageSize,
+      }
+      console.log('处理后的二级游戏分类数据:', allCategories)
+      console.log('二级分类数量:', allCategories.length)
+      console.log('分页信息:', secondaryCategoriesPagination.value)
     } else {
-      console.log('没有获取到二级游戏分类数据');
-      secondaryCategories.value = [];
+      console.log('没有获取到二级游戏分类数据')
+      secondaryCategories.value = []
       secondaryCategoriesPagination.value = {
         currentPage: 1,
         totalCount: 0,
         totalPages: 0,
-        pageSize: 12
-      };
+        pageSize: 12,
+      }
     }
   } catch (error) {
-    console.error('获取二级游戏分类失败:', error);
-    hasSecondaryCategoriesError.value = true;
-    secondaryCategories.value = [];
+    console.error('获取二级游戏分类失败:', error)
+    hasSecondaryCategoriesError.value = true
+    secondaryCategories.value = []
     secondaryCategoriesPagination.value = {
       currentPage: 1,
       totalCount: 0,
       totalPages: 0,
-      pageSize: 12
-    };
+      pageSize: 12,
+    }
   } finally {
-    isLoadingSecondaryCategories.value = false;
-    isGlobalLoading.value = false;
-    isSecondaryCategoriesLoading.value = false;
+    isLoadingSecondaryCategories.value = false
+    isGlobalLoading.value = false
+    isSecondaryCategoriesLoading.value = false
   }
-};
+}
 
 // 获取某个一级分类下的二级游戏
-const fetchGamesForSubCategory = async (topCategoryId: string, subCategoryId: string, page: number = 1) => {
+const fetchGamesForSubCategory = async (
+  topCategoryId: string,
+  subCategoryId: string,
+  page: number = 1,
+) => {
   // 找到对应的二级分类
-  const subCategory = secondaryCategories.value.find(cat => cat.id === subCategoryId);
-  if (!subCategory) return;
+  const subCategory = secondaryCategories.value.find((cat) => cat.id === subCategoryId)
+  if (!subCategory) return
 
   // 设置局部加载状态
-  subCategory.loading = true;
+  subCategory.loading = true
 
   try {
     // 构建查询参数，添加分页参数
@@ -309,29 +328,29 @@ const fetchGamesForSubCategory = async (topCategoryId: string, subCategoryId: st
       service: 'caipiao.gettwoclass',
       pid: topCategoryId,
       oneclass_id: subCategoryId,
-      p: page.toString() // 当前页数
-    });
+      p: page.toString(), // 当前页数
+    })
 
     // 发起POST请求
     const response = await fetch(`${NEW_API_BASE_URL}/?${queryParams.toString()}`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/x-www-form-urlencoded',
-        'Accept': 'application/json'
-      }
-    });
+        Accept: 'application/json',
+      },
+    })
 
     if (!response.ok) {
-      throw new Error(`HTTP error! Status: ${response.status}`);
+      throw new Error(`HTTP error! Status: ${response.status}`)
     }
 
-    const result = await response.json();
-    console.log(`获取分类 ${subCategory.name} 的游戏列表:`, result);
+    const result = await response.json()
+    console.log(`获取分类 ${subCategory.name} 的游戏列表:`, result)
 
     if (result && result.ret === 200 && result.data && result.data.code === 0) {
       // 检查新的数据结构：result.data.info.data
-      const gameData = result.data.info?.data || result.data.info;
-      const totalCount = result.data.info?.total || 0; // 获取总条数
+      const gameData = result.data.info?.data || result.data.info
+      const totalCount = result.data.info?.total || 0 // 获取总条数
 
       if (Array.isArray(gameData)) {
         // 处理游戏数据
@@ -341,215 +360,212 @@ const fetchGamesForSubCategory = async (topCategoryId: string, subCategoryId: st
           imageUrl: String(item.icon || ''),
           biaoshi: String(item.biaoshi || ''), // 必需字段
           code: item.code ? String(item.code) : String(item.biaoshi || ''), // 优先使用code，否则使用biaoshi
-          type: item.type ? String(item.type) : String(item.biaoshi || '') // 优先使用type，否则使用biaoshi
-        }));
+          type: item.type ? String(item.type) : String(item.biaoshi || ''), // 优先使用type，否则使用biaoshi
+        }))
 
         // 计算分页信息
-        const pageSize = 12; // 每页固定12条
-        const totalPages = Math.ceil(totalCount / pageSize);
+        const pageSize = 12 // 每页固定12条
+        const totalPages = Math.ceil(totalCount / pageSize)
 
         // 直接替换当前页的游戏列表
-        subCategory.games = gamesList;
+        subCategory.games = gamesList
 
         // 更新分页信息
         subCategory.pagination = {
           currentPage: page,
           totalCount: totalCount,
           totalPages: totalPages,
-          pageSize: pageSize
-        };
+          pageSize: pageSize,
+        }
 
-        console.log(`处理后的分类 ${subCategory.name} 游戏数据:`, gamesList);
-        console.log(`分页信息:`, subCategory.pagination);
+        console.log(`处理后的分类 ${subCategory.name} 游戏数据:`, gamesList)
+        console.log(`分页信息:`, subCategory.pagination)
       } else {
-        console.log(`分类 ${subCategory.name} 的游戏数据格式不正确:`, result.data.info);
-        subCategory.games = [];
+        console.log(`分类 ${subCategory.name} 的游戏数据格式不正确:`, result.data.info)
+        subCategory.games = []
         subCategory.pagination = {
           currentPage: 1,
           totalCount: 0,
           totalPages: 0,
-          pageSize: 12
-        };
+          pageSize: 12,
+        }
       }
     } else {
-      console.log(`没有获取到分类 ${subCategory.name} 的游戏数据`);
-      subCategory.games = [];
+      console.log(`没有获取到分类 ${subCategory.name} 的游戏数据`)
+      subCategory.games = []
       subCategory.pagination = {
         currentPage: 1,
         totalCount: 0,
         totalPages: 0,
-        pageSize: 12
-      };
+        pageSize: 12,
+      }
     }
   } catch (error) {
-    console.error(`获取分类 ${subCategory.name} 的游戏失败:`, error);
-    subCategory.games = [];
+    console.error(`获取分类 ${subCategory.name} 的游戏失败:`, error)
+    subCategory.games = []
   } finally {
     // 关闭局部加载状态
-    subCategory.loading = false;
+    subCategory.loading = false
   }
-};
+}
 
-
-
-
-
-const router = useRouter();
+const router = useRouter()
 
 // 处理顶级分类点击
 const handleTopCategoryClick = (categoryId: string) => {
-  console.log('点击顶级分类:', categoryId);
+  console.log('点击顶级分类:', categoryId)
 
   // 如果点击的是当前选中的分类，不做任何操作
-  if (selectedTopCategory.value === categoryId) return;
+  if (selectedTopCategory.value === categoryId) return
 
   // 更新选中的分类
-  selectedTopCategory.value = categoryId;
-  console.log('更新选中的顶级分类为:', categoryId);
+  selectedTopCategory.value = categoryId
+  console.log('更新选中的顶级分类为:', categoryId)
 
   // 重置分页到第一页
-  secondaryCategoriesPagination.value.currentPage = 1;
-  secondaryCategoriesJumpPage.value = 1;
+  secondaryCategoriesPagination.value.currentPage = 1
+  secondaryCategoriesJumpPage.value = 1
 
   // 获取该顶级分类下的二级分类列表
-  fetchSecondaryCategories(categoryId, 1);
-};
+  fetchSecondaryCategories(categoryId, 1)
+}
 
 // 处理二级分类点击
 const handleSecondaryCategoryClick = (secondaryCategory: SubGameCategory) => {
   // 先关闭所有其他分类的展开状态
-  secondaryCategories.value.forEach(cat => {
-    cat.expanded = false;
-  });
+  secondaryCategories.value.forEach((cat) => {
+    cat.expanded = false
+  })
 
   // 展开当前选中的分类
-  secondaryCategory.expanded = true;
+  secondaryCategory.expanded = true
 
   // 如果还没有加载过游戏，则加载游戏
   if (!secondaryCategory.games || secondaryCategory.games.length === 0) {
-    fetchGamesForSubCategory(selectedTopCategory.value, secondaryCategory.id, 1);
+    fetchGamesForSubCategory(selectedTopCategory.value, secondaryCategory.id, 1)
   }
   // 如果已经有数据，直接展开，不做任何网络请求
-};
+}
 
 // 处理分页点击
 const handlePageChange = (subCategory: SubGameCategory, page: number) => {
-  if (page < 1 || page > (subCategory.pagination?.totalPages || 1)) return;
-  if (page === subCategory.pagination?.currentPage) return;
+  if (page < 1 || page > (subCategory.pagination?.totalPages || 1)) return
+  if (page === subCategory.pagination?.currentPage) return
 
-  fetchGamesForSubCategory(selectedTopCategory.value, subCategory.id, page);
-};
+  fetchGamesForSubCategory(selectedTopCategory.value, subCategory.id, page)
+}
 
 // 处理跳转页面
 const handleJumpPage = (subCategory: SubGameCategory) => {
-  const jumpPage = subCategory.jumpPage;
-  if (!jumpPage || !subCategory.pagination) return;
+  const jumpPage = subCategory.jumpPage
+  if (!jumpPage || !subCategory.pagination) return
 
-  const targetPage = parseInt(jumpPage.toString());
+  const targetPage = parseInt(jumpPage.toString())
   if (isNaN(targetPage)) {
-    subCategory.jumpPage = undefined;
-    return;
+    subCategory.jumpPage = undefined
+    return
   }
 
-  const maxPage = subCategory.pagination.totalPages;
+  const maxPage = subCategory.pagination.totalPages
   if (targetPage < 1 || targetPage > maxPage) {
-    subCategory.jumpPage = undefined;
-    return;
+    subCategory.jumpPage = undefined
+    return
   }
 
   if (targetPage !== subCategory.pagination.currentPage) {
-    handlePageChange(subCategory, targetPage);
+    handlePageChange(subCategory, targetPage)
   }
 
-  subCategory.jumpPage = undefined;
-};
+  subCategory.jumpPage = undefined
+}
 
 // 处理二级分类分页点击
 const handleSecondaryCategoriesPageChange = (page: number) => {
-  if (page < 1 || page > secondaryCategoriesPagination.value.totalPages) return;
-  if (page === secondaryCategoriesPagination.value.currentPage) return;
+  if (page < 1 || page > secondaryCategoriesPagination.value.totalPages) return
+  if (page === secondaryCategoriesPagination.value.currentPage) return
 
-  fetchSecondaryCategories(selectedTopCategory.value, page);
-};
+  fetchSecondaryCategories(selectedTopCategory.value, page)
+}
 
 // 处理二级分类跳转页面
 const handleSecondaryCategoriesJumpPage = () => {
-  const jumpPage = secondaryCategoriesJumpPage.value;
+  const jumpPage = secondaryCategoriesJumpPage.value
   if (jumpPage && jumpPage >= 1 && jumpPage <= secondaryCategoriesPagination.value.totalPages) {
-    handleSecondaryCategoriesPageChange(jumpPage);
+    handleSecondaryCategoriesPageChange(jumpPage)
   } else {
     // 重置为当前页
-    secondaryCategoriesJumpPage.value = secondaryCategoriesPagination.value.currentPage;
+    secondaryCategoriesJumpPage.value = secondaryCategoriesPagination.value.currentPage
   }
-};
+}
 
 // 游戏确认弹窗状态
-const showGameDialog = ref(false);
-const currentGame = ref<Game | null>(null);
-const currentGameUrl = ref('');
+const showGameDialog = ref(false)
+const currentGame = ref<Game | null>(null)
+const currentGameUrl = ref('')
 
 // 显示游戏确认弹窗
 const showGameConfirmDialog = (game: Game, gameUrl: string) => {
-  currentGame.value = game;
-  currentGameUrl.value = gameUrl;
-  showGameDialog.value = true;
-};
+  currentGame.value = game
+  currentGameUrl.value = gameUrl
+  showGameDialog.value = true
+}
 
 // 确认开始游戏
 const confirmStartGame = () => {
   if (currentGameUrl.value) {
-    const newWindow = window.open(currentGameUrl.value, '_blank', 'noopener,noreferrer');
+    const newWindow = window.open(currentGameUrl.value, '_blank', 'noopener,noreferrer')
     if (!newWindow) {
-      showToast('无法打开游戏窗口，请检查浏览器设置');
+      showToast('无法打开游戏窗口，请检查浏览器设置')
     }
   }
-  showGameDialog.value = false;
-};
+  showGameDialog.value = false
+}
 
 // 取消开始游戏
 const cancelStartGame = () => {
-  showGameDialog.value = false;
-  currentGame.value = null;
-  currentGameUrl.value = '';
-};
-
-
-
-
-
-
+  showGameDialog.value = false
+  currentGame.value = null
+  currentGameUrl.value = ''
+}
 
 // 处理游戏点击
 const handleGameClick = (game: Game) => {
   // 检查是否为占位数据
   if (game.id < 0) {
-    return; // 占位数据不可点击
+    return // 占位数据不可点击
   }
 
   // 检查必要的游戏信息
   if (!game.biaoshi) {
-    console.error('游戏信息不完整，无法进入游戏', game);
-    return;
+    console.error('游戏信息不完整，无法进入游戏', game)
+    return
   }
 
   // 获取用户信息
-  const userInfo = getUserInfo();
+  const userInfo = getUserInfo()
   if (!userInfo || !userInfo.user_id || !userInfo.token) {
     // 用户未登录，跳转到登录页
-    router.push('/login');
-    return;
+    router.push('/login')
+    return
   }
 
   // 使用biaoshi作为所有必要参数
-  const type = game.type || game.biaoshi;
-  const code = game.code || game.biaoshi;
+  const type = game.type || game.biaoshi
+  const code = game.code || game.biaoshi
 
   // 进入游戏
-  enterGame(userInfo.user_id, userInfo.token, game.biaoshi, type, code, game);
-};
+  enterGame(userInfo.user_id, userInfo.token, game.biaoshi, type, code, game)
+}
 
 // 进入游戏接口
-const enterGame = async (uid: number, token: string, biaoshi: string, type: string, code: string, game: Game) => {
+const enterGame = async (
+  uid: number,
+  token: string,
+  biaoshi: string,
+  type: string,
+  code: string,
+  game: Game,
+) => {
   try {
     // 构建查询参数
     const queryParams = new URLSearchParams({
@@ -558,108 +574,105 @@ const enterGame = async (uid: number, token: string, biaoshi: string, type: stri
       token: token,
       biaoshi: biaoshi,
       type: type,
-      code: code
-    });
+      code: code,
+    })
 
     // 发起POST请求
     const response = await fetch(`${NEW_API_BASE_URL}/?${queryParams.toString()}`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/x-www-form-urlencoded',
-        'Accept': 'application/json'
-      }
-    });
+        Accept: 'application/json',
+      },
+    })
 
     if (!response.ok) {
-      throw new Error(`HTTP error! Status: ${response.status}`);
+      throw new Error(`HTTP error! Status: ${response.status}`)
     }
 
-    const result = await response.json();
-    console.log('进入游戏结果:', result);
+    const result = await response.json()
+    console.log('进入游戏结果:', result)
 
     if (result && result.ret === 200 && result.data && result.data.code === 0) {
       // 游戏链接
-      const gameUrl = result.data.info?.purl;
+      const gameUrl = result.data.info?.purl
       if (gameUrl) {
         // 显示游戏确认弹窗
-        showGameConfirmDialog(game, gameUrl);
+        showGameConfirmDialog(game, gameUrl)
       } else {
-        console.error('没有获取到游戏链接');
-        showToast('获取游戏链接失败');
+        console.error('没有获取到游戏链接')
+        showToast('获取游戏链接失败')
       }
     } else {
-      console.error('进入游戏失败:', result?.data?.msg || '未知错误');
-      showToast(result?.data?.msg || '进入游戏失败');
+      console.error('进入游戏失败:', result?.data?.msg || '未知错误')
+      showToast(result?.data?.msg || '进入游戏失败')
     }
   } catch (error) {
-    console.error('进入游戏请求失败:', error);
-    showToast('网络错误，请重试');
+    console.error('进入游戏请求失败:', error)
+    showToast('网络错误，请重试')
   }
-};
+}
 
 // 页面跳转方法
 const goToRecharge = () => {
-  router.push('/recharge');
-};
+  router.push('/recharge')
+}
 
 const goToWithdraw = () => {
-  router.push('/withdraw');
-};
+  router.push('/withdraw')
+}
 
 const goToGameRecord = () => {
   // 检查登录状态
   if (!isLoggedIn()) {
-    showToast('请先登录');
-    return;
+    showToast('请先登录')
+    return
   }
 
   // 跳转到游戏记录页面
-  router.push('/game-record');
-};
-
-
+  router.push('/game-record')
+}
 
 // 跳转到登录页面
 const goToLogin = () => {
-  router.push('/login');
-};
+  router.push('/login')
+}
 
 // 跳转到注册页面
 const goToRegister = () => {
-  router.push('/register');
-};
+  router.push('/register')
+}
 
 // 获取用户余额和登录状态
 const fetchUserBalance = () => {
-  const userInfo = getUserInfo();
+  const userInfo = getUserInfo()
   if (userInfo && userInfo.token) {
     // 用户已登录
-    isUserLoggedIn.value = true;
-    userBalance.value = userInfo.coin || 0; // 账户余额改为使用coin字段
-    gameBalance.value = userInfo.coin || 0; // 游戏余额也使用coin字段
+    isUserLoggedIn.value = true
+    userBalance.value = userInfo.coin || 0 // 账户余额改为使用coin字段
+    gameBalance.value = userInfo.coin || 0 // 游戏余额也使用coin字段
   } else {
     // 用户未登录
-    isUserLoggedIn.value = false;
-    userBalance.value = 0;
-    gameBalance.value = 0;
+    isUserLoggedIn.value = false
+    userBalance.value = 0
+    gameBalance.value = 0
   }
-};
+}
 
 // 组件挂载时获取数据
 onMounted(() => {
   // 获取顶级分类数据
-  fetchTopCategories();
+  fetchTopCategories()
   // 获取用户余额
-  fetchUserBalance();
+  fetchUserBalance()
   // 获取充值公告
-  fetchRechargeNotice();
+  fetchRechargeNotice()
   // 顶级分类数据加载后会自动加载一级分类列表
-});
+})
 </script>
 
 <template>
   <div class="game-page">
-
     <!-- 全屏加载状态 -->
     <div v-if="isGlobalLoading" class="global-loading">
       <div class="custom-spinner"></div>
@@ -668,7 +681,7 @@ onMounted(() => {
     <!-- 公告版块 -->
     <div class="announcement-section">
       <div class="announcement-icon">
-        <img src="@/assets/img/icon-notice.svg" alt="">
+        <img src="@/assets/img/icon-notice.svg" alt="" />
       </div>
       <div class="announcement-content">
         <div class="announcement-text">{{ announcementText }}</div>
@@ -761,8 +774,13 @@ onMounted(() => {
           <!-- 顶级分类横向滚动列表 -->
           <div v-else-if="topCategories.length > 0" class="top-categories-scroll">
             <div class="top-categories-list">
-              <div v-for="category in topCategories" :key="category.id" class="top-category-horizontal-item"
-                :class="{ active: selectedTopCategory === category.id }" @click="handleTopCategoryClick(category.id)">
+              <div
+                v-for="category in topCategories"
+                :key="category.id"
+                class="top-category-horizontal-item"
+                :class="{ active: selectedTopCategory === category.id }"
+                @click="handleTopCategoryClick(category.id)"
+              >
                 <div class="top-category-horizontal-icon">
                   <img v-if="category.icon" :src="category.icon" :alt="category.name" />
                   <div v-else class="placeholder-icon"></div>
@@ -780,7 +798,6 @@ onMounted(() => {
 
         <!-- 游戏内容区域 -->
         <div class="game-content-area">
-
           <!-- 二级分类加载状态 -->
           <div v-if="isLoadingSecondaryCategories" class="secondary-loading">
             <div class="custom-spinner"></div>
@@ -794,12 +811,26 @@ onMounted(() => {
           </div>
 
           <!-- 二级分类网格 -->
-          <div v-if="!isLoadingSecondaryCategories && !hasSecondaryCategoriesError && secondaryCategories.length > 0"
-            class="secondary-categories-grid">
-            <div v-for="secondaryCategory in secondaryCategories" :key="secondaryCategory.id"
-              class="secondary-category-item" @click="handleSecondaryCategoryClick(secondaryCategory)">
+          <div
+            v-if="
+              !isLoadingSecondaryCategories &&
+              !hasSecondaryCategoriesError &&
+              secondaryCategories.length > 0
+            "
+            class="secondary-categories-grid"
+          >
+            <div
+              v-for="secondaryCategory in secondaryCategories"
+              :key="secondaryCategory.id"
+              class="secondary-category-item"
+              @click="handleSecondaryCategoryClick(secondaryCategory)"
+            >
               <div class="secondary-category-icon">
-                <img v-if="secondaryCategory.icon" :src="secondaryCategory.icon" :alt="secondaryCategory.name" />
+                <img
+                  v-if="secondaryCategory.icon"
+                  :src="secondaryCategory.icon"
+                  :alt="secondaryCategory.name"
+                />
                 <div v-else class="placeholder-icon"></div>
               </div>
               <div class="secondary-category-name">{{ secondaryCategory.name }}</div>
@@ -808,32 +839,58 @@ onMounted(() => {
 
           <!-- 二级分类分页控件 -->
           <div
-            v-if="!isLoadingSecondaryCategories && !hasSecondaryCategoriesError && secondaryCategoriesPagination.totalPages > 1"
-            class="pagination-compact secondary-pagination">
+            v-if="
+              !isLoadingSecondaryCategories &&
+              !hasSecondaryCategoriesError &&
+              secondaryCategoriesPagination.totalPages > 1
+            "
+            class="pagination-compact secondary-pagination"
+          >
             <!-- 上一页 -->
-            <button class="page-btn-compact" :disabled="secondaryCategoriesPagination.currentPage <= 1"
-              @click="handleSecondaryCategoriesPageChange(secondaryCategoriesPagination.currentPage - 1)">
+            <button
+              class="page-btn-compact"
+              :disabled="secondaryCategoriesPagination.currentPage <= 1"
+              @click="
+                handleSecondaryCategoriesPageChange(secondaryCategoriesPagination.currentPage - 1)
+              "
+            >
               <van-icon name="arrow-left" size="14" />
             </button>
 
             <!-- 当前页信息 -->
             <span class="page-info-compact">
-              {{ secondaryCategoriesPagination.currentPage }}/{{ secondaryCategoriesPagination.totalPages }}
+              {{ secondaryCategoriesPagination.currentPage }}/{{
+                secondaryCategoriesPagination.totalPages
+              }}
             </span>
 
             <!-- 下一页 -->
-            <button class="page-btn-compact"
-              :disabled="secondaryCategoriesPagination.currentPage >= secondaryCategoriesPagination.totalPages"
-              @click="handleSecondaryCategoriesPageChange(secondaryCategoriesPagination.currentPage + 1)">
+            <button
+              class="page-btn-compact"
+              :disabled="
+                secondaryCategoriesPagination.currentPage >=
+                secondaryCategoriesPagination.totalPages
+              "
+              @click="
+                handleSecondaryCategoriesPageChange(secondaryCategoriesPagination.currentPage + 1)
+              "
+            >
               <van-icon name="arrow" size="14" />
             </button>
 
             <!-- 跳转输入框 -->
             <div class="page-jump">
               <span class="jump-label">跳转</span>
-              <input v-model="secondaryCategoriesJumpPage" type="number" class="jump-input" :min="1"
-                :max="secondaryCategoriesPagination.totalPages" @keyup.enter="handleSecondaryCategoriesJumpPage"
-                @blur="handleSecondaryCategoriesJumpPage" placeholder="" />
+              <input
+                v-model="secondaryCategoriesJumpPage"
+                type="number"
+                class="jump-input"
+                :min="1"
+                :max="secondaryCategoriesPagination.totalPages"
+                @keyup.enter="handleSecondaryCategoriesJumpPage"
+                @blur="handleSecondaryCategoriesJumpPage"
+                placeholder=""
+              />
               <span class="jump-total">页</span>
             </div>
 
@@ -855,8 +912,12 @@ onMounted(() => {
                 <!-- 游戏网格 -->
                 <div v-else-if="secondaryCategory.games && secondaryCategory.games.length > 0">
                   <div class="games-grid">
-                    <div class="game-item" v-for="game in secondaryCategory.games" :key="game.id"
-                      @click="handleGameClick(game)">
+                    <div
+                      class="game-item"
+                      v-for="game in secondaryCategory.games"
+                      :key="game.id"
+                      @click="handleGameClick(game)"
+                    >
                       <div class="game-image">
                         <img v-if="game.imageUrl" :src="game.imageUrl" :alt="game.name" />
                       </div>
@@ -865,37 +926,70 @@ onMounted(() => {
                   </div>
 
                   <!-- 精简分页控件 -->
-                  <div v-if="secondaryCategory.pagination && secondaryCategory.pagination.totalPages > 1"
-                    class="pagination-compact">
+                  <div
+                    v-if="
+                      secondaryCategory.pagination && secondaryCategory.pagination.totalPages > 1
+                    "
+                    class="pagination-compact"
+                  >
                     <!-- 上一页 -->
-                    <button class="page-btn-compact" :disabled="secondaryCategory.pagination.currentPage <= 1"
-                      @click="handlePageChange(secondaryCategory, secondaryCategory.pagination.currentPage - 1)">
+                    <button
+                      class="page-btn-compact"
+                      :disabled="secondaryCategory.pagination.currentPage <= 1"
+                      @click="
+                        handlePageChange(
+                          secondaryCategory,
+                          secondaryCategory.pagination.currentPage - 1,
+                        )
+                      "
+                    >
                       <van-icon name="arrow-left" size="14" />
                     </button>
 
                     <!-- 当前页信息 -->
                     <span class="page-info-compact">
-                      {{ secondaryCategory.pagination.currentPage }}/{{ secondaryCategory.pagination.totalPages }}
+                      {{ secondaryCategory.pagination.currentPage }}/{{
+                        secondaryCategory.pagination.totalPages
+                      }}
                     </span>
 
                     <!-- 下一页 -->
-                    <button class="page-btn-compact"
-                      :disabled="secondaryCategory.pagination.currentPage >= secondaryCategory.pagination.totalPages"
-                      @click="handlePageChange(secondaryCategory, secondaryCategory.pagination.currentPage + 1)">
+                    <button
+                      class="page-btn-compact"
+                      :disabled="
+                        secondaryCategory.pagination.currentPage >=
+                        secondaryCategory.pagination.totalPages
+                      "
+                      @click="
+                        handlePageChange(
+                          secondaryCategory,
+                          secondaryCategory.pagination.currentPage + 1,
+                        )
+                      "
+                    >
                       <van-icon name="arrow" size="14" />
                     </button>
 
                     <!-- 跳转输入框 -->
                     <div class="page-jump">
                       <span class="jump-label">跳转</span>
-                      <input v-model="secondaryCategory.jumpPage" type="number" class="jump-input" :min="1"
-                        :max="secondaryCategory.pagination.totalPages" @keyup.enter="handleJumpPage(secondaryCategory)"
-                        @blur="handleJumpPage(secondaryCategory)" placeholder="" />
+                      <input
+                        v-model="secondaryCategory.jumpPage"
+                        type="number"
+                        class="jump-input"
+                        :min="1"
+                        :max="secondaryCategory.pagination.totalPages"
+                        @keyup.enter="handleJumpPage(secondaryCategory)"
+                        @blur="handleJumpPage(secondaryCategory)"
+                        placeholder=""
+                      />
                       <span class="jump-total">页</span>
                     </div>
 
                     <!-- 总数信息 -->
-                    <span class="total-info">共{{ secondaryCategory.pagination.totalCount }}项</span>
+                    <span class="total-info"
+                      >共{{ secondaryCategory.pagination.totalCount }}项</span
+                    >
                   </div>
                 </div>
 
@@ -908,8 +1002,14 @@ onMounted(() => {
           </div>
 
           <!-- 无二级分类时的提示 -->
-          <div v-if="!isLoadingSecondaryCategories && !hasSecondaryCategoriesError && secondaryCategories.length === 0"
-            class="no-selected-category">
+          <div
+            v-if="
+              !isLoadingSecondaryCategories &&
+              !hasSecondaryCategoriesError &&
+              secondaryCategories.length === 0
+            "
+            class="no-selected-category"
+          >
             <div class="no-selected-text">该分类下暂无游戏</div>
           </div>
         </div>
@@ -923,8 +1023,8 @@ onMounted(() => {
         <div class="nav-text">首页</div>
       </router-link>
       <router-link to="/live" class="nav-item">
-        <img src="@/assets/img/icon-tabbar-live-normal.svg" alt="直播" class="tabbar-icon" />
-        <div class="nav-text">直播</div>
+        <img src="@/assets/img/icon-tabbar-live-normal.svg" alt="活动" class="tabbar-icon" />
+        <div class="nav-text">活动</div>
       </router-link>
       <router-link to="/game" class="nav-item active">
         <img src="@/assets/img/icon-tabbar-game-active.svg" alt="游戏" class="tabbar-icon" />
@@ -946,8 +1046,12 @@ onMounted(() => {
 
         <div class="game-confirm-body">
           <div class="game-image-container">
-            <img v-if="currentGame.imageUrl" :src="currentGame.imageUrl" :alt="currentGame.name"
-              class="game-preview-image" />
+            <img
+              v-if="currentGame.imageUrl"
+              :src="currentGame.imageUrl"
+              :alt="currentGame.name"
+              class="game-preview-image"
+            />
             <div v-else class="game-placeholder">
               <Icon name="photo" size="48" color="#666" />
             </div>
@@ -1020,7 +1124,7 @@ onMounted(() => {
 
 /* 公告版块样式 */
 .announcement-section {
-  background: #2C2C2C;
+  background: #2c2c2c;
   margin: 12px 12px 0 12px;
   padding: 12px 16px;
   border-radius: 8px;
@@ -1072,7 +1176,7 @@ onMounted(() => {
 
 /* 充值版块样式 */
 .recharge-section {
-  background: #2C2C2C;
+  background: #2c2c2c;
   padding: 26px 16px 16px 16px;
   margin: 12px;
   flex-shrink: 0;
@@ -1108,8 +1212,6 @@ onMounted(() => {
 .dots-decoration .dot:last-child {
   background-color: #ffffff;
 }
-
-
 
 /* 余额显示区域 */
 .balance-display-section {
@@ -1330,7 +1432,7 @@ onMounted(() => {
 }
 
 .register-btn {
-  background: linear-gradient(135deg, #4CAF50 0%, #45a049 100%);
+  background: linear-gradient(135deg, #4caf50 0%, #45a049 100%);
   color: white;
 }
 
@@ -1354,11 +1456,9 @@ onMounted(() => {
   padding: 0;
 }
 
-
-
 /* 游戏区域 */
 .game-container {
-  background: #2C2C2C;
+  background: #2c2c2c;
   box-sizing: border-box;
   margin: 12px;
   margin-top: 0;
@@ -1595,8 +1695,6 @@ onMounted(() => {
   color: #ff9500;
 }
 
-
-
 /* 游戏内容区域 */
 .game-content {
   flex: 1;
@@ -1790,8 +1888,6 @@ onMounted(() => {
   color: #999;
   min-height: 200px;
 }
-
-
 
 /* 游戏列表网格 */
 .games-grid {
@@ -2050,7 +2146,6 @@ onMounted(() => {
 .tabbar-icon {
   width: 24px;
   height: 24px;
-
 }
 
 .nav-item.active,
@@ -2181,9 +2276,6 @@ onMounted(() => {
 }
 
 /* ==========新布局样式========== */
-
-
-
 
 /* 选中分类的游戏展示区域 */
 .selected-category-games {

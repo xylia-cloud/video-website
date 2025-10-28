@@ -1,206 +1,206 @@
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue';
-import { useRouter, useRoute } from 'vue-router';
-import { Icon as VanIcon, showToast, showLoadingToast, closeToast, showDialog } from 'vant';
-import { userLogin, isLoggedIn, touristLogin } from '@/api/fetch-api';
-import { getDeviceIMEI } from '@/utils/device';
-import bgImage from '@/assets/img/img-live.jpg';
+import { ref, computed, onMounted } from 'vue'
+import { useRouter, useRoute } from 'vue-router'
+import { Icon as VanIcon, showToast, showLoadingToast, closeToast, showDialog } from 'vant'
+import { userLogin, isLoggedIn, touristLogin } from '@/api/fetch-api'
+import { getDeviceIMEI } from '@/utils/device'
+import bgImage from '@/assets/img/img-live.jpg'
 
-const router = useRouter();
-const route = useRoute();
-const username = ref('');
-const password = ref('');
-const showPassword = ref(false);
-const isLoading = ref(false);
+const router = useRouter()
+const route = useRoute()
+const username = ref('')
+const password = ref('')
+const showPassword = ref(false)
+const isLoading = ref(false)
 
 // 获取重定向地址
 const redirectUrl = computed(() => {
-  return route.query.redirect as string || '/';
-});
+  return (route.query.redirect as string) || '/'
+})
 
 // 从URL中获取邀请码
 const inviteCode = computed(() => {
-  return route.query.invite as string || '';
-});
+  return (route.query.invite as string) || ''
+})
 
 // 登录表单提交
 const handleLogin = async () => {
   if (!username.value) {
     showToast({
       message: '请输入用户名',
-      duration: 2000
-    });
-    return;
+      duration: 2000,
+    })
+    return
   }
 
   if (!password.value) {
     showToast({
       message: '请输入密码',
-      duration: 2000
-    });
-    return;
+      duration: 2000,
+    })
+    return
   }
 
   try {
-    isLoading.value = true;
+    isLoading.value = true
     showLoadingToast({
       message: '正在登录...',
       forbidClick: true,
-    });
+    })
 
     const result = await userLogin({
       user_name: username.value,
-      user_pwd: password.value
-    });
+      user_pwd: password.value,
+    })
 
     if (result && result.code === 1) {
-      console.log('登录成功，准备跳转到:', redirectUrl.value);
+      console.log('登录成功，准备跳转到:', redirectUrl.value)
       showToast({
         message: '登录成功',
-        duration: 2000
-      });
+        duration: 2000,
+      })
 
       // 登录成功后跳转到重定向地址或首页
       setTimeout(() => {
-        console.log('开始跳转到:', redirectUrl.value);
-        router.push(redirectUrl.value);
-      }, 500);
+        console.log('开始跳转到:', redirectUrl.value)
+        router.push(redirectUrl.value)
+      }, 500)
     } else {
       showDialog({
         title: '登录失败',
         message: result?.msg || '请检查用户名和密码',
         confirmButtonText: '确定',
-        confirmButtonColor: '#ff9500'
-      });
+        confirmButtonColor: '#ff9500',
+      })
     }
   } catch (error: any) {
-    console.error('登录失败:', error);
+    console.error('登录失败:', error)
     showDialog({
       title: '登录失败',
       message: error.message || '网络连接失败，请稍后再试',
       confirmButtonText: '确定',
-      confirmButtonColor: '#ff9500'
-    });
+      confirmButtonColor: '#ff9500',
+    })
   } finally {
-    isLoading.value = false;
-    closeToast();
+    isLoading.value = false
+    closeToast()
   }
-};
+}
 
 // 切换密码显示
 const togglePasswordVisibility = () => {
-  showPassword.value = !showPassword.value;
-};
+  showPassword.value = !showPassword.value
+}
 
 // 跳转到注册页
 const goToRegister = () => {
   // 修改注册页面跳转方式，确保参数正确传递
-  const params: Record<string, string> = {};
+  const params: Record<string, string> = {}
 
   // 传递重定向地址
   if (redirectUrl.value && redirectUrl.value !== '/') {
-    params['redirect'] = redirectUrl.value;
+    params['redirect'] = redirectUrl.value
   }
 
   // 优先使用URL中的邀请码
   if (inviteCode.value) {
-    params['invite'] = inviteCode.value;
-    console.log('从登录页传递邀请码到注册页:', inviteCode.value);
+    params['invite'] = inviteCode.value
+    console.log('从登录页传递邀请码到注册页:', inviteCode.value)
   }
 
   // 使用replace而不是push，避免返回时回到带邀请码的登录页
   router.replace({
     path: '/register',
-    query: params
-  });
-};
+    query: params,
+  })
+}
 
 // 跳转到找回账号页
 const goToRecovery = () => {
-  router.push('/recover');
-};
+  router.push('/recover')
+}
 
 // 跳转到忘记密码页
 const goToForgotPassword = () => {
-  router.push('/forgot-password');
-};
+  router.push('/forgot-password')
+}
 
 // 游客登录
 const handleGuestLogin = async () => {
-  console.log('🎯 用户点击游客登录，开始执行游客登录流程');
+  console.log('🎯 用户点击游客登录，开始执行游客登录流程')
 
   try {
     showLoadingToast({
       message: '正在进入游客模式...',
       forbidClick: true,
-    });
+    })
 
-    const deviceIMEI = getDeviceIMEI();
-    console.log('📱 使用设备IMEI进行游客登录:', deviceIMEI);
+    const deviceIMEI = getDeviceIMEI()
+    console.log('📱 使用设备IMEI进行游客登录:', deviceIMEI)
 
-    const result = await touristLogin(deviceIMEI);
-    console.log('📥 游客登录API响应:', result);
+    const result = await touristLogin(deviceIMEI)
+    console.log('📥 游客登录API响应:', result)
 
     if (result.code === 1 && result.data) {
       // 游客登录成功
-      console.log('✅ 游客登录成功，用户信息已保存到本地');
+      console.log('✅ 游客登录成功，用户信息已保存到本地')
 
-      closeToast();
+      closeToast()
       showToast({
         message: '游客登录成功',
-        duration: 1000
-      });
+        duration: 1000,
+      })
 
       // 登录成功后跳转到个人中心
       setTimeout(() => {
-        router.push('/profile');
-      }, 1000);
+        router.push('/profile')
+      }, 1000)
     } else {
       // 游客登录失败
-      closeToast();
-      console.error('❌ 游客登录失败:', result);
+      closeToast()
+      console.error('❌ 游客登录失败:', result)
       showDialog({
         title: '游客登录失败',
         message: result?.msg || '无法获取游客信息，请稍后重试',
         confirmButtonText: '确定',
-        confirmButtonColor: '#ff9500'
-      });
+        confirmButtonColor: '#ff9500',
+      })
     }
   } catch (error) {
-    console.error('❌ 游客登录异常:', error);
-    closeToast();
+    console.error('❌ 游客登录异常:', error)
+    closeToast()
     showDialog({
       title: '游客登录失败',
       message: (error as Error).message || '网络连接失败，请稍后再试',
       confirmButtonText: '确定',
-      confirmButtonColor: '#ff9500'
-    });
+      confirmButtonColor: '#ff9500',
+    })
   }
-};
+}
 
 // 检查是否已登录
 onMounted(() => {
   // 如果已经登录，直接跳转到重定向地址或首页
   if (isLoggedIn()) {
-    router.push(redirectUrl.value);
-    return;
+    router.push(redirectUrl.value)
+    return
   }
 
   // 如果URL中有邀请码，需要处理一下特殊情况
   if (inviteCode.value) {
-    console.log('登录页检测到邀请码:', inviteCode.value);
+    console.log('登录页检测到邀请码:', inviteCode.value)
 
     // 如果当前URL的路径是/，但hash是#/login，这时邀请码在根路径上
     // 需要手动处理这种情况，直接跳转到注册页
-    const currentHash = window.location.hash;
-    const rootInvite = window.location.search.includes('invite=');
+    const currentHash = window.location.hash
+    const rootInvite = window.location.search.includes('invite=')
 
     if (currentHash === '#/login' && rootInvite) {
-      console.log('检测到邀请码在根路径，直接跳转到注册页');
-      goToRegister();
+      console.log('检测到邀请码在根路径，直接跳转到注册页')
+      goToRegister()
     }
   }
-});
+})
 </script>
 
 <template>
@@ -214,7 +214,7 @@ onMounted(() => {
     <div class="app-logo">
       <div class="logo-container">
         <div class="logo-bg">
-          <img src="@/assets/img/logo.png" alt="logo" class="logo-image">
+          <img src="@/assets/img/logo.png" alt="logo" class="logo-image" />
         </div>
       </div>
     </div>
@@ -226,7 +226,12 @@ onMounted(() => {
       </div>
 
       <div class="input-group">
-        <input :type="showPassword ? 'text' : 'password'" v-model="password" placeholder="请输入密码" class="form-input" />
+        <input
+          :type="showPassword ? 'text' : 'password'"
+          v-model="password"
+          placeholder="请输入密码"
+          class="form-input"
+        />
         <div class="password-toggle" @click="togglePasswordVisibility">
           <van-icon :name="showPassword ? 'eye-o' : 'closed-eye'" size="24" color="#999" />
         </div>
@@ -250,7 +255,6 @@ onMounted(() => {
       <div class="action-item" @click="goToRegister">
         <span class="action-text">注册账号</span>
       </div>
-
     </div>
 
     <!-- 底部导航 -->
@@ -260,8 +264,8 @@ onMounted(() => {
         <div class="nav-text">首页</div>
       </router-link>
       <router-link to="/live" class="nav-item">
-        <img src="@/assets/img/icon-tabbar-live-normal.svg" alt="直播" class="tabbar-icon" />
-        <div class="nav-text">直播</div>
+        <img src="@/assets/img/icon-tabbar-live-normal.svg" alt="活动" class="tabbar-icon" />
+        <div class="nav-text">活动</div>
       </router-link>
       <router-link to="/game" class="nav-item">
         <img src="@/assets/img/icon-tabbar-game-normal.svg" alt="游戏" class="tabbar-icon" />
@@ -470,7 +474,6 @@ onMounted(() => {
 .tabbar-icon {
   width: 24px;
   height: 24px;
-
 }
 
 .nav-text {

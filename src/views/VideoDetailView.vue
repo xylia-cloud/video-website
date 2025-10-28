@@ -2686,8 +2686,8 @@ const handleAdClick = (ad: ListAd) => {
         <div class="nav-text">首页</div>
       </router-link>
       <router-link to="/live" class="nav-item">
-        <img src="@/assets/img/icon-tabbar-live-normal.svg" alt="直播" class="tabbar-icon" />
-        <div class="nav-text">直播</div>
+        <img src="@/assets/img/icon-tabbar-live-normal.svg" alt="活动" class="tabbar-icon" />
+        <div class="nav-text">活动</div>
       </router-link>
       <router-link to="/game" class="nav-item">
         <img src="@/assets/img/icon-tabbar-game-normal.svg" alt="游戏" class="tabbar-icon" />

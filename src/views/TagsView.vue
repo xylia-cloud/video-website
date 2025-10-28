@@ -1,87 +1,87 @@
 <script setup lang="ts">
-import { ref, onMounted } from 'vue';
-import { fetchTags } from '@/api/fetch-api';
-import { BASE_URL } from '@/utils/config';
+import { ref, onMounted } from 'vue'
+import { fetchTags } from '@/api/fetch-api'
+import { BASE_URL } from '@/utils/config'
 
 // 标签数据
 interface TagData {
-  tag_id: number;
-  tag_name: string;
-  tag_img: string;
+  tag_id: number
+  tag_name: string
+  tag_img: string
 }
 
-const tags = ref<TagData[]>([]);
-const isLoading = ref<boolean>(false);
-const hasError = ref<boolean>(false);
+const tags = ref<TagData[]>([])
+const isLoading = ref<boolean>(false)
+const hasError = ref<boolean>(false)
 
 // 获取标签数据
 const fetchTagsData = async () => {
-  isLoading.value = true;
-  hasError.value = false;
-  
+  isLoading.value = true
+  hasError.value = false
+
   try {
     // 请求标签数据
-    const result = await fetchTags();
-    console.log('标签数据:', result);
-    
+    const result = await fetchTags()
+    console.log('标签数据:', result)
+
     if (result.code === 1 && result.data && Array.isArray(result.data)) {
       // 处理API返回的标签数据
       const apiTags = result.data.map((item: any) => {
         return {
           tag_id: item.tag_id || 0,
           tag_name: item.tag_name || '',
-          tag_img: processImageUrl(item.tag_img || '')
-        };
-      });
-      
+          tag_img: processImageUrl(item.tag_img || ''),
+        }
+      })
+
       // 更新标签数据
-      tags.value = apiTags;
-      
-      console.log('处理后的标签数据:', tags.value);
+      tags.value = apiTags
+
+      console.log('处理后的标签数据:', tags.value)
     } else {
-      console.log('没有获取到标签数据');
-      tags.value = [];
+      console.log('没有获取到标签数据')
+      tags.value = []
     }
   } catch (error) {
-    console.error('获取标签数据请求失败:', error);
-    hasError.value = true;
-    tags.value = [];
+    console.error('获取标签数据请求失败:', error)
+    hasError.value = true
+    tags.value = []
   } finally {
-    isLoading.value = false;
+    isLoading.value = false
   }
-};
+}
 
 // 处理标签图片加载错误
 const handleImageError = (event: Event, tag: TagData) => {
-  console.error('标签图片加载失败:', tag.tag_name);
-  
+  console.error('标签图片加载失败:', tag.tag_name)
+
   // 图片加载失败时隐藏图片，但保留标签
-  const imgElement = event.target as HTMLImageElement;
-  imgElement.style.display = 'none';
-};
+  const imgElement = event.target as HTMLImageElement
+  imgElement.style.display = 'none'
+}
 
 // 处理图片URL
 const processImageUrl = (imgPath: string): string => {
-  if (!imgPath) return '';
-  
-  let imageUrl = '';
-  
+  if (!imgPath) return ''
+
+  let imageUrl = ''
+
   // 处理图片URL
   if (imgPath.startsWith('/')) {
-    imageUrl = `${BASE_URL}${imgPath}`;
+    imageUrl = `${BASE_URL}${imgPath}`
   } else if (imgPath.startsWith('http')) {
-    imageUrl = imgPath;
+    imageUrl = imgPath
   } else {
-    imageUrl = `${BASE_URL}/${imgPath}`;
+    imageUrl = `${BASE_URL}/${imgPath}`
   }
-  
-  return imageUrl;
-};
+
+  return imageUrl
+}
 
 // 组件挂载时获取数据
 onMounted(() => {
-  fetchTagsData();
-});
+  fetchTagsData()
+})
 </script>
 
 <template>
@@ -102,27 +102,31 @@ onMounted(() => {
         <van-loading type="spinner" color="#ff9500" />
         <div class="loading-text">加载中...</div>
       </div>
-      
+
       <!-- 错误状态 -->
       <div v-else-if="hasError" class="error-state">
         <van-icon name="warning-o" size="24" color="#ff9500" />
         <div class="error-text">加载失败，请稍后再试</div>
       </div>
-      
+
       <!-- 标签网格 -->
       <div v-else-if="tags.length > 0" class="tag-grid">
-        <router-link 
-          v-for="tag in tags" 
-          :key="tag.tag_id" 
-          :to="`/tag/${tag.tag_id}?name=${encodeURIComponent(tag.tag_name)}`" 
+        <router-link
+          v-for="tag in tags"
+          :key="tag.tag_id"
+          :to="`/tag/${tag.tag_id}?name=${encodeURIComponent(tag.tag_name)}`"
           class="tag-item"
         >
-          <img :src="tag.tag_img" :alt="tag.tag_name" @error="(event) => handleImageError(event, tag)" />
+          <img
+            :src="tag.tag_img"
+            :alt="tag.tag_name"
+            @error="(event) => handleImageError(event, tag)"
+          />
           <div class="tag-overlay"></div>
           <div class="tag-content">{{ tag.tag_name }}</div>
         </router-link>
       </div>
-      
+
       <!-- 空状态 -->
       <div v-else class="empty-state">
         <van-icon name="photo-o" size="48" color="#666" />
@@ -137,8 +141,8 @@ onMounted(() => {
         <div class="nav-text">首页</div>
       </router-link>
       <router-link to="/live" class="nav-item">
-        <img src="@/assets/img/icon-tabbar-live-normal.svg" alt="直播" class="tabbar-icon" />
-        <div class="nav-text">直播</div>
+        <img src="@/assets/img/icon-tabbar-live-normal.svg" alt="活动" class="tabbar-icon" />
+        <div class="nav-text">活动</div>
       </router-link>
       <router-link to="/game" class="nav-item">
         <img src="@/assets/img/icon-tabbar-game-normal.svg" alt="游戏" class="tabbar-icon" />
@@ -283,7 +287,6 @@ onMounted(() => {
 .tabbar-icon {
   width: 24px;
   height: 24px;
-  
 }
 
 .nav-item.active,
@@ -309,4 +312,4 @@ onMounted(() => {
   color: #999;
   font-size: 14px;
 }
-</style> 
+</style>

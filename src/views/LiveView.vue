@@ -1,16 +1,16 @@
 <script setup lang="ts">
-// 直播页面逻辑
+// 活动页面逻辑
 </script>
 
 <template>
   <div class="live-page">
-    <!-- 直播内容区域 -->
+    <!-- 活动内容区域 -->
     <div class="live-content">
-      <div class="live-banner">
-        <img src="@/assets/img/img-live.jpg" alt="直播封面" />
+      <div class="coming-soon">
+        <div class="coming-soon-text">敬请期待</div>
       </div>
     </div>
-    
+
     <!-- 底部导航 -->
     <div class="bottom-nav">
       <router-link to="/" class="nav-item">
@@ -18,8 +18,8 @@
         <div class="nav-text">首页</div>
       </router-link>
       <router-link to="/live" class="nav-item active">
-        <img src="@/assets/img/icon-tabbar-live-active.svg" alt="直播" class="tabbar-icon" />
-        <div class="nav-text">直播</div>
+        <img src="@/assets/img/icon-tabbar-live-active.svg" alt="活动" class="tabbar-icon" />
+        <div class="nav-text">活动</div>
       </router-link>
       <router-link to="/game" class="nav-item">
         <img src="@/assets/img/icon-tabbar-game-normal.svg" alt="游戏" class="tabbar-icon" />
@@ -46,31 +46,20 @@
 
 .live-content {
   padding: 20px;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  min-height: calc(100vh - 50px);
 }
 
-.live-banner {
-  position: relative;
-  margin-bottom: 20px;
-}
-
-.live-banner img {
-  width: 100%;
-  height: auto;
-  border-radius: 4px;
-}
-
-.live-info {
+.coming-soon {
   text-align: center;
 }
 
-.live-info h2 {
+.coming-soon-text {
   font-size: 24px;
-  margin-bottom: 10px;
-}
-
-.live-info p {
-  font-size: 16px;
   color: #999;
+  font-weight: 500;
 }
 
 /* 底部导航 */
@@ -99,7 +88,6 @@
 .tabbar-icon {
   width: 24px;
   height: 24px;
-  
 }
 
 .nav-item.active,
@@ -110,4 +98,4 @@
 .nav-text {
   font-size: 12px;
 }
-</style> 
+</style>

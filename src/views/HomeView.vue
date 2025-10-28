@@ -1,201 +1,207 @@
 <script setup lang="ts">
 // 导入视频列表组件
-import VideoList from '@/components/VideoList.vue';
-import { ref, onMounted, onBeforeUnmount, computed, onActivated } from 'vue';
-import { getRecommendVideos } from '@/api/video';
-import { fetchRecommendVideos, fetchTypesList, fetchAds, fetchTags, touristLogin, getUserInfo, isLoggedIn } from '@/api/fetch-api';
-import type { TypeItem } from '@/api/fetch-api';
-import { BASE_URL, VIDEO_CATEGORIES, DEFAULT_PAGE_SIZE } from '@/utils/config';
-import { useRouter, useRoute } from 'vue-router';
-import { getDeviceIMEI } from '@/utils/device';
-import { showToast } from 'vant';
+import VideoList from '@/components/VideoList.vue'
+import { ref, onMounted, onBeforeUnmount, computed, onActivated } from 'vue'
+import { getRecommendVideos } from '@/api/video'
+import {
+  fetchRecommendVideos,
+  fetchTypesList,
+  fetchAds,
+  fetchTags,
+  touristLogin,
+  getUserInfo,
+  isLoggedIn,
+} from '@/api/fetch-api'
+import type { TypeItem } from '@/api/fetch-api'
+import { BASE_URL, VIDEO_CATEGORIES, DEFAULT_PAGE_SIZE } from '@/utils/config'
+import { useRouter, useRoute } from 'vue-router'
+import { getDeviceIMEI } from '@/utils/device'
+import { showToast } from 'vant'
 
 // 使用路由
-const router = useRouter();
-const route = useRoute();
+const router = useRouter()
+const route = useRoute()
 
 // 获取邀请码参数
 const inviteCode = computed(() => {
-  return route.query.invite as string || '';
-});
+  return (route.query.invite as string) || ''
+})
 
 // 处理邀请码
 const handleInviteCode = () => {
   if (inviteCode.value) {
-    console.log('检测到邀请码:', inviteCode.value);
+    console.log('检测到邀请码:', inviteCode.value)
     // 保存邀请码到本地存储，以便后续使用
-    localStorage.setItem('inviteCode', inviteCode.value);
+    localStorage.setItem('inviteCode', inviteCode.value)
 
     // 只记录邀请码，不显示弹窗提示
     // 当用户点击注册时，注册页面会自动读取此邀请码
   }
-};
+}
 
 // 定义视频数据接口
 interface VideoItem {
-  id: number;
-  coverUrl: string;
-  title: string;
-  isVip?: boolean;
-  isFree?: boolean;
-  duration?: string;  // 视频时长
-  class?: string;     // 视频分类
-  time?: string;      // 发布时间
-  points?: string;    // 视频价格
-  isAd?: boolean;     // 是否为广告
-  link?: string;      // 广告链接
+  id: number
+  coverUrl: string
+  title: string
+  isVip?: boolean
+  isFree?: boolean
+  duration?: string // 视频时长
+  class?: string // 视频分类
+  time?: string // 发布时间
+  points?: string // 视频价格
+  isAd?: boolean // 是否为广告
+  link?: string // 广告链接
 }
-
 
 // 定义API返回的视频数据接口
 interface ApiVideoItem {
-  id?: number;
-  vod_id?: number;
-  vod_pic?: string;
-  vod_pic_thumb?: string;
-  coverUrl?: string;
-  vod_name?: string;
-  title?: string;
-  vod_class?: string;
-  vod_duration?: string;
-  vod_time?: string;
-  vod_time_add?: string;
-  vod_copyright?: string | number;
-  vod_pubdate?: string;
-  vod_points_play?: number | string;
+  id?: number
+  vod_id?: number
+  vod_pic?: string
+  vod_pic_thumb?: string
+  coverUrl?: string
+  vod_name?: string
+  title?: string
+  vod_class?: string
+  vod_duration?: string
+  vod_time?: string
+  vod_time_add?: string
+  vod_copyright?: string | number
+  vod_pubdate?: string
+  vod_points_play?: number | string
 }
 
 // 定义API响应接口
 interface ApiResponse {
-  code?: number;
-  msg?: string;
+  code?: number
+  msg?: string
   data?: {
-    list?: ApiVideoItem[];
-    [key: string]: any;
-  };
-  list?: ApiVideoItem[];
-  total?: number;
-  page?: number;
-  pagecount?: number;
-  [key: string]: any;
+    list?: ApiVideoItem[]
+    [key: string]: any
+  }
+  list?: ApiVideoItem[]
+  total?: number
+  page?: number
+  pagecount?: number
+  [key: string]: any
 }
 
 // 轮播图广告数据
 interface BannerAd {
-  id: number;
-  imageUrl: string;
-  title: string;
-  link?: string;
+  id: number
+  imageUrl: string
+  title: string
+  link?: string
 }
 
-const bannerAds = ref<BannerAd[]>([]);
+const bannerAds = ref<BannerAd[]>([])
 
 // 单图广告数据
 interface SingleAd {
-  id: number;
-  imageUrl: string;
-  title: string;
-  link?: string;
+  id: number
+  imageUrl: string
+  title: string
+  link?: string
 }
 
-const singleAd = ref<SingleAd | null>(null);
+const singleAd = ref<SingleAd | null>(null)
 
 // 定义视频数据响应式变量
-const videoData = ref<VideoItem[]>([]);
-const isLoading = ref(false);
-const hasError = ref(false);
-const errorMessage = ref<string>('');
+const videoData = ref<VideoItem[]>([])
+const isLoading = ref(false)
+const hasError = ref(false)
+const errorMessage = ref<string>('')
 
 // 栏目列表数据
-const typesList = ref<TypeItem[]>([]);
-const activeTypeId = ref<number>(1); // 默认选中首页
+const typesList = ref<TypeItem[]>([])
+const activeTypeId = ref<number>(1) // 默认选中首页
 
 // 记录每个标签页的完整状态
 const tabStates = ref<{
   [key: number]: {
-    scrollPosition: number;
-    currentPage: number;
-    totalPages: number;
-    hasMoreVideos: boolean;
-    videos: VideoItem[];
-    lastUpdateTime: number; // 添加更新时间，用于判断缓存是否过期
+    scrollPosition: number
+    currentPage: number
+    totalPages: number
+    hasMoreVideos: boolean
+    videos: VideoItem[]
+    lastUpdateTime: number // 添加更新时间，用于判断缓存是否过期
   }
-}>({});
+}>({})
 
 // 标签数据
 interface TagData {
-  tag_id: number;
-  tag_name: string;
-  tag_img: string;
-  hasImage?: boolean;
+  tag_id: number
+  tag_name: string
+  tag_img: string
+  hasImage?: boolean
 }
 
-const tagsList = ref<TagData[]>([]);
-const visibleTags = ref<TagData[]>([]);
-const isTagsLoading = ref<boolean>(false);
+const tagsList = ref<TagData[]>([])
+const visibleTags = ref<TagData[]>([])
+const isTagsLoading = ref<boolean>(false)
 
 // 页码信息
-const currentPage = ref(1);
-const totalPages = ref(1);
+const currentPage = ref(1)
+const totalPages = ref(1)
 
 // 记录当前滚动位置
-const currentScrollPosition = ref(0);
+const currentScrollPosition = ref(0)
 
 // 无限滚动相关变量
-const isLoadingMore = ref(false);
-const hasMoreVideos = ref(true);
-const isFirstLoad = ref(true); // 标记是否为第一次加载
+const isLoadingMore = ref(false)
+const hasMoreVideos = ref(true)
+const isFirstLoad = ref(true) // 标记是否为第一次加载
 
 // 新增：最新视频数据
-const latestVideoData = ref<VideoItem[]>([]);
-const isLoadingLatest = ref(false);
-const hasLatestError = ref(false);
-const latestErrorMessage = ref('');
-const latestCurrentPage = ref(1);
-const latestTotalPages = ref(1);
+const latestVideoData = ref<VideoItem[]>([])
+const isLoadingLatest = ref(false)
+const hasLatestError = ref(false)
+const latestErrorMessage = ref('')
+const latestCurrentPage = ref(1)
+const latestTotalPages = ref(1)
 
 // 是否使用原生fetch还是axios
-const useFetch = true;
+const useFetch = true
 
 // 搜索相关
-const searchKeyword = ref('');
+const searchKeyword = ref('')
 
 // 轮播图当前索引
-const currentBannerIndex = ref(0);
-
+const currentBannerIndex = ref(0)
 
 // 计算属性：判断当前是否为第一个标签
 const isFirstTabActive = computed(() => {
-  const firstTypeId = typesList.value.length > 0 ? typesList.value[0].type_id : 1;
-  return activeTypeId.value === firstTypeId;
-});
+  const firstTypeId = typesList.value.length > 0 ? typesList.value[0].type_id : 1
+  return activeTypeId.value === firstTypeId
+})
 
 // 处理轮播图切换
 const onBannerChange = (index: number) => {
-  currentBannerIndex.value = index;
-};
+  currentBannerIndex.value = index
+}
 
 // 处理视频数据的函数
 const processVideoData = (item: ApiVideoItem): VideoItem => {
   // 处理封面图片URL
-  let coverUrl = '';
+  let coverUrl = ''
   if (item.vod_pic) {
     // 如果路径是相对路径，添加BASE_URL
     if (item.vod_pic.startsWith('/')) {
-      coverUrl = `${BASE_URL}${item.vod_pic}`;
+      coverUrl = `${BASE_URL}${item.vod_pic}`
     } else if (item.vod_pic.startsWith('http')) {
-      coverUrl = item.vod_pic;
+      coverUrl = item.vod_pic
     } else {
-      coverUrl = item.coverUrl || '';
+      coverUrl = item.coverUrl || ''
     }
   } else {
-    coverUrl = item.coverUrl || '';
+    coverUrl = item.coverUrl || ''
   }
 
   // 判断是否付费内容
-  const pointsPlay = item.vod_points_play !== undefined ? Number(item.vod_points_play) : 0;
-  const isVip = pointsPlay > 0;
-  const isFree = !isVip;
+  const pointsPlay = item.vod_points_play !== undefined ? Number(item.vod_points_play) : 0
+  const isVip = pointsPlay > 0
+  const isFree = !isVip
 
   return {
     id: item.id || item.vod_id || 0,
@@ -206,70 +212,76 @@ const processVideoData = (item: ApiVideoItem): VideoItem => {
     duration: item.vod_duration || '',
     class: item.vod_class || '',
     time: item.vod_pubdate || item.vod_time || item.vod_time_add || '',
-    points: isVip ? pointsPlay + '积分' : ''
-  };
-};
+    points: isVip ? pointsPlay + '积分' : '',
+  }
+}
 
 // 获取栏目列表数据
 const fetchTypesData = async () => {
   try {
-    const result = await fetchTypesList();
-    console.log('栏目列表数据:', result);
+    const result = await fetchTypesList()
+    console.log('栏目列表数据:', result)
 
     if (result.code === 1 && result.data && Array.isArray(result.data)) {
-      typesList.value = result.data;
+      typesList.value = result.data
     } else {
-      console.error('获取栏目列表失败:', result.msg || '未知错误');
+      console.error('获取栏目列表失败:', result.msg || '未知错误')
     }
   } catch (error: any) {
-    console.error('获取栏目列表请求失败:', error);
+    console.error('获取栏目列表请求失败:', error)
   }
-};
+}
 
 // 切换栏目
 const switchType = (typeId: number) => {
-  if (activeTypeId.value === typeId) return;
+  if (activeTypeId.value === typeId) return
 
   // 保存当前标签的状态
-  saveCurrentTabState();
+  saveCurrentTabState()
 
   // 移除之前的滚动监听（无论是哪个标签）
-  removeScrollListener();
+  removeScrollListener()
 
-  activeTypeId.value = typeId;
+  activeTypeId.value = typeId
 
   // 保存当前选中的标签ID到localStorage
-  localStorage.setItem('lastActiveTabId', typeId.toString());
+  localStorage.setItem('lastActiveTabId', typeId.toString())
 
   // 恢复这个标签的状态，如果有有效缓存的话
-  const targetTabState = tabStates.value[typeId];
-  if (targetTabState && targetTabState.videos.length > 0 && isCacheValid(targetTabState.lastUpdateTime)) {
-    console.log(`恢复标签${typeId}的有效缓存状态`);
+  const targetTabState = tabStates.value[typeId]
+  if (
+    targetTabState &&
+    targetTabState.videos.length > 0 &&
+    isCacheValid(targetTabState.lastUpdateTime)
+  ) {
+    console.log(`恢复标签${typeId}的有效缓存状态`)
 
-    currentPage.value = targetTabState.currentPage;
-    totalPages.value = targetTabState.totalPages;
-    hasMoreVideos.value = targetTabState.hasMoreVideos;
-    videoData.value = [...targetTabState.videos]; // 创建副本
-    isFirstLoad.value = false; // 重要：标记为非首次加载
+    currentPage.value = targetTabState.currentPage
+    totalPages.value = targetTabState.totalPages
+    hasMoreVideos.value = targetTabState.hasMoreVideos
+    videoData.value = [...targetTabState.videos] // 创建副本
+    isFirstLoad.value = false // 重要：标记为非首次加载
 
     // 延迟恢复滚动位置，确保DOM已经更新
     setTimeout(() => {
-      window.scrollTo(0, targetTabState.scrollPosition);
-    }, 100);
+      window.scrollTo(0, targetTabState.scrollPosition)
+    }, 100)
 
-    console.log(`缓存状态恢复完成: 页码=${currentPage.value}, 总页数=${totalPages.value}, 数据长度=${videoData.value.length}, 滚动位置=${targetTabState.scrollPosition}`);
+    console.log(
+      `缓存状态恢复完成: 页码=${currentPage.value}, 总页数=${totalPages.value}, 数据长度=${videoData.value.length}, 滚动位置=${targetTabState.scrollPosition}`,
+    )
   } else {
     // 重置状态
-    currentPage.value = 1;
-    totalPages.value = 1;
-    hasMoreVideos.value = true;
-    isFirstLoad.value = true;
-    videoData.value = [];
+    currentPage.value = 1
+    totalPages.value = 1
+    hasMoreVideos.value = true
+    isFirstLoad.value = true
+    videoData.value = []
   }
 
   // 检查是否为第一个标签（热门），如果不是则启用懒加载
-  const firstTypeId = typesList.value.length > 0 ? typesList.value[0].type_id : 1;
-  const isFirstTab = typeId === firstTypeId;
+  const firstTypeId = typesList.value.length > 0 ? typesList.value[0].type_id : 1
+  const isFirstTab = typeId === firstTypeId
 
   if (isFirstTab) {
     // 第一个标签立即加载，如果没有缓存数据
@@ -277,50 +289,52 @@ const switchType = (typeId: number) => {
       // 先获取广告数据，然后再获取视频数据
       fetchListAds().then(() => {
         // 🔥 最热视频必须使用 tid=1，否则API只返回10条数据
-        fetchRecommendVideosData(1, VIDEO_CATEGORIES.ALL);
-      });
+        fetchRecommendVideosData(1, VIDEO_CATEGORIES.ALL)
+      })
     } else {
       // 如果有缓存数据，仍然需要获取广告数据以备后续使用
-      fetchListAds();
+      fetchListAds()
     }
   } else {
     // 其他标签也需要获取广告数据
-    fetchListAds();
+    fetchListAds()
     // 其他标签，如果没有缓存数据，等待滚动触发懒加载
     if (!tabStates.value[typeId]) {
-      isFirstLoad.value = true;
+      isFirstLoad.value = true
     }
 
     // 添加滚动监听（如果还没有添加）
-    addScrollListener();
+    addScrollListener()
 
     // 立即触发一次检查，如果用户已经在底部附近则开始加载
     setTimeout(() => {
-      checkScrollForLazyLoad();
-    }, 100);
+      checkScrollForLazyLoad()
+    }, 100)
   }
-};
+}
 
 // 检查缓存是否有效（30分钟内的缓存认为有效）
 const isCacheValid = (lastUpdateTime: number): boolean => {
-  const CACHE_DURATION = 30 * 60 * 1000; // 30分钟
-  return Date.now() - lastUpdateTime < CACHE_DURATION;
-};
+  const CACHE_DURATION = 30 * 60 * 1000 // 30分钟
+  return Date.now() - lastUpdateTime < CACHE_DURATION
+}
 
 // 更新指定标签的缓存
 const updateTabCache = (tabId: number) => {
   // 记录当前滚动位置
-  const scrollPosition = window.scrollY || document.documentElement.scrollTop;
+  const scrollPosition = window.scrollY || document.documentElement.scrollTop
 
   // 对于首页标签，缓存时需要过滤掉广告，只保存纯视频数据
-  const firstTypeId = typesList.value.length > 0 ? typesList.value[0].type_id : 1;
-  const isFirstTab = tabId === firstTypeId;
+  const firstTypeId = typesList.value.length > 0 ? typesList.value[0].type_id : 1
+  const isFirstTab = tabId === firstTypeId
 
-  let videosToCache = [...videoData.value];
+  let videosToCache = [...videoData.value]
   if (isFirstTab) {
     // 首页标签：只缓存非广告的视频数据
-    videosToCache = videoData.value.filter(item => !item.isAd);
-    console.log(`首页标签缓存: 原始数据${videoData.value.length}条，过滤广告后${videosToCache.length}条`);
+    videosToCache = videoData.value.filter((item) => !item.isAd)
+    console.log(
+      `首页标签缓存: 原始数据${videoData.value.length}条，过滤广告后${videosToCache.length}条`,
+    )
   }
 
   // 更新指定标签的缓存状态
@@ -330,105 +344,107 @@ const updateTabCache = (tabId: number) => {
     totalPages: totalPages.value,
     hasMoreVideos: hasMoreVideos.value,
     videos: videosToCache, // 缓存过滤后的视频数据
-    lastUpdateTime: Date.now() // 记录缓存时间
-  };
+    lastUpdateTime: Date.now(), // 记录缓存时间
+  }
 
   // 同时保存到sessionStorage进行持久化
-  saveSessionData();
+  saveSessionData()
 
-  console.log(`更新标签${tabId}的缓存: 页码=${currentPage.value}, 总页数=${totalPages.value}, 缓存数据长度=${videosToCache.length}, 滚动位置=${scrollPosition}`);
-};
+  console.log(
+    `更新标签${tabId}的缓存: 页码=${currentPage.value}, 总页数=${totalPages.value}, 缓存数据长度=${videosToCache.length}, 滚动位置=${scrollPosition}`,
+  )
+}
 
 // 保存当前标签状态（主要用于切换标签时）
 const saveCurrentTabState = () => {
-  updateTabCache(activeTypeId.value);
-};
+  updateTabCache(activeTypeId.value)
+}
 
 // 存储广告位置信息，以便在"换一批"后依然保留广告位置
-const adPositions = ref<number[]>([3, 6, 11]);
+const adPositions = ref<number[]>([3, 6, 11])
 // 存储已插入广告的视频数据，用于"换一批"后的数据处理
-const videoDataWithAds = ref<VideoItem[]>([]);
+const videoDataWithAds = ref<VideoItem[]>([])
 
 // 获取最新视频数据
 const fetchLatestVideosData = async (page: number = 1) => {
-  isLoadingLatest.value = true;
-  hasLatestError.value = false;
-  latestErrorMessage.value = '';
+  isLoadingLatest.value = true
+  hasLatestError.value = false
+  latestErrorMessage.value = ''
 
   try {
-    console.log('🔥 开始获取最新视频数据，页码:', page);
+    console.log('🔥 开始获取最新视频数据，页码:', page)
 
     // 调用接口获取最新视频，tid不为1时按发布时间排序
     const result = await fetchRecommendVideos({
       mid: 1,
       limit: 10, // 最新视频只显示10条
       page: page,
-      tid: 2 // tid不是1的时候，请求的就是按发布时间排序的视频列表
-    });
+      tid: 2, // tid不是1的时候，请求的就是按发布时间排序的视频列表
+    })
 
-    console.log('🔥 最新视频API返回:', result);
+    console.log('🔥 最新视频API返回:', result)
 
     // 检查不同的数据结构
-    let apiData = null;
+    let apiData = null
     if (result && result.code === 1) {
       if (result.list && Array.isArray(result.list)) {
         // 新的数据格式：直接在 result.list 中
-        apiData = result.list;
-        console.log('🔥 使用 result.list 数据格式');
+        apiData = result.list
+        console.log('🔥 使用 result.list 数据格式')
 
         // 更新分页信息
-        latestCurrentPage.value = result.page || page;
-        latestTotalPages.value = result.pagecount || 1;
+        latestCurrentPage.value = result.page || page
+        latestTotalPages.value = result.pagecount || 1
       } else if (result.data && Array.isArray(result.data.data)) {
         // 旧的数据格式：在 result.data.data 中
-        apiData = result.data.data;
-        console.log('🔥 使用 result.data.data 数据格式');
+        apiData = result.data.data
+        console.log('🔥 使用 result.data.data 数据格式')
 
         // 更新分页信息
-        latestCurrentPage.value = result.data.page || page;
-        latestTotalPages.value = result.data.pagecount || 1;
+        latestCurrentPage.value = result.data.page || page
+        latestTotalPages.value = result.data.pagecount || 1
       }
     }
 
     if (apiData && Array.isArray(apiData)) {
       // 映射字段
-      const processedData = apiData.map(processVideoData);
-      console.log('🔥 最新视频映射后数据长度:', processedData.length);
+      const processedData = apiData.map(processVideoData)
+      console.log('🔥 最新视频映射后数据长度:', processedData.length)
       console.log('🔥 最新视频分页信息:', {
         currentPage: latestCurrentPage.value,
-        totalPages: latestTotalPages.value
-      });
+        totalPages: latestTotalPages.value,
+      })
 
       // 添加短暂延迟，确保UI更新的一致性
-      await new Promise(resolve => setTimeout(resolve, 100));
+      await new Promise((resolve) => setTimeout(resolve, 100))
 
-      latestVideoData.value = processedData;
-      console.log('✅ 最新视频数据加载成功');
+      latestVideoData.value = processedData
+      console.log('✅ 最新视频数据加载成功')
     } else {
-      console.error('❌ 最新视频数据格式不正确:', result);
-      hasLatestError.value = true;
-      latestErrorMessage.value = '数据格式错误';
+      console.error('❌ 最新视频数据格式不正确:', result)
+      hasLatestError.value = true
+      latestErrorMessage.value = '数据格式错误'
     }
   } catch (error) {
-    console.error('🚫 获取最新视频数据失败:', error);
-    hasLatestError.value = true;
-    latestErrorMessage.value = '网络错误，请稍后再试';
+    console.error('🚫 获取最新视频数据失败:', error)
+    hasLatestError.value = true
+    latestErrorMessage.value = '网络错误，请稍后再试'
   } finally {
-    isLoadingLatest.value = false;
+    isLoadingLatest.value = false
   }
-};
+}
 
 // 获取推荐视频数据
 const fetchRecommendVideosData = async (page = 1, tid = VIDEO_CATEGORIES.ALL, loadMore = false) => {
   // 如果是加载更多，设置加载更多状态
   if (loadMore) {
-    isLoadingMore.value = true;
+    isLoadingMore.value = true
   } else {
-    isLoading.value = true;
+    isLoading.value = true
   }
 
-  hasError.value = false;
-  errorMessage.value = '';
+  hasError.value = false
+  errorMessage.value = ''
 
   try {
     // 构建请求参数，包含页码和分类ID
@@ -436,134 +452,139 @@ const fetchRecommendVideosData = async (page = 1, tid = VIDEO_CATEGORIES.ALL, lo
       mid: 1,
       limit: DEFAULT_PAGE_SIZE,
       page: page,
-      tid: tid
-    };
+      tid: tid,
+    }
 
     // 选择使用哪种请求方法
     const result = useFetch
       ? await fetchRecommendVideos(params)
-      : await getRecommendVideos(params) as ApiResponse;
+      : ((await getRecommendVideos(params)) as ApiResponse)
 
-    console.log('API返回数据:', result);
+    console.log('API返回数据:', result)
 
     // 更新页码信息
     if (result.page) {
-      currentPage.value = result.page;
+      currentPage.value = result.page
     }
     if (result.pagecount) {
-      totalPages.value = result.pagecount;
+      totalPages.value = result.pagecount
     }
 
     // 检查是否还有更多数据
-    hasMoreVideos.value = currentPage.value < totalPages.value;
+    hasMoreVideos.value = currentPage.value < totalPages.value
 
     // 处理API返回的数据，并根据实际响应结构调整
-    let apiData: ApiVideoItem[] = [];
+    let apiData: ApiVideoItem[] = []
 
     // 适应不同的数据结构
     if (result.data && result.data.list) {
       // 新的数据结构 { data: { list: [...] } }
-      apiData = result.data.list;
+      apiData = result.data.list
     } else if (result.data) {
       // 直接返回数据列表 { data: [...] }
-      apiData = Array.isArray(result.data) ? result.data : [];
+      apiData = Array.isArray(result.data) ? result.data : []
     } else if (result.list) {
       // 另一种结构 { list: [...] }
-      apiData = result.list;
+      apiData = result.list
     }
 
     // 映射字段
-    const processedData = apiData.map(processVideoData);
-    console.log('🔍 [初始加载] API返回原始数据长度:', apiData.length);
-    console.log('🔍 [初始加载] 视频映射后数据长度:', processedData.length);
-    console.log('🔍 [初始加载] 当前页码:', page);
-    console.log('🔍 [初始加载] DEFAULT_PAGE_SIZE:', DEFAULT_PAGE_SIZE);
+    const processedData = apiData.map(processVideoData)
+    console.log('🔍 [初始加载] API返回原始数据长度:', apiData.length)
+    console.log('🔍 [初始加载] 视频映射后数据长度:', processedData.length)
+    console.log('🔍 [初始加载] 当前页码:', page)
+    console.log('🔍 [初始加载] DEFAULT_PAGE_SIZE:', DEFAULT_PAGE_SIZE)
 
     // 处理数据并插入广告
-    const finalData = processDataWithAds(processedData, page);
+    const finalData = processDataWithAds(processedData, page)
 
     // 判断是加载更多还是第一页
     if (loadMore && page > 1) {
       // 加载更多，将新数据追加到现有数据后面
-      videoData.value = [...videoData.value, ...finalData];
+      videoData.value = [...videoData.value, ...finalData]
     } else {
       // 第一页，直接替换数据
-      videoData.value = finalData;
+      videoData.value = finalData
     }
 
     // 标记已完成第一次加载
     if (isFirstLoad.value) {
-      isFirstLoad.value = false;
+      isFirstLoad.value = false
     }
 
     // 数据加载完成后立即更新缓存
-    updateTabCache(tid);
+    updateTabCache(tid)
 
-    console.log('处理后的视频数据:', videoData.value);
-    console.log(`当前页: ${currentPage.value}, 总页数: ${totalPages.value}`);
+    console.log('处理后的视频数据:', videoData.value)
+    console.log(`当前页: ${currentPage.value}, 总页数: ${totalPages.value}`)
   } catch (error: any) {
-    console.error('获取推荐视频失败:', error);
-    hasError.value = true;
+    console.error('获取推荐视频失败:', error)
+    hasError.value = true
 
     // 显示明确的错误信息
     if (error.message) {
-      console.error('错误详情:', error.message);
-      errorMessage.value = error.message;
+      console.error('错误详情:', error.message)
+      errorMessage.value = error.message
     }
     if (error.response) {
-      console.error('服务器返回状态:', error.response.status);
-      console.error('服务器返回数据:', error.response.data);
+      console.error('服务器返回状态:', error.response.status)
+      console.error('服务器返回数据:', error.response.data)
     }
   } finally {
-    isLoading.value = false;
-    isLoadingMore.value = false;
+    isLoading.value = false
+    isLoadingMore.value = false
   }
-};
+}
 
 // 处理数据并插入广告
 const processDataWithAds = (processedData: VideoItem[], page: number): VideoItem[] => {
   // 创建数据副本，避免直接修改原始数据
-  const finalData = [...processedData];
+  const finalData = [...processedData]
 
   // 只有第一页且有广告时才处理
-  console.log('📢 [processDataWithAds] 检查广告插入条件 - page:', page, 'listAds.length:', listAds.value.length);
-  console.log('📢 [processDataWithAds] 广告数据详情:', listAds.value);
+  console.log(
+    '📢 [processDataWithAds] 检查广告插入条件 - page:',
+    page,
+    'listAds.length:',
+    listAds.value.length,
+  )
+  console.log('📢 [processDataWithAds] 广告数据详情:', listAds.value)
 
   if (page === 1 && listAds.value.length > 0) {
-    console.log('📢 [processDataWithAds] ✅ 开始处理广告插入，广告数据长度:', listAds.value.length);
-    console.log('📢 [processDataWithAds] 输入视频数据长度:', processedData.length);
+    console.log('📢 [processDataWithAds] ✅ 开始处理广告插入，广告数据长度:', listAds.value.length)
+    console.log('📢 [processDataWithAds] 输入视频数据长度:', processedData.length)
 
     // 🔥 使用前3个广告
-    const adsToUse = listAds.value.slice(0, 3);
-    console.log('将使用的广告数量:', adsToUse.length);
+    const adsToUse = listAds.value.slice(0, 3)
+    console.log('将使用的广告数量:', adsToUse.length)
 
     // 🔥 目标：17条视频 + 3条广告 = 20条
     // 移除最后3条视频（20-3=17），为广告腾出位置
     if (finalData.length >= 20) {
-      finalData.splice(17); // 只保留前17条视频
-      console.log('🔥 保留前17条视频，移除后的数据长度:', finalData.length);
+      finalData.splice(17) // 只保留前17条视频
+      console.log('🔥 保留前17条视频，移除后的数据长度:', finalData.length)
     }
 
     // 插入广告到预设位置（位置3、6、11）
     for (let i = 0; i < Math.min(adPositions.value.length, adsToUse.length); i++) {
-      const position = adPositions.value[i];
+      const position = adPositions.value[i]
       // 确保位置在有效范围内
       if (finalData.length >= position) {
-        console.log(`在位置${position}插入第${i + 1}个广告:`, adsToUse[i]);
-        finalData.splice(position, 0, adsToUse[i]);
+        console.log(`在位置${position}插入第${i + 1}个广告:`, adsToUse[i])
+        finalData.splice(position, 0, adsToUse[i])
       }
     }
 
-    console.log('🔥 插入广告后的最终数据长度:', finalData.length, '（目标：20条）');
+    console.log('🔥 插入广告后的最终数据长度:', finalData.length, '（目标：20条）')
     // 保存带广告的数据供后续使用
-    videoDataWithAds.value = [...finalData];
+    videoDataWithAds.value = [...finalData]
   } else if (page === 1) {
     // 如果是第一页但没有广告，则使用原始数据
-    videoDataWithAds.value = finalData;
+    videoDataWithAds.value = finalData
   }
 
-  return page === 1 ? finalData : processedData;
-};
+  return page === 1 ? finalData : processedData
+}
 
 // 处理搜索提交
 const handleSearch = () => {
@@ -571,115 +592,115 @@ const handleSearch = () => {
     // 跳转到搜索页面，并传递搜索关键词作为查询参数
     router.push({
       name: 'search',
-      query: { wd: searchKeyword.value.trim() }
-    });
+      query: { wd: searchKeyword.value.trim() },
+    })
   }
-};
-
+}
 
 // 最新视频换一批
 const refreshLatestVideos = () => {
   // 防止重复点击
-  if (isLoadingLatest.value) return;
+  if (isLoadingLatest.value) return
 
-  const nextPage = latestCurrentPage.value < latestTotalPages.value ? latestCurrentPage.value + 1 : 1;
-  console.log(`🔥 最新视频换一批，加载第 ${nextPage} 页数据`);
+  const nextPage =
+    latestCurrentPage.value < latestTotalPages.value ? latestCurrentPage.value + 1 : 1
+  console.log(`🔥 最新视频换一批，加载第 ${nextPage} 页数据`)
 
   // 先清空数据，显示加载状态
-  latestVideoData.value = [];
+  latestVideoData.value = []
 
   // 然后加载新数据
-  fetchLatestVideosData(nextPage);
-};
+  fetchLatestVideosData(nextPage)
+}
 
 // 刷新视频数据 - 加载下一页（仅用于换一批按钮）
 const refreshVideos = () => {
   // 检查是否为第一个标签
-  const firstTypeId = typesList.value.length > 0 ? typesList.value[0].type_id : 1;
-  const isFirstTab = activeTypeId.value === firstTypeId;
+  const firstTypeId = typesList.value.length > 0 ? typesList.value[0].type_id : 1
+  const isFirstTab = activeTypeId.value === firstTypeId
 
   if (isFirstTab) {
     // 第一个标签使用换一批逻辑
-    const nextPage = currentPage.value < totalPages.value ? currentPage.value + 1 : 1;
-    console.log(`加载第 ${nextPage} 页数据`);
+    const nextPage = currentPage.value < totalPages.value ? currentPage.value + 1 : 1
+    console.log(`加载第 ${nextPage} 页数据`)
 
     // 设置临时加载状态
-    isLoading.value = true;
+    isLoading.value = true
 
     // 构建请求参数
     const params = {
       mid: 1,
       limit: DEFAULT_PAGE_SIZE,
       page: nextPage,
-      tid: activeTypeId.value
-    };
+      tid: activeTypeId.value,
+    }
 
     // 发起请求获取新数据
-    (useFetch ? fetchRecommendVideos(params) : getRecommendVideos(params))
+    ;(useFetch ? fetchRecommendVideos(params) : getRecommendVideos(params))
       .then((result: ApiResponse) => {
         // 更新页码信息
         if (result.page) {
-          currentPage.value = result.page;
+          currentPage.value = result.page
         }
 
         // 处理API返回的数据
-        let apiData: ApiVideoItem[] = [];
+        let apiData: ApiVideoItem[] = []
 
         // 适应不同的数据结构
         if (result.data && result.data.list) {
-          apiData = result.data.list;
+          apiData = result.data.list
         } else if (result.data) {
-          apiData = Array.isArray(result.data) ? result.data : [];
+          apiData = Array.isArray(result.data) ? result.data : []
         } else if (result.list) {
-          apiData = result.list;
+          apiData = result.list
         }
 
         // 映射字段
-        const processedData = apiData.map(processVideoData);
-        console.log('🔄 [换一批] API返回原始数据长度:', apiData.length);
-        console.log('🔄 [换一批] 视频映射后数据长度:', processedData.length);
-        console.log('🔄 [换一批] DEFAULT_PAGE_SIZE:', DEFAULT_PAGE_SIZE);
+        const processedData = apiData.map(processVideoData)
+        console.log('🔄 [换一批] API返回原始数据长度:', apiData.length)
+        console.log('🔄 [换一批] 视频映射后数据长度:', processedData.length)
+        console.log('🔄 [换一批] DEFAULT_PAGE_SIZE:', DEFAULT_PAGE_SIZE)
 
         // 🔥 目标：17条视频 + 3条广告 = 20条
         // 移除最后3条视频（20-3=17），为广告腾出位置
         if (processedData.length >= 20) {
-          processedData.splice(17); // 只保留前17条视频
-          console.log('🔄 [换一批] 保留前17条视频，移除后的数据长度:', processedData.length);
+          processedData.splice(17) // 只保留前17条视频
+          console.log('🔄 [换一批] 保留前17条视频，移除后的数据长度:', processedData.length)
         }
 
         // 直接使用之前保存的广告位置插入广告
-        const adsToUse = listAds.value.slice(0, 3);
+        const adsToUse = listAds.value.slice(0, 3)
 
         // 确保广告数据可用
         if (adsToUse.length > 0) {
           for (let i = 0; i < Math.min(adPositions.value.length, adsToUse.length); i++) {
-            const position = adPositions.value[i];
+            const position = adPositions.value[i]
             // 确保位置在有效范围内
             if (processedData.length >= position) {
-              console.log(`🔄 [换一批] 在位置${position}插入第${i + 1}个广告:`, adsToUse[i]);
-              processedData.splice(position, 0, adsToUse[i]);
+              console.log(`🔄 [换一批] 在位置${position}插入第${i + 1}个广告:`, adsToUse[i])
+              processedData.splice(position, 0, adsToUse[i])
             }
           }
         }
 
         // 更新视频数据
-        videoData.value = processedData;
+        videoData.value = processedData
 
-        console.log('🔄 [换一批] 最终数据长度:', videoData.value.length, '（目标：20条）');
+        console.log('🔄 [换一批] 最终数据长度:', videoData.value.length, '（目标：20条）')
       })
       .catch((error) => {
-        console.error('换一批加载数据失败:', error);
-        hasError.value = true;
-        errorMessage.value = error.message || '加载失败，请稍后再试';
+        console.error('换一批加载数据失败:', error)
+        hasError.value = true
+        errorMessage.value = error.message || '加载失败，请稍后再试'
       })
       .finally(() => {
-        isLoading.value = false;
-      });
+        isLoading.value = false
+      })
   } else {
     // 其他标签不显示换一批按钮，改为无限滚动
-    console.log('当前标签使用无限滚动，不支持换一批');
+    console.log('当前标签使用无限滚动，不支持换一批')
   }
-};
+}
 
 // 获取轮播图广告数据
 const fetchBannerAds = async () => {
@@ -687,38 +708,44 @@ const fetchBannerAds = async () => {
     // 请求首页轮播图广告数据
     const result = await fetchAds({
       ad_pos: 1, // 首页位置
-      ad_type: 1  // 轮播图类型
-    });
+      ad_type: 1, // 轮播图类型
+    })
 
-    console.log('获取轮播图广告数据:', result);
+    console.log('获取轮播图广告数据:', result)
 
     // 处理API返回的广告数据
-    if (result && result.code === 1 && result.data && Array.isArray(result.data) && result.data.length > 0) {
+    if (
+      result &&
+      result.code === 1 &&
+      result.data &&
+      Array.isArray(result.data) &&
+      result.data.length > 0
+    ) {
       // 将API返回的广告数据转换为本地数据结构
       const apiAds = result.data.map((item: any) => {
         const adItem = {
           id: item.id || 0,
           imageUrl: processAdImageUrl(item.ad_img || ''),
           title: item.ad_name || '广告',
-          link: item.ad_url || ''
-        };
+          link: item.ad_url || '',
+        }
 
-        console.log('处理后的广告项:', adItem);
-        return adItem;
-      });
+        console.log('处理后的广告项:', adItem)
+        return adItem
+      })
 
       // 更新轮播图广告数据
-      console.log('更新轮播图广告数据:', apiAds);
-      bannerAds.value = apiAds;
+      console.log('更新轮播图广告数据:', apiAds)
+      bannerAds.value = apiAds
     } else {
-      console.log('没有获取到轮播图广告数据，不显示轮播图');
-      bannerAds.value = [];
+      console.log('没有获取到轮播图广告数据，不显示轮播图')
+      bannerAds.value = []
     }
   } catch (error) {
-    console.error('获取轮播图广告失败:', error);
-    bannerAds.value = [];
+    console.error('获取轮播图广告失败:', error)
+    bannerAds.value = []
   }
-};
+}
 
 // 获取单图广告数据
 const fetchSingleAd = async () => {
@@ -726,221 +753,257 @@ const fetchSingleAd = async () => {
     // 请求首页单图广告数据
     const result = await fetchAds({
       ad_pos: 1, // 首页位置
-      ad_type: 2  // 单图类型
-    });
+      ad_type: 2, // 单图类型
+    })
 
-    console.log('获取单图广告数据:', result);
+    console.log('获取单图广告数据:', result)
 
     // 处理API返回的广告数据
-    if (result && result.code === 1 && result.data && Array.isArray(result.data) && result.data.length > 0) {
+    if (
+      result &&
+      result.code === 1 &&
+      result.data &&
+      Array.isArray(result.data) &&
+      result.data.length > 0
+    ) {
       // 获取第一个单图广告
-      const item = result.data[0];
+      const item = result.data[0]
 
       singleAd.value = {
         id: item.id || 0,
         imageUrl: processAdImageUrl(item.ad_img || ''),
         title: item.ad_name || '广告',
-        link: item.ad_url || ''
-      };
+        link: item.ad_url || '',
+      }
 
-      console.log('处理后的单图广告:', singleAd.value);
+      console.log('处理后的单图广告:', singleAd.value)
     } else {
-      console.log('没有获取到单图广告数据，不显示单图广告');
-      singleAd.value = null;
+      console.log('没有获取到单图广告数据，不显示单图广告')
+      singleAd.value = null
     }
   } catch (error) {
-    console.error('获取单图广告失败:', error);
-    singleAd.value = null;
+    console.error('获取单图广告失败:', error)
+    singleAd.value = null
   }
-};
+}
 
 // 处理广告点击
 const handleAdClick = (ad: BannerAd | SingleAd) => {
-  if (!ad.link) return;
+  if (!ad.link) return
 
-  console.log(`广告点击: ${ad.title}, 链接: ${ad.link}`);
+  console.log(`广告点击: ${ad.title}, 链接: ${ad.link}`)
 
   // 如果是内部链接，使用路由跳转
   if (ad.link.startsWith('/')) {
-    router.push(ad.link);
+    router.push(ad.link)
   } else {
     // 外部链接，使用window.open打开
-    window.open(ad.link, '_blank');
+    window.open(ad.link, '_blank')
   }
-};
+}
 
 // 处理图片加载错误
 const handleImageError = (event: Event, ad: BannerAd | SingleAd) => {
-  console.error(`广告图片加载失败: ${ad.title}, URL: ${ad.imageUrl}`);
+  console.error(`广告图片加载失败: ${ad.title}, URL: ${ad.imageUrl}`)
 
   // 如果是轮播图广告，从列表中移除
   if ('id' in ad) {
-    const bannerIndex = bannerAds.value.findIndex(item => item.id === ad.id);
+    const bannerIndex = bannerAds.value.findIndex((item) => item.id === ad.id)
     if (bannerIndex > -1) {
-      bannerAds.value.splice(bannerIndex, 1);
-      return;
+      bannerAds.value.splice(bannerIndex, 1)
+      return
     }
 
     // 如果是单图广告，设置为null
     if (singleAd.value && singleAd.value.id === ad.id) {
-      singleAd.value = null;
+      singleAd.value = null
     }
   }
-};
+}
 
 // 处理广告图片路径
 const processAdImageUrl = (imgPath: string) => {
-  console.log('原始广告图片路径:', imgPath);
+  console.log('原始广告图片路径:', imgPath)
 
-  if (!imgPath) return '';
+  if (!imgPath) return ''
 
-  let imageUrl = '';
+  let imageUrl = ''
 
   // 处理图片URL
   if (imgPath.startsWith('/')) {
-    imageUrl = `${BASE_URL}${imgPath}`;
+    imageUrl = `${BASE_URL}${imgPath}`
   } else if (imgPath.startsWith('http')) {
-    imageUrl = imgPath;
+    imageUrl = imgPath
   } else {
-    imageUrl = `${BASE_URL}/${imgPath}`;
+    imageUrl = `${BASE_URL}/${imgPath}`
   }
 
-  console.log('处理后的图片路径:', imageUrl);
-  return imageUrl;
-};
+  console.log('处理后的图片路径:', imageUrl)
+  return imageUrl
+}
 
 // 获取标签数据
 const fetchTagsData = async () => {
-  isTagsLoading.value = true;
+  isTagsLoading.value = true
 
   try {
     // 请求标签数据
-    const result = await fetchTags();
-    console.log('标签数据原始响应:', result);
+    const result = await fetchTags()
+    console.log('标签数据原始响应:', result)
 
-    if (result && result.code === 1 && result.data && Array.isArray(result.data) && result.data.length > 0) {
+    if (
+      result &&
+      result.code === 1 &&
+      result.data &&
+      Array.isArray(result.data) &&
+      result.data.length > 0
+    ) {
       // 处理API返回的标签数据
       const apiTags = result.data.map((item: any, index: number) => {
         return {
-          tag_id: item.tag_id || (index + 1), // 如果没有tag_id，使用索引+1作为ID
+          tag_id: item.tag_id || index + 1, // 如果没有tag_id，使用索引+1作为ID
           tag_name: item.tag_name || '',
           tag_img: item.tag_img ? processImageUrl(item.tag_img) : '', // 如果没有图片，设置为空，让CSS处理背景
-          hasImage: !!item.tag_img // 标记是否有图片
-        };
-      });
+          hasImage: !!item.tag_img, // 标记是否有图片
+        }
+      })
 
       // 更新标签数据
-      tagsList.value = apiTags;
+      tagsList.value = apiTags
 
       // 只显示前3个标签
-      visibleTags.value = apiTags.slice(0, 3);
+      visibleTags.value = apiTags.slice(0, 3)
 
-      console.log('处理后的标签数据:', tagsList.value);
-      console.log('显示的标签:', visibleTags.value);
-      console.log('visibleTags长度:', visibleTags.value.length);
+      console.log('处理后的标签数据:', tagsList.value)
+      console.log('显示的标签:', visibleTags.value)
+      console.log('visibleTags长度:', visibleTags.value.length)
     } else {
-      console.log('API返回的标签数据格式不正确或为空，使用默认标签');
+      console.log('API返回的标签数据格式不正确或为空，使用默认标签')
       console.log('API返回详情:', {
         hasResult: !!result,
         code: result?.code,
         hasData: !!result?.data,
         isArray: Array.isArray(result?.data),
-        dataLength: result?.data?.length
-      });
+        dataLength: result?.data?.length,
+      })
 
       // 使用默认标签数据
-      useDefaultTags();
+      useDefaultTags()
     }
   } catch (error) {
-    console.error('获取标签数据请求失败:', error);
-    console.log('使用默认标签数据作为备选方案');
+    console.error('获取标签数据请求失败:', error)
+    console.log('使用默认标签数据作为备选方案')
 
     // 出错时使用默认标签数据
-    useDefaultTags();
+    useDefaultTags()
   } finally {
-    isTagsLoading.value = false;
+    isTagsLoading.value = false
   }
-};
+}
 
 // 使用默认标签数据
 const useDefaultTags = () => {
   const defaultTags = [
-    { tag_id: 1, tag_name: '热门', tag_img: 'https://images.pexels.com/photos/1036623/pexels-photo-1036623.jpeg?auto=compress&cs=tinysrgb&w=600', hasImage: true },
-    { tag_id: 2, tag_name: '最新', tag_img: 'https://images.pexels.com/photos/1462637/pexels-photo-1462637.jpeg?auto=compress&cs=tinysrgb&w=600', hasImage: true },
-    { tag_id: 3, tag_name: '推荐', tag_img: 'https://images.pexels.com/photos/1382731/pexels-photo-1382731.jpeg?auto=compress&cs=tinysrgb&w=600', hasImage: true }
-  ];
+    {
+      tag_id: 1,
+      tag_name: '热门',
+      tag_img:
+        'https://images.pexels.com/photos/1036623/pexels-photo-1036623.jpeg?auto=compress&cs=tinysrgb&w=600',
+      hasImage: true,
+    },
+    {
+      tag_id: 2,
+      tag_name: '最新',
+      tag_img:
+        'https://images.pexels.com/photos/1462637/pexels-photo-1462637.jpeg?auto=compress&cs=tinysrgb&w=600',
+      hasImage: true,
+    },
+    {
+      tag_id: 3,
+      tag_name: '推荐',
+      tag_img:
+        'https://images.pexels.com/photos/1382731/pexels-photo-1382731.jpeg?auto=compress&cs=tinysrgb&w=600',
+      hasImage: true,
+    },
+  ]
 
-  tagsList.value = defaultTags;
-  visibleTags.value = defaultTags.slice(0, 3);
+  tagsList.value = defaultTags
+  visibleTags.value = defaultTags.slice(0, 3)
 
-  console.log('已设置默认标签数据:', defaultTags);
-};
+  console.log('已设置默认标签数据:', defaultTags)
+}
 
 // 处理图片URL (通用方法)
 const processImageUrl = (imgPath: string): string => {
-  if (!imgPath) return '';
+  if (!imgPath) return ''
 
-  let imageUrl = '';
+  let imageUrl = ''
 
   // 处理图片URL
   if (imgPath.startsWith('/')) {
-    imageUrl = `${BASE_URL}${imgPath}`;
+    imageUrl = `${BASE_URL}${imgPath}`
   } else if (imgPath.startsWith('http')) {
-    imageUrl = imgPath;
+    imageUrl = imgPath
   } else {
-    imageUrl = `${BASE_URL}/${imgPath}`;
+    imageUrl = `${BASE_URL}/${imgPath}`
   }
 
-  return imageUrl;
-};
+  return imageUrl
+}
 
 // 处理标签图片加载错误
 const handleTagImageError = (event: Event) => {
-  console.error('标签图片加载失败');
+  console.error('标签图片加载失败')
 
   // 图片加载失败时，设置为透明或移除图片，但保持标签可见
-  const imgElement = event.target as HTMLImageElement;
-  imgElement.style.display = 'none'; // 隐藏图片，但保持标签可见
+  const imgElement = event.target as HTMLImageElement
+  imgElement.style.display = 'none' // 隐藏图片，但保持标签可见
 
   // 可选：为标签添加一个背景色，确保文字可见
-  const tagItem = imgElement.closest('.tag-item') as HTMLElement;
+  const tagItem = imgElement.closest('.tag-item') as HTMLElement
   if (tagItem) {
-    tagItem.style.backgroundColor = '#333'; // 设置背景色
+    tagItem.style.backgroundColor = '#333' // 设置背景色
   }
-};
+}
 
 // 列表广告数据
 interface ListAd {
-  id: number;
-  coverUrl: string;
-  title: string;
-  isVip?: boolean;
-  isFree?: boolean;
-  duration?: string;
-  class?: string;
-  link?: string;
-  isAd: boolean;
+  id: number
+  coverUrl: string
+  title: string
+  isVip?: boolean
+  isFree?: boolean
+  duration?: string
+  class?: string
+  link?: string
+  isAd: boolean
 }
 
-const listAds = ref<ListAd[]>([]);
+const listAds = ref<ListAd[]>([])
 
 // 获取列表广告数据
 const fetchListAds = async () => {
-  console.log('🎯 [fetchListAds] 开始获取列表广告数据...');
+  console.log('🎯 [fetchListAds] 开始获取列表广告数据...')
   try {
     // 请求首页单图广告数据(ad_type=2)
     const result = await fetchAds({
       ad_pos: 2, // 首页位置
-      ad_type: 2  // 单图类型
-    });
+      ad_type: 2, // 单图类型
+    })
 
-    console.log('🎯 [fetchListAds] API返回结果:', result);
-    console.log('🎯 [fetchListAds] result.code:', result?.code);
-    console.log('🎯 [fetchListAds] result.data:', result?.data);
-    console.log('🎯 [fetchListAds] result.data.length:', result?.data?.length);
+    console.log('🎯 [fetchListAds] API返回结果:', result)
+    console.log('🎯 [fetchListAds] result.code:', result?.code)
+    console.log('🎯 [fetchListAds] result.data:', result?.data)
+    console.log('🎯 [fetchListAds] result.data.length:', result?.data?.length)
 
     // 处理API返回的广告数据
-    if (result && result.code === 1 && result.data && Array.isArray(result.data) && result.data.length > 0) {
+    if (
+      result &&
+      result.code === 1 &&
+      result.data &&
+      Array.isArray(result.data) &&
+      result.data.length > 0
+    ) {
       // 将API返回的广告数据转换为VideoItem格式
       const apiAds = result.data.map((item: any) => {
         const adItem: ListAd = {
@@ -951,387 +1014,414 @@ const fetchListAds = async () => {
           isFree: true,
           class: '广告',
           link: item.ad_url || '',
-          isAd: true
-        };
+          isAd: true,
+        }
 
-        console.log('处理后的列表广告项:', adItem);
-        return adItem;
-      });
+        console.log('处理后的列表广告项:', adItem)
+        return adItem
+      })
 
       // 更新列表广告数据
-      console.log('更新列表广告数据:', apiAds);
-      listAds.value = apiAds;
+      console.log('更新列表广告数据:', apiAds)
+      listAds.value = apiAds
     } else {
-      console.log('没有获取到列表广告数据，不显示广告');
-      listAds.value = [];
+      console.log('没有获取到列表广告数据，不显示广告')
+      listAds.value = []
     }
   } catch (error) {
-    console.error('获取列表广告失败:', error);
-    listAds.value = [];
+    console.error('获取列表广告失败:', error)
+    listAds.value = []
   }
-};
+}
 
 // 添加滚动监听，检测何时到达底部进行懒加载
 const checkScrollForLazyLoad = () => {
   // 如果正在加载、已经加载完所有数据、有错误，或者是第一个标签，则不处理
-  const firstTypeId = typesList.value.length > 0 ? typesList.value[0].type_id : 1;
-  const isFirstTab = activeTypeId.value === firstTypeId;
+  const firstTypeId = typesList.value.length > 0 ? typesList.value[0].type_id : 1
+  const isFirstTab = activeTypeId.value === firstTypeId
 
-  if (isLoading.value || isLoadingMore.value || !hasMoreVideos.value || hasError.value || isFirstTab) {
-    return;
+  if (
+    isLoading.value ||
+    isLoadingMore.value ||
+    !hasMoreVideos.value ||
+    hasError.value ||
+    isFirstTab
+  ) {
+    return
   }
 
   // 获取滚动位置
-  const scrollTop = window.scrollY || document.documentElement.scrollTop;
+  const scrollTop = window.scrollY || document.documentElement.scrollTop
   // 更新当前滚动位置
-  currentScrollPosition.value = scrollTop;
+  currentScrollPosition.value = scrollTop
 
   // 获取视口高度
-  const windowHeight = window.innerHeight;
+  const windowHeight = window.innerHeight
   // 获取文档总高度
-  const documentHeight = document.documentElement.scrollHeight;
+  const documentHeight = document.documentElement.scrollHeight
 
   // 当距离底部不足100px时，进行懒加载
   if (documentHeight - (scrollTop + windowHeight) < 100) {
-    loadMoreVideos();
+    loadMoreVideos()
   }
-};
+}
 
 // 加载更多视频
 const loadMoreVideos = () => {
   // 检查是否为第一个标签
-  const firstTypeId = typesList.value.length > 0 ? typesList.value[0].type_id : 1;
-  const isFirstTab = activeTypeId.value === firstTypeId;
+  const firstTypeId = typesList.value.length > 0 ? typesList.value[0].type_id : 1
+  const isFirstTab = activeTypeId.value === firstTypeId
 
   if (isFirstTab) {
     // 第一个标签不使用无限滚动
-    return;
+    return
   }
 
   // 如果是第一次加载（懒加载）且当前没有数据
   if (isFirstLoad.value && videoData.value.length === 0) {
-    console.log(`首次加载第1页数据，标签ID: ${activeTypeId.value}`);
-    fetchRecommendVideosData(1, activeTypeId.value);
-    return;
+    console.log(`首次加载第1页数据，标签ID: ${activeTypeId.value}`)
+    fetchRecommendVideosData(1, activeTypeId.value)
+    return
   }
 
   // 如果当前没有更多数据或正在加载，则不处理
   if (!hasMoreVideos.value || isLoadingMore.value) {
-    console.log(`无更多数据或正在加载中，hasMoreVideos: ${hasMoreVideos.value}, isLoadingMore: ${isLoadingMore.value}`);
-    return;
+    console.log(
+      `无更多数据或正在加载中，hasMoreVideos: ${hasMoreVideos.value}, isLoadingMore: ${isLoadingMore.value}`,
+    )
+    return
   }
 
   // 计算下一页，如果已到最后一页则不加载
   if (currentPage.value < totalPages.value) {
-    const nextPage = currentPage.value + 1;
-    console.log(`加载更多数据 - 第 ${nextPage} 页，当前已有${videoData.value.length}条数据，标签ID: ${activeTypeId.value}`);
-    fetchRecommendVideosData(nextPage, activeTypeId.value, true);
+    const nextPage = currentPage.value + 1
+    console.log(
+      `加载更多数据 - 第 ${nextPage} 页，当前已有${videoData.value.length}条数据，标签ID: ${activeTypeId.value}`,
+    )
+    fetchRecommendVideosData(nextPage, activeTypeId.value, true)
   } else {
-    console.log('已经是最后一页了');
-    hasMoreVideos.value = false;
+    console.log('已经是最后一页了')
+    hasMoreVideos.value = false
   }
-};
+}
 
 // 添加滚动事件监听
 const addScrollListener = () => {
   // 移除已存在的监听器避免重复添加
-  window.removeEventListener('scroll', checkScrollForLazyLoad);
+  window.removeEventListener('scroll', checkScrollForLazyLoad)
   // 添加新的监听器
-  window.addEventListener('scroll', checkScrollForLazyLoad);
-};
+  window.addEventListener('scroll', checkScrollForLazyLoad)
+}
 
 // 移除滚动事件监听
 const removeScrollListener = () => {
-  window.removeEventListener('scroll', checkScrollForLazyLoad);
-};
-
-
-
+  window.removeEventListener('scroll', checkScrollForLazyLoad)
+}
 
 // 处理页面关闭或刷新的函数
 const handlePageUnload = () => {
   // 保存当前会话数据
-  saveSessionData();
+  saveSessionData()
 
   // 在页面关闭或刷新时清除会话状态
-  sessionStorage.removeItem('pageSessionActive');
+  sessionStorage.removeItem('pageSessionActive')
   // 不清除弹窗状态，保持关闭状态直到会话结束
-};
+}
 
 // 组件挂载时获取数据
 onMounted(async () => {
   // 添加页面关闭或刷新的事件监听
-  window.addEventListener('beforeunload', handlePageUnload);
+  window.addEventListener('beforeunload', handlePageUnload)
 
   // 尝试恢复之前的会话数据
-  restoreSessionData();
+  restoreSessionData()
 
   // 处理邀请码参数
-  handleInviteCode();
+  handleInviteCode()
 
   // 首先执行游客登录（如果需要的话）
-  await performTouristLogin();
-
+  await performTouristLogin()
 
   // 获取类型列表数据
-  await fetchTypesData();
+  await fetchTypesData()
 
   // 只有在页面内导航时才恢复选项卡状态，关闭页面后重新打开应该重置为默认选项卡
-  const isPageRefreshed = !sessionStorage.getItem('pageSessionActive');
+  const isPageRefreshed = !sessionStorage.getItem('pageSessionActive')
 
   // 标记页面会话已激活
-  sessionStorage.setItem('pageSessionActive', 'true');
+  sessionStorage.setItem('pageSessionActive', 'true')
 
   if (!isPageRefreshed) {
     // 从localStorage读取上一次选中的标签ID
-    const lastActiveTabId = localStorage.getItem('lastActiveTabId');
-    if (lastActiveTabId && typesList.value.some(type => type.type_id === parseInt(lastActiveTabId))) {
+    const lastActiveTabId = localStorage.getItem('lastActiveTabId')
+    if (
+      lastActiveTabId &&
+      typesList.value.some((type) => type.type_id === parseInt(lastActiveTabId))
+    ) {
       // 如果有上次选中的标签ID且该标签存在于当前标签列表中，则恢复选中状态
-      activeTypeId.value = parseInt(lastActiveTabId);
-      console.log('恢复上次选中的标签ID:', activeTypeId.value);
+      activeTypeId.value = parseInt(lastActiveTabId)
+      console.log('恢复上次选中的标签ID:', activeTypeId.value)
     }
   } else {
-    console.log('页面是刷新或新打开的，使用默认选项卡');
+    console.log('页面是刷新或新打开的，使用默认选项卡')
     // 页面刷新或新打开时，清除之前保存的选项卡状态
-    localStorage.removeItem('lastActiveTabId');
+    localStorage.removeItem('lastActiveTabId')
     // 设置为第一个选项卡
-    activeTypeId.value = typesList.value.length > 0 ? typesList.value[0].type_id : 1;
+    activeTypeId.value = typesList.value.length > 0 ? typesList.value[0].type_id : 1
   }
 
   // 确定是否是首页标签
-  const firstTypeId = typesList.value.length > 0 ? typesList.value[0].type_id : 1;
-  const isFirstTab = activeTypeId.value === firstTypeId;
+  const firstTypeId = typesList.value.length > 0 ? typesList.value[0].type_id : 1
+  const isFirstTab = activeTypeId.value === firstTypeId
 
   // 先获取广告数据
   await Promise.all([
     fetchBannerAds(),
     fetchSingleAd(),
-    fetchListAds() // 根据当前标签类型获取对应广告
-  ]);
+    fetchListAds(), // 根据当前标签类型获取对应广告
+  ])
 
   // 检查当前标签是否有有效的缓存数据
-  const currentTabCache = tabStates.value[activeTypeId.value];
-  if (currentTabCache && currentTabCache.videos.length > 0 && isCacheValid(currentTabCache.lastUpdateTime)) {
-    console.log('使用有效的缓存数据');
+  const currentTabCache = tabStates.value[activeTypeId.value]
+  if (
+    currentTabCache &&
+    currentTabCache.videos.length > 0 &&
+    isCacheValid(currentTabCache.lastUpdateTime)
+  ) {
+    console.log('使用有效的缓存数据')
 
     // 恢复完整状态
-    currentPage.value = currentTabCache.currentPage;
-    totalPages.value = currentTabCache.totalPages;
-    hasMoreVideos.value = currentTabCache.hasMoreVideos;
+    currentPage.value = currentTabCache.currentPage
+    totalPages.value = currentTabCache.totalPages
+    hasMoreVideos.value = currentTabCache.hasMoreVideos
 
     // 对于首页标签，需要重新处理广告插入
     if (isFirstTab) {
-      console.log('首页标签使用缓存数据，重新处理广告插入');
+      console.log('首页标签使用缓存数据，重新处理广告插入')
       // 从缓存数据中过滤出非广告的视频数据
-      const videosWithoutAds = currentTabCache.videos.filter(item => !item.isAd);
-      console.log('缓存中的纯视频数据长度:', videosWithoutAds.length);
+      const videosWithoutAds = currentTabCache.videos.filter((item) => !item.isAd)
+      console.log('缓存中的纯视频数据长度:', videosWithoutAds.length)
 
       // 重新插入最新的广告数据
-      const finalData = processDataWithAds(videosWithoutAds, 1);
-      videoData.value = finalData;
-      console.log('重新插入广告后的数据长度:', finalData.length);
+      const finalData = processDataWithAds(videosWithoutAds, 1)
+      videoData.value = finalData
+      console.log('重新插入广告后的数据长度:', finalData.length)
     } else {
       // 非首页标签直接使用缓存数据
-      videoData.value = [...currentTabCache.videos];
+      videoData.value = [...currentTabCache.videos]
     }
 
-    isFirstLoad.value = false; // 重要：标记为非首次加载
+    isFirstLoad.value = false // 重要：标记为非首次加载
 
     // 恢复滚动位置
     setTimeout(() => {
-      window.scrollTo(0, currentTabCache.scrollPosition);
-    }, 100);
+      window.scrollTo(0, currentTabCache.scrollPosition)
+    }, 100)
   } else {
     // 没有有效缓存，重新获取视频数据
     if (currentTabCache) {
-      console.log('缓存已过期，重新获取视频数据');
+      console.log('缓存已过期，重新获取视频数据')
     } else {
-      console.log('没有缓存，重新获取视频数据');
+      console.log('没有缓存，重新获取视频数据')
     }
 
     // 🔥 如果是首页标签，必须使用 tid=1，否则API只返回10条数据
-    const tidToUse = isFirstTab ? VIDEO_CATEGORIES.ALL : activeTypeId.value;
-    console.log('🔥 onMounted加载数据 - isFirstTab:', isFirstTab, 'tidToUse:', tidToUse);
-    fetchRecommendVideosData(1, tidToUse);
+    const tidToUse = isFirstTab ? VIDEO_CATEGORIES.ALL : activeTypeId.value
+    console.log('🔥 onMounted加载数据 - isFirstTab:', isFirstTab, 'tidToUse:', tidToUse)
+    fetchRecommendVideosData(1, tidToUse)
   }
 
-  fetchTagsData();
+  fetchTagsData()
 
   // 如果是首页标签，加载最新视频数据
   if (isFirstTab) {
-    fetchLatestVideosData();
+    fetchLatestVideosData()
   }
 
   // 如果不是首页标签，添加滚动监听
   if (!isFirstTab) {
     // 添加滚动监听
-    addScrollListener();
+    addScrollListener()
   }
-});
+})
 
 // 从其他页面返回时激活的钩子（用于处理从详情页返回的情况）
 onActivated(() => {
-  console.log('首页被重新激活');
+  console.log('首页被重新激活')
 
   // 确定是否是首页标签
-  const firstTypeId = typesList.value.length > 0 ? typesList.value[0].type_id : 1;
-  const isFirstTab = activeTypeId.value === firstTypeId;
+  const firstTypeId = typesList.value.length > 0 ? typesList.value[0].type_id : 1
+  const isFirstTab = activeTypeId.value === firstTypeId
 
   // 尝试恢复当前标签的缓存数据
-  const currentTabCache = tabStates.value[activeTypeId.value];
-  if (currentTabCache && currentTabCache.videos.length > 0 && isCacheValid(currentTabCache.lastUpdateTime)) {
-    console.log(`从有效缓存恢复标签${activeTypeId.value}的数据`);
+  const currentTabCache = tabStates.value[activeTypeId.value]
+  if (
+    currentTabCache &&
+    currentTabCache.videos.length > 0 &&
+    isCacheValid(currentTabCache.lastUpdateTime)
+  ) {
+    console.log(`从有效缓存恢复标签${activeTypeId.value}的数据`)
 
     // 恢复所有状态
-    currentPage.value = currentTabCache.currentPage;
-    totalPages.value = currentTabCache.totalPages;
-    hasMoreVideos.value = currentTabCache.hasMoreVideos;
-    videoData.value = [...currentTabCache.videos];
-    isFirstLoad.value = false; // 重要：标记为非首次加载
+    currentPage.value = currentTabCache.currentPage
+    totalPages.value = currentTabCache.totalPages
+    hasMoreVideos.value = currentTabCache.hasMoreVideos
+    videoData.value = [...currentTabCache.videos]
+    isFirstLoad.value = false // 重要：标记为非首次加载
 
     // 恢复滚动位置
     setTimeout(() => {
-      window.scrollTo(0, currentTabCache.scrollPosition);
-      console.log(`恢复滚动位置到: ${currentTabCache.scrollPosition}`);
-    }, 50);
+      window.scrollTo(0, currentTabCache.scrollPosition)
+      console.log(`恢复滚动位置到: ${currentTabCache.scrollPosition}`)
+    }, 50)
   }
 
   // 检查是否有从详情页返回的滚动位置需要恢复
-  const savedScrollPosition = sessionStorage.getItem('homeScrollPosition');
+  const savedScrollPosition = sessionStorage.getItem('homeScrollPosition')
   if (savedScrollPosition) {
-    const scrollPosition = parseInt(savedScrollPosition);
-    console.log(`从详情页返回，恢复精确滚动位置: ${scrollPosition}`);
+    const scrollPosition = parseInt(savedScrollPosition)
+    console.log(`从详情页返回，恢复精确滚动位置: ${scrollPosition}`)
 
     setTimeout(() => {
-      window.scrollTo(0, scrollPosition);
-      sessionStorage.removeItem('homeScrollPosition');
-    }, 50);
+      window.scrollTo(0, scrollPosition)
+      sessionStorage.removeItem('homeScrollPosition')
+    }, 50)
   }
 
   // 如果不是首页标签，重新添加滚动监听
   if (!isFirstTab) {
-    console.log('重新添加滚动监听器');
-    addScrollListener();
+    console.log('重新添加滚动监听器')
+    addScrollListener()
   }
 
   // 从详情页返回时不再检查弹窗状态，保持关闭状态
-});
+})
 
 // 组件卸载时移除滚动事件监听
 onBeforeUnmount(() => {
   // 保存当前标签状态
-  saveCurrentTabState();
+  saveCurrentTabState()
 
   // 保存会话数据
-  saveSessionData();
+  saveSessionData()
 
-  removeScrollListener();
+  removeScrollListener()
 
   // 移除页面关闭或刷新的事件监听
-  window.removeEventListener('beforeunload', handlePageUnload);
+  window.removeEventListener('beforeunload', handlePageUnload)
 
   // 不清除弹窗状态，保持关闭状态直到会话结束
-});
+})
 
 // 处理APP下载点击
 const openAppDownload = () => {
   // 打开APP下载页面
-  const appDownloadUrl = 'https://jm.muqumw.cn/fyf/index.html?vipid=168168';
-  window.open(appDownloadUrl, '_blank');
-  console.log('跳转到APP下载页面:', appDownloadUrl);
-};
+  const appDownloadUrl = 'https://jm.muqumw.cn/fyf/index.html?vipid=168168'
+  window.open(appDownloadUrl, '_blank')
+  console.log('跳转到APP下载页面:', appDownloadUrl)
+}
 
 // 保存会话数据到sessionStorage
 const saveSessionData = () => {
   try {
     // 将当前的tabStates转换为JSON字符串并保存
-    sessionStorage.setItem('tabStates', JSON.stringify(tabStates.value));
-    console.log('保存会话数据到sessionStorage');
+    sessionStorage.setItem('tabStates', JSON.stringify(tabStates.value))
+    console.log('保存会话数据到sessionStorage')
   } catch (error) {
-    console.error('保存会话数据失败:', error);
+    console.error('保存会话数据失败:', error)
   }
-};
+}
 
 // 从sessionStorage恢复会话数据
 const restoreSessionData = () => {
   try {
-    const savedData = sessionStorage.getItem('tabStates');
+    const savedData = sessionStorage.getItem('tabStates')
     if (savedData) {
-      tabStates.value = JSON.parse(savedData);
-      console.log('从sessionStorage恢复会话数据');
-      return true;
+      tabStates.value = JSON.parse(savedData)
+      console.log('从sessionStorage恢复会话数据')
+      return true
     }
   } catch (error) {
-    console.error('恢复会话数据失败:', error);
+    console.error('恢复会话数据失败:', error)
   }
-  return false;
-};
+  return false
+}
 
 // 游客登录函数
 const performTouristLogin = async () => {
-  console.log('=== 首页游客登录开始 ===');
+  console.log('=== 首页游客登录开始 ===')
 
   // 检查本地是否已有用户信息
-  const localUserInfo = getUserInfo();
+  const localUserInfo = getUserInfo()
 
   if (localUserInfo) {
-    console.log('✅ 本地已有用户信息，跳过游客登录');
-    return;
+    console.log('✅ 本地已有用户信息，跳过游客登录')
+    return
   }
 
   // 检查是否已登录
   if (isLoggedIn()) {
-    console.log('✅ 用户已登录，跳过游客登录');
-    return;
+    console.log('✅ 用户已登录，跳过游客登录')
+    return
   }
 
   try {
-    console.log('🔄 开始游客登录流程...');
+    console.log('🔄 开始游客登录流程...')
 
-    const deviceIMEI = getDeviceIMEI();
-    console.log('📱 使用设备IMEI进行游客登录:', deviceIMEI);
+    const deviceIMEI = getDeviceIMEI()
+    console.log('📱 使用设备IMEI进行游客登录:', deviceIMEI)
 
-    const result = await touristLogin(deviceIMEI);
-    console.log('📥 游客登录API响应:', result);
+    const result = await touristLogin(deviceIMEI)
+    console.log('📥 游客登录API响应:', result)
 
     if (result.code === 1 && result.data) {
       // 游客登录成功，保存用户信息
-      console.log('✅ 游客登录成功，用户信息已保存到本地');
+      console.log('✅ 游客登录成功，用户信息已保存到本地')
 
       showToast({
         message: '已获取游客信息',
-        duration: 1000
-      });
+        duration: 1000,
+      })
     } else {
       // 游客登录失败
-      console.error('❌ 游客登录失败:', result);
+      console.error('❌ 游客登录失败:', result)
       showToast({
         message: '获取游客信息失败',
-        duration: 2000
-      });
+        duration: 2000,
+      })
     }
   } catch (error) {
-    console.error('❌ 游客登录异常:', error);
+    console.error('❌ 游客登录异常:', error)
     showToast({
       message: '获取游客信息失败',
-      duration: 2000
-    });
+      duration: 2000,
+    })
   }
 
-  console.log('=== 首页游客登录结束 ===');
-};
+  console.log('=== 首页游客登录结束 ===')
+}
 </script>
 
 <template>
   <div class="home">
-
     <!-- 顶部搜索栏 -->
     <div class="search-bar">
       <div class="search-input">
         <van-icon name="search" color="#999" />
-        <input type="text" placeholder="影片名称" class="search-field" v-model="searchKeyword"
-          @keyup.enter="handleSearch" />
-        <van-icon v-if="searchKeyword" name="clear" color="#999" class="clear-icon" @click="searchKeyword = ''" />
+        <input
+          type="text"
+          placeholder="影片名称"
+          class="search-field"
+          v-model="searchKeyword"
+          @keyup.enter="handleSearch"
+        />
+        <van-icon
+          v-if="searchKeyword"
+          name="clear"
+          color="#999"
+          class="clear-icon"
+          @click="searchKeyword = ''"
+        />
       </div>
       <div class="app-download" @click="openAppDownload">
         <img src="@/assets/img/icon-yjym.svg" alt="永久域名" />
@@ -1341,8 +1431,12 @@ const performTouristLogin = async () => {
 
     <!-- 导航栏 -->
     <div class="nav-tabs">
-      <div v-for="type in typesList" :key="type.type_id"
-        :class="['tab-item', activeTypeId === type.type_id ? 'active' : '']" @click="switchType(type.type_id)">
+      <div
+        v-for="type in typesList"
+        :key="type.type_id"
+        :class="['tab-item', activeTypeId === type.type_id ? 'active' : '']"
+        @click="switchType(type.type_id)"
+      >
         {{ type.type_name }}
       </div>
     </div>
@@ -1351,7 +1445,13 @@ const performTouristLogin = async () => {
     <div class="content">
       <!-- 大型轮播广告 -->
       <div class="banner" v-if="bannerAds.length > 0">
-        <van-swipe :autoplay="3000" lazy-render indicator-color="#ff9500" :loop="true" @change="onBannerChange">
+        <van-swipe
+          :autoplay="3000"
+          lazy-render
+          indicator-color="#ff9500"
+          :loop="true"
+          @change="onBannerChange"
+        >
           <van-swipe-item v-for="(ad, index) in bannerAds" :key="ad.id" @click="handleAdClick(ad)">
             <div v-show="currentBannerIndex === index">
               <img :src="ad.imageUrl" :alt="ad.title" @error="handleImageError($event, ad)" />
@@ -1366,11 +1466,18 @@ const performTouristLogin = async () => {
           <van-loading type="spinner" size="24px" color="#ff9500" />
         </div>
         <template v-else-if="visibleTags.length > 0">
-          <router-link v-for="tag in visibleTags" :key="tag.tag_id"
+          <router-link
+            v-for="tag in visibleTags"
+            :key="tag.tag_id"
             :to="`/tag/${tag.tag_id}?name=${encodeURIComponent(tag.tag_name)}`"
-            :class="['tag-item', !tag.hasImage ? 'tag-no-image' : '']">
-            <img v-if="tag.hasImage && tag.tag_img" :src="tag.tag_img" :alt="tag.tag_name"
-              @error="handleTagImageError($event)" />
+            :class="['tag-item', !tag.hasImage ? 'tag-no-image' : '']"
+          >
+            <img
+              v-if="tag.hasImage && tag.tag_img"
+              :src="tag.tag_img"
+              :alt="tag.tag_name"
+              @error="handleTagImageError($event)"
+            />
             <div class="tag-overlay"></div>
             <div class="tag-content">{{ tag.tag_name }}</div>
           </router-link>
@@ -1382,7 +1489,11 @@ const performTouristLogin = async () => {
 
       <!-- 横幅广告 -->
       <div class="ad-banner" v-if="singleAd" @click="handleAdClick(singleAd)">
-        <img :src="singleAd.imageUrl" :alt="singleAd.title" @error="handleImageError($event, singleAd)" />
+        <img
+          :src="singleAd.imageUrl"
+          :alt="singleAd.title"
+          @error="handleImageError($event, singleAd)"
+        />
       </div>
 
       <!-- 最新视频列表（仅首页标签显示） -->
@@ -1401,7 +1512,11 @@ const performTouristLogin = async () => {
         <VideoList v-else :videos="latestVideoData" />
 
         <!-- 最新视频换一批按钮 -->
-        <div v-if="latestVideoData.length > 0 && !isLoadingLatest" class="refresh-btn" @click="refreshLatestVideos">
+        <div
+          v-if="latestVideoData.length > 0 && !isLoadingLatest"
+          class="refresh-btn"
+          @click="refreshLatestVideos"
+        >
           <van-icon name="replay" />
           <span>换一批</span>
         </div>
@@ -1451,11 +1566,18 @@ const performTouristLogin = async () => {
       </div>
 
       <!-- 已全部加载（仅非第一个标签显示） -->
-      <div v-if="videoData.length > 0 && !hasMoreVideos && !isLoading && !isLoadingMore && !isFirstTabActive"
-        class="all-loaded">
+      <div
+        v-if="
+          videoData.length > 0 &&
+          !hasMoreVideos &&
+          !isLoading &&
+          !isLoadingMore &&
+          !isFirstTabActive
+        "
+        class="all-loaded"
+      >
         已经到底了~
       </div>
-
     </div>
 
     <!-- 底部导航 -->
@@ -1465,8 +1587,8 @@ const performTouristLogin = async () => {
         <div class="nav-text">首页</div>
       </router-link>
       <router-link to="/live" class="nav-item">
-        <img src="@/assets/img/icon-tabbar-live-normal.svg" alt="直播" class="tabbar-icon" />
-        <div class="nav-text">直播</div>
+        <img src="@/assets/img/icon-tabbar-live-normal.svg" alt="活动" class="tabbar-icon" />
+        <div class="nav-text">活动</div>
       </router-link>
       <router-link to="/game" class="nav-item">
         <img src="@/assets/img/icon-tabbar-game-normal.svg" alt="游戏" class="tabbar-icon" />
@@ -1491,9 +1613,6 @@ const performTouristLogin = async () => {
   overflow-x: hidden;
   /* 防止横向滚动 */
 }
-
-
-
 
 /* 顶部搜索栏 */
 .search-bar {
@@ -1760,7 +1879,6 @@ const performTouristLogin = async () => {
 .tabbar-icon {
   width: 24px;
   height: 24px;
-
 }
 
 .nav-item.active,
@@ -1792,7 +1910,7 @@ const performTouristLogin = async () => {
   display: flex;
   align-items: center;
   justify-content: center;
-  background-color: #2C2C2C;
+  background-color: #2c2c2c;
   border-radius: 6px;
 }
 
