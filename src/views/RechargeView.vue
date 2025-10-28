@@ -1,102 +1,109 @@
 <script setup lang="ts">
 // 充值页面逻辑
-import { ref, onMounted, computed } from 'vue';
-import { showToast, showDialog } from 'vant';
-import { useRouter } from 'vue-router';
-import { fetchPayChannels, fetchChargeRules, createChargeOrder, getUserInfo, fetchUserDatas, setUserInfo } from '@/api/fetch-api';
-import HeaderNav from '@/components/HeaderNav.vue';
+import { ref, onMounted, computed } from 'vue'
+import { showToast, showDialog } from 'vant'
+import { useRouter } from 'vue-router'
+import {
+  fetchPayChannels,
+  fetchChargeRules,
+  createChargeOrder,
+  getUserInfo,
+  fetchUserDatas,
+  setUserInfo,
+} from '@/api/fetch-api'
+import HeaderNav from '@/components/HeaderNav.vue'
 
 // 接口类型定义
 interface PaymentChannel {
-  id: string;
-  name: string;
-  status: string;
-  type: string;
-  payid: string;
-  selected: boolean;
+  id: string
+  name: string
+  status: string
+  type: string
+  payid: string
+  selected: boolean
 }
 
 interface MoneyItem {
-  id: string;
-  name: string;
-  coin: string;
-  coin_ios: string;
-  money: string;
-  product_id: string;
-  give: string;
-  list_order: string;
-  addtime: string;
-  coin_paypal: string;
+  id: string
+  name: string
+  coin: string
+  coin_ios: string
+  money: string
+  product_id: string
+  give: string
+  list_order: string
+  addtime: string
+  coin_paypal: string
 }
 
 interface PaymentSubChannel {
-  id: string;
-  name: string;
-  paycode?: string;
-  type?: string;
-  status?: string;
-  moneylist?: MoneyItem[];
-  payid?: string;
-  paytypeid?: string;
-  bankare?: string;
-  bankno?: string;
+  id: string
+  name: string
+  paycode?: string
+  type?: string
+  status?: string
+  moneylist?: MoneyItem[]
+  payid?: string
+  paytypeid?: string
+  bankare?: string
+  bankno?: string
 }
 
 interface ChargeRulesResponse {
-  ret: number;
+  ret: number
   data: {
-    code: number;
-    msg: string;
+    code: number
+    msg: string
     info: {
-      moneylist: MoneyItem[];
-      list: PaymentSubChannel | PaymentSubChannel[];
-    };
-  };
-  msg: string;
+      moneylist: MoneyItem[]
+      list: PaymentSubChannel | PaymentSubChannel[]
+    }
+  }
+  msg: string
 }
 
 interface ChargeRulesDisplay {
-  type: 'simple' | 'channels' | 'unsupported';
-  moneyList: MoneyItem[];
-  accountInfo?: PaymentSubChannel | null;
-  channels?: PaymentSubChannel[];
-  message?: string;
+  type: 'simple' | 'channels' | 'unsupported'
+  moneyList: MoneyItem[]
+  accountInfo?: PaymentSubChannel | null
+  channels?: PaymentSubChannel[]
+  message?: string
 }
 
-const router = useRouter();
+const router = useRouter()
 
 // 修复返回按钮
 const goBack = () => {
-  router.back();
-};
+  router.back()
+}
 
 // 处理广告点击
 const handleAdClick = (ad: { id: number; name: string; icon: string; link: string }) => {
-  console.log(`点击广告: ${ad.name}, 跳转到: ${ad.link}`);
+  console.log(`点击广告: ${ad.name}, 跳转到: ${ad.link}`)
 
   // 如果是内部链接，使用路由跳转
   if (ad.link.startsWith('/')) {
-    router.push(ad.link);
+    router.push(ad.link)
   } else {
     // 外部链接，使用window.open打开
-    window.open(ad.link, '_blank');
+    window.open(ad.link, '_blank')
   }
-};
+}
 
 // 钻石余额
-const diamondBalance = ref(0);
+const diamondBalance = ref(0)
 
 // 选项卡状态
-const activeTab = ref('game'); // 'game' 或 'video'
+const activeTab = ref('game') // 'game' 或 'video'
 
 // 切换选项卡
 const switchTab = (tab: string) => {
   if (tab === 'video') {
-    router.push('/vip-recharge');
+    router.push('/vip-recharge')
   } else {
-    activeTab.value = tab;
+    activeTab.value = tab
   }
-};
+}
 
 // 广告列表数据
 const adsList = ref([
@@ -104,88 +111,85 @@ const adsList = ref([
     id: 1,
     name: '快帆加速VPN',
     icon: new URL('@/assets/img/icon-link-01.png', import.meta.url).href,
-    link: 'https://www.kuaifan.co/'
+    link: 'https://www.kuaifan.co/',
   },
   {
     id: 2,
     name: '穿梭加速VPN',
     icon: new URL('@/assets/img/icon-link-02.png', import.meta.url).href,
-    link: 'https://www.transocks.com.cn/'
+    link: 'https://www.transocks.com.cn/',
   },
   {
     id: 3,
     name: 'imToken',
     icon: new URL('@/assets/img/icon-link-03.png', import.meta.url).href,
-    link: 'https://token.im/download'
+    link: 'https://token.im/download',
   },
   {
     id: 4,
     name: 'TOKEN POCKET',
     icon: new URL('@/assets/img/icon-link-04.png', import.meta.url).href,
-    link: 'https://www.tokenpocket.pro/zh/download/app'
+    link: 'https://www.tokenpocket.pro/zh/download/app',
   },
   {
     id: 5,
     name: 'TronLink',
     icon: new URL('@/assets/img/icon-link-05.png', import.meta.url).href,
-    link: 'https://www.tronlink.org/'
+    link: 'https://www.tronlink.org/',
   },
   {
     id: 6,
     name: 'Bitpie',
     icon: new URL('@/assets/img/icon-link-06.png', import.meta.url).href,
-    link: 'https://bitpie.com/'
+    link: 'https://bitpie.com/',
   },
   {
     id: 7,
     name: 'wnbit',
     icon: new URL('@/assets/img/icon-link-07.png', import.meta.url).href,
-    link: 'https://ownbit.io/en/download/'
+    link: 'https://ownbit.io/en/download/',
   },
   {
     id: 8,
     name: 'Trust Wallet',
     icon: new URL('@/assets/img/icon-link-08.png', import.meta.url).href,
-    link: 'https://trustwallet.com/zh_CN/'
-  }
-]);
+    link: 'https://trustwallet.com/zh_CN/',
+  },
+])
 
 // 支付渠道数据
-const paymentChannels = ref<PaymentChannel[]>([]);
-const isLoadingChannels = ref(false);
+const paymentChannels = ref<PaymentChannel[]>([])
+const isLoadingChannels = ref(false)
 
 // 当前选中的支付方式
-const selectedPaymentMethod = ref('');
+const selectedPaymentMethod = ref('')
 
 // 充值金额
-const rechargeAmount = ref('');
+const rechargeAmount = ref('')
 
 // 当前充值规则数据
-const chargeRules = ref<ChargeRulesResponse | null>(null);
-const isLoadingRules = ref(false);
+const chargeRules = ref<ChargeRulesResponse | null>(null)
+const isLoadingRules = ref(false)
 
 // 选中的金额项
-const selectedMoneyItem = ref<MoneyItem | null>(null);
+const selectedMoneyItem = ref<MoneyItem | null>(null)
 
 // 选中的子渠道
-const selectedSubChannel = ref<PaymentSubChannel | null>(null);
+const selectedSubChannel = ref<PaymentSubChannel | null>(null)
 
 // 转账账号（仅虚拟币显示）
-const transferAccount = ref('');
+const transferAccount = ref('')
 
 // 创建订单加载状态
-const isCreatingOrder = ref(false);
+const isCreatingOrder = ref(false)
 
-// 🔥 充值平台选择弹窗状态
-const showPlatformModal = ref(false);
-
-// 🔥 订单成功弹窗状态
-const showOrderSuccessModal = ref(false);
+// 订单成功弹窗状态
+const showOrderSuccessModal = ref(false)
 const orderInfo = ref({
   orderNumber: '',
   payUrl: '',
-  qudaoid: 0
-});
+  qudaoid: 0,
+})
 
 // 计算渠道ID到类型的映射
 const channelTypeMap: Record<string, number> = {
@@ -193,337 +197,317 @@ const channelTypeMap: Record<string, number> = {
   '3': 3, // 银行卡
   '4': 4, // 微信
   '5': 5, // 支付宝
-};
+}
 
 // 获取支付渠道数据
 const fetchPaymentChannels = async () => {
-  isLoadingChannels.value = true;
+  isLoadingChannels.value = true
   try {
-    const result = await fetchPayChannels();
+    const result = await fetchPayChannels()
     if (result.ret === 200 && result.data && result.data.info && result.data.info.list) {
-      paymentChannels.value = result.data.info.list.map((item: { id: string; name: string; status: string; type: string; payid: string }) => ({
-        id: item.id,
-        name: item.name,
-        status: item.status,
-        type: item.type,
-        payid: item.payid,
-        selected: false
-      }));
+      paymentChannels.value = result.data.info.list.map(
+        (item: { id: string; name: string; status: string; type: string; payid: string }) => ({
+          id: item.id,
+          name: item.name,
+          status: item.status,
+          type: item.type,
+          payid: item.payid,
+          selected: false,
+        }),
+      )
 
       // 🔥 不再默认选中任何支付方式，让用户主动选择
 
-      console.log('支付渠道数据:', paymentChannels.value);
+      console.log('支付渠道数据:', paymentChannels.value)
     } else {
-      console.error('获取支付渠道失败:', result);
+      console.error('获取支付渠道失败:', result)
       showToast({
         message: '获取支付渠道失败',
-        duration: 2000
-      });
+        duration: 2000,
+      })
     }
   } catch (error) {
-    console.error('获取支付渠道错误:', error);
+    console.error('获取支付渠道错误:', error)
     showToast({
       message: '网络错误，请重试',
-      duration: 2000
-    });
+      duration: 2000,
+    })
   } finally {
-    isLoadingChannels.value = false;
+    isLoadingChannels.value = false
   }
-};
+}
 
 // 获取充值规则
 const fetchRules = async (channelId: string) => {
-  const qudaoid = channelTypeMap[channelId];
+  const qudaoid = channelTypeMap[channelId]
   if (!qudaoid) {
-    console.error('未知的渠道类型:', channelId);
-    return;
+    console.error('未知的渠道类型:', channelId)
+    return
   }
 
-  isLoadingRules.value = true;
+  isLoadingRules.value = true
   try {
-    const result = await fetchChargeRules(qudaoid);
-    chargeRules.value = result;
+    const result = await fetchChargeRules(qudaoid)
+    chargeRules.value = result
 
     // 重置选择状态
-    selectedMoneyItem.value = null;
-    selectedSubChannel.value = null;
-    rechargeAmount.value = '';
+    selectedMoneyItem.value = null
+    selectedSubChannel.value = null
+    rechargeAmount.value = ''
     // 🔥 清空转账账号，避免显示上一个支付方式的信息
-    transferAccount.value = '';
+    transferAccount.value = ''
 
     // 处理不同类型的返回数据
     if (result?.ret === 200 && result?.data?.info) {
-      const info = result.data.info;
+      const info = result.data.info
 
       // 如果是虚拟币（类型2），设置转账账号
       if (qudaoid === 2 && !Array.isArray(info.list)) {
-        transferAccount.value = info.list.bankno || '';
+        transferAccount.value = info.list.bankno || ''
       }
 
-      console.log('充值规则数据:', result);
+      console.log('充值规则数据:', result)
     }
   } catch (error) {
-    console.error('获取充值规则错误:', error);
+    console.error('获取充值规则错误:', error)
     showToast({
       message: '获取充值规则失败',
-      duration: 2000
-    });
+      duration: 2000,
+    })
   } finally {
-    isLoadingRules.value = false;
+    isLoadingRules.value = false
   }
-};
+}
 
 // 选择支付方式
 const selectPaymentMethod = async (methodId: string) => {
-  paymentChannels.value.forEach(method => {
-    method.selected = method.id === methodId;
-  });
-  selectedPaymentMethod.value = methodId;
+  paymentChannels.value.forEach((method) => {
+    method.selected = method.id === methodId
+  })
+  selectedPaymentMethod.value = methodId
 
   // 重置选择状态
-  selectedSubChannel.value = null;
-  selectedMoneyItem.value = null;
-  rechargeAmount.value = '';
+  selectedSubChannel.value = null
+  selectedMoneyItem.value = null
+  rechargeAmount.value = ''
 
   // 获取该渠道的充值规则
-  await fetchRules(methodId);
+  await fetchRules(methodId)
 
-  // 🔥 如果是需要选择平台的支付方式（微信/支付宝），立即弹出平台选择弹窗
-  if (chargeRulesDisplay.value?.type === 'channels' &&
-    chargeRulesDisplay.value.channels &&
-    chargeRulesDisplay.value.channels.length > 0) {
-    showPlatformModal.value = true;
-  }
-};
+  // 如果是不需要选择平台的支付方式，直接显示金额选择
+}
 
 // 获取支付方式图标 - 通过TYPE和NAME字段组合判断
 const getPaymentIcon = (type: string, name: string) => {
   switch (type) {
     case '2': // 虚拟币
-      return new URL('@/assets/img/icon-usdt.png', import.meta.url).href;
+      return new URL('@/assets/img/icon-usdt.png', import.meta.url).href
     case '3': // 银行卡
-      return new URL('@/assets/img/icon-yl.png', import.meta.url).href;
+      return new URL('@/assets/img/icon-yl.png', import.meta.url).href
     case '1': // 微信和支付宝都是type=1，需要通过name区分
-      const lowerName = name.toLowerCase();
+      const lowerName = name.toLowerCase()
       if (lowerName.includes('微信') || lowerName.includes('wechat') || lowerName.includes('wx')) {
-        return new URL('@/assets/img/icon-wechat.png', import.meta.url).href;
-      } else if (lowerName.includes('支付宝') || lowerName.includes('alipay') || lowerName.includes('ali')) {
-        return new URL('@/assets/img/icon-alipay.png', import.meta.url).href;
+        return new URL('@/assets/img/icon-wechat.png', import.meta.url).href
+      } else if (
+        lowerName.includes('支付宝') ||
+        lowerName.includes('alipay') ||
+        lowerName.includes('ali')
+      ) {
+        return new URL('@/assets/img/icon-alipay.png', import.meta.url).href
       } else {
         // type=1但无法识别名称时，默认微信图标
-        return new URL('@/assets/img/icon-wechat.png', import.meta.url).href;
+        return new URL('@/assets/img/icon-wechat.png', import.meta.url).href
       }
     default:
-      return new URL('@/assets/img/icon-bankcard-orange.svg', import.meta.url).href;
+      return new URL('@/assets/img/icon-bankcard-orange.svg', import.meta.url).href
   }
-};
-
-// 🔥 获取平台图标 - 用于弹窗中的平台列表
-const getPlatformIcon = (name: string) => {
-  const lowerName = name.toLowerCase();
-  if (lowerName.includes('支付宝') || lowerName.includes('alipay') || lowerName.includes('ali')) {
-    return new URL('@/assets/img/icon-alipay.png', import.meta.url).href;
-  } else if (lowerName.includes('微信') || lowerName.includes('wechat') || lowerName.includes('wx')) {
-    return new URL('@/assets/img/icon-wechat.png', import.meta.url).href;
-  } else {
-    // 默认支付宝图标
-    return new URL('@/assets/img/icon-alipay.png', import.meta.url).href;
-  }
-};
+}
 
 // 选择平台
 const selectPlatform = (platform: PaymentSubChannel | Record<string, unknown>) => {
-  selectedSubChannel.value = platform as PaymentSubChannel;
+  selectedSubChannel.value = platform as PaymentSubChannel
 
   // 重置金额选择
-  selectedMoneyItem.value = null;
-  rechargeAmount.value = '';
-
-  // 🔥 关闭平台选择弹窗
-  showPlatformModal.value = false;
-};
-
-// 🔥 打开平台选择弹窗
-const openPlatformModal = () => {
-  showPlatformModal.value = true;
-};
+  selectedMoneyItem.value = null
+  rechargeAmount.value = ''
+}
 
 // 🔥 处理支付成功
 const handlePaymentSuccess = () => {
-  showOrderSuccessModal.value = false;
+  showOrderSuccessModal.value = false
   showToast({
     message: '支付成功！',
-    duration: 2000
-  });
+    duration: 2000,
+  })
   // 可以在这里添加跳转到成功页面或刷新余额等逻辑
-};
+}
 
 // 🔥 处理支付失败
 const handlePaymentFailure = () => {
-  showOrderSuccessModal.value = false;
+  showOrderSuccessModal.value = false
   showToast({
     message: '支付失败，请重试',
-    duration: 2000
-  });
+    duration: 2000,
+  })
   // 保持在当前页面，用户可以重新选择支付方式
-};
+}
 
 // 选择金额
 const selectAmount = (item: MoneyItem) => {
-  selectedMoneyItem.value = item;
-  rechargeAmount.value = item.money;
-};
+  selectedMoneyItem.value = item
+  rechargeAmount.value = item.money
+}
 
 // 复制转账账号
 const copyTransferAccount = async () => {
   try {
-    await navigator.clipboard.writeText(transferAccount.value);
+    await navigator.clipboard.writeText(transferAccount.value)
     showToast({
       message: '✅ 钱包地址已复制到剪贴板',
-      duration: 2000
-    });
+      duration: 2000,
+    })
   } catch (error) {
-    console.error('复制失败:', error);
+    console.error('复制失败:', error)
     // 降级处理：尝试使用旧版API
     try {
-      const textArea = document.createElement('textarea');
-      textArea.value = transferAccount.value;
-      document.body.appendChild(textArea);
-      textArea.select();
-      document.execCommand('copy');
-      document.body.removeChild(textArea);
+      const textArea = document.createElement('textarea')
+      textArea.value = transferAccount.value
+      document.body.appendChild(textArea)
+      textArea.select()
+      document.execCommand('copy')
+      document.body.removeChild(textArea)
       showToast({
         message: '✅ 钱包地址已复制到剪贴板',
-        duration: 2000
-      });
+        duration: 2000,
+      })
     } catch {
       showToast({
         message: '复制失败，请手动复制地址',
-        duration: 2000
-      });
+        duration: 2000,
+      })
     }
   }
-};
+}
 
 // 创建充值订单并处理支付
 const createOrder = async () => {
   if (isCreatingOrder.value) {
-    return; // 防止重复点击
+    return // 防止重复点击
   }
 
   if (!selectedMoneyItem.value) {
     showToast({
       message: '请选择充值金额',
-      duration: 2000
-    });
-    return;
+      duration: 2000,
+    })
+    return
   }
 
   // 🔥 智能验证支付方式：对于有子渠道的支付方式，检查是否选择了子渠道
   if (!selectedPaymentMethod.value && !selectedSubChannel.value) {
     showToast({
       message: '请选择支付方式',
-      duration: 2000
-    });
-    return;
+      duration: 2000,
+    })
+    return
   }
 
   // 如果有选中的支付方式，验证其有效性
-  let selectedChannel = null;
+  let selectedChannel = null
   if (selectedPaymentMethod.value) {
-    selectedChannel = paymentChannels.value.find(c => c.id === selectedPaymentMethod.value);
+    selectedChannel = paymentChannels.value.find((c) => c.id === selectedPaymentMethod.value)
     if (!selectedChannel) {
       showToast({
         message: '支付方式无效',
-        duration: 2000
-      });
-      return;
+        duration: 2000,
+      })
+      return
     }
   }
 
-  isCreatingOrder.value = true;
+  isCreatingOrder.value = true
 
   try {
     // 准备订单参数
-    let qudaoid = 0;
-    let paytypecode = '';
+    let qudaoid = 0
+    let paytypecode = ''
 
     // 🔥 智能获取渠道类型：优先从selectedPaymentMethod，其次从selectedSubChannel
     if (selectedPaymentMethod.value) {
-      qudaoid = channelTypeMap[selectedPaymentMethod.value];
+      qudaoid = channelTypeMap[selectedPaymentMethod.value]
     } else if (selectedSubChannel.value) {
       // 从子渠道的paytypeid获取渠道类型，或根据子渠道信息推断
-      qudaoid = parseInt(selectedSubChannel.value.paytypeid || '1'); // 微信/支付宝默认为1
+      qudaoid = parseInt(selectedSubChannel.value.paytypeid || '1') // 微信/支付宝默认为1
     }
 
     // 根据不同渠道类型获取paytypecode
     if (qudaoid === 2) {
       // 虚拟币类型，使用默认值或从accountInfo获取
-      paytypecode = chargeRulesDisplay.value?.accountInfo?.bankare || 'USDT-TRC20';
+      paytypecode = chargeRulesDisplay.value?.accountInfo?.bankare || 'USDT-TRC20'
     } else if (selectedSubChannel.value) {
       // 微信/支付宝等有子渠道的，使用子渠道的paycode
-      paytypecode = selectedSubChannel.value.paycode || '';
+      paytypecode = selectedSubChannel.value.paycode || ''
     }
 
     if (!paytypecode) {
       showToast({
         message: '支付通道信息缺失',
-        duration: 2000
-      });
-      return;
+        duration: 2000,
+      })
+      return
     }
 
     const orderParams = {
       qudaoid: qudaoid,
       money: selectedMoneyItem.value.money,
       paytypecode: paytypecode,
-      moneylistid: parseInt(selectedMoneyItem.value.id)
-    };
+      moneylistid: parseInt(selectedMoneyItem.value.id),
+    }
 
-    console.log('创建订单参数:', orderParams);
+    console.log('创建订单参数:', orderParams)
 
     // 显示加载提示
     showToast({
       message: '正在创建订单...',
-      duration: 1000
-    });
+      duration: 1000,
+    })
 
     // 调用创建订单接口
-    const result = await createChargeOrder(orderParams);
+    const result = await createChargeOrder(orderParams)
 
     if (result && result.ret === 200 && result.data && result.data.code === 0) {
-      const payUrl = result.data.info?.purl;
-      const orderNumber = result.data.info?.order_no || result.data.info?.orderid || '#222222';
+      const payUrl = result.data.info?.purl
+      const orderNumber = result.data.info?.order_no || result.data.info?.orderid || '#222222'
 
       // 🔥 设置订单信息并显示自定义弹窗
       orderInfo.value = {
         orderNumber: orderNumber,
         payUrl: payUrl || '',
-        qudaoid: qudaoid
-      };
-      showOrderSuccessModal.value = true;
+        qudaoid: qudaoid,
+      }
+      showOrderSuccessModal.value = true
     } else {
       // 订单创建失败
       showToast({
         message: result?.data?.msg || result?.msg || '订单创建失败，请重试',
-        duration: 2000
-      });
+        duration: 2000,
+      })
     }
   } catch (error) {
-    console.error('创建订单错误:', error);
+    console.error('创建订单错误:', error)
     showToast({
       message: '网络错误，请重试',
-      duration: 2000
-    });
+      duration: 2000,
+    })
   } finally {
-    isCreatingOrder.value = false;
+    isCreatingOrder.value = false
   }
-};
+}
 
 // 确认充值
 const confirmRecharge = () => {
-  const selectedChannel = paymentChannels.value.find(c => c.id === selectedPaymentMethod.value);
-  const channelType = selectedChannel?.type;
+  const selectedChannel = paymentChannels.value.find((c) => c.id === selectedPaymentMethod.value)
+  const channelType = selectedChannel?.type
 
   if (channelType === '2') {
     // 虚拟币，先显示转账提示，然后创建订单
@@ -532,117 +516,117 @@ const confirmRecharge = () => {
       message: `确认充值 ${rechargeAmount.value} 元？\n\n请在创建订单后按照提示完成转账`,
       confirmButtonText: '确认充值',
       cancelButtonText: '取消',
-      confirmButtonColor: '#ff9500'
+      confirmButtonColor: '#ff9500',
     }).then(() => {
-      createOrder();
-    });
+      createOrder()
+    })
   } else {
     // 其他支付方式，直接创建订单
-    createOrder();
+    createOrder()
   }
-};
+}
 
 // 计算充值规则显示数据
 const chargeRulesDisplay = computed((): ChargeRulesDisplay | null => {
-  if (!chargeRules.value?.data?.info) return null;
+  if (!chargeRules.value?.data?.info) return null
 
-  const info = chargeRules.value.data.info;
-  const qudaoid = channelTypeMap[selectedPaymentMethod.value];
+  const info = chargeRules.value.data.info
+  const qudaoid = channelTypeMap[selectedPaymentMethod.value]
 
   if (qudaoid === 2) {
     // 虚拟币类型，直接显示moneylist
     return {
       type: 'simple',
       moneyList: info.moneylist || [],
-      accountInfo: Array.isArray(info.list) ? null : info.list
-    };
+      accountInfo: Array.isArray(info.list) ? null : info.list,
+    }
   } else if (qudaoid === 3) {
     // 🔥 银行卡类型，暂不支持时不显示金额选择，只显示提示信息
     return {
       type: 'unsupported',
       moneyList: info.moneylist || [],
-      message: Array.isArray(info.list) ? '暂不支持' : info.list?.name || '暂不支持'
-    };
+      message: Array.isArray(info.list) ? '暂不支持' : info.list?.name || '暂不支持',
+    }
   } else {
     // 微信/支付宝类型，显示子渠道
     return {
       type: 'channels',
       moneyList: info.moneylist || [],
-      channels: Array.isArray(info.list) ? info.list : []
-    };
+      channels: Array.isArray(info.list) ? info.list : [],
+    }
   }
-});
+})
 
 // 计算是否显示金额选择
 const showAmountSelection = computed(() => {
-  if (!chargeRulesDisplay.value) return false;
+  if (!chargeRulesDisplay.value) return false
 
   if (chargeRulesDisplay.value.type === 'simple') {
     // 虚拟币类型，直接显示金额选择
-    return true;
+    return true
   } else if (chargeRulesDisplay.value.type === 'channels') {
     // 🔥 微信/支付宝类型，选择了平台后显示金额选择
-    return selectedSubChannel.value !== null;
+    return selectedSubChannel.value !== null
   } else if (chargeRulesDisplay.value.type === 'unsupported') {
     // 🔥 不支持的支付方式，不显示金额选择
-    return false;
+    return false
   }
 
-  return false;
-});
+  return false
+})
 
 // 计算可用的充值金额
 const availableAmounts = computed(() => {
-  if (!chargeRulesDisplay.value) return [];
+  if (!chargeRulesDisplay.value) return []
 
   if (chargeRulesDisplay.value.type === 'simple') {
     // 虚拟币类型，返回默认金额列表
-    return chargeRulesDisplay.value.moneyList;
+    return chargeRulesDisplay.value.moneyList
   } else if (chargeRulesDisplay.value.type === 'channels' && selectedSubChannel.value) {
     // 微信/支付宝类型，返回选中平台的金额列表
-    return selectedSubChannel.value.moneylist || [];
+    return selectedSubChannel.value.moneylist || []
   }
 
-  return [];
-});
+  return []
+})
 
 // 获取用户钻石余额
 const loadUserBalance = () => {
-  const userInfo = getUserInfo();
+  const userInfo = getUserInfo()
   if (userInfo && userInfo.coin !== undefined) {
-    diamondBalance.value = userInfo.coin;
+    diamondBalance.value = userInfo.coin
   }
-};
+}
 
 // 刷新用户余额（从服务器获取最新数据）
 const refreshUserBalance = async () => {
   try {
-    const result = await fetchUserDatas({});
+    const result = await fetchUserDatas({})
     if (result && result.code === 1 && result.data) {
       // 更新本地用户信息
-      const currentUserInfo = getUserInfo();
+      const currentUserInfo = getUserInfo()
       if (currentUserInfo && result.data.coin !== undefined) {
         const updatedUserInfo = {
           ...currentUserInfo,
-          coin: result.data.coin
-        };
-        setUserInfo(updatedUserInfo);
-        diamondBalance.value = result.data.coin;
+          coin: result.data.coin,
+        }
+        setUserInfo(updatedUserInfo)
+        diamondBalance.value = result.data.coin
       }
     }
   } catch (error) {
-    console.error('刷新用户余额失败:', error);
+    console.error('刷新用户余额失败:', error)
   }
-};
+}
 
 onMounted(async () => {
   // 获取用户钻石余额
-  loadUserBalance();
+  loadUserBalance()
   // 刷新最新余额
-  await refreshUserBalance();
+  await refreshUserBalance()
   // 获取支付渠道数据
-  fetchPaymentChannels();
-});
+  fetchPaymentChannels()
+})
 </script>
 
 <template>
@@ -653,10 +637,18 @@ onMounted(async () => {
     <!-- 选项卡切换 -->
     <div class="nav-tabs">
       <div class="tab-container">
-        <div class="tab-button" :class="{ active: activeTab === 'video' }" @click="switchTab('video')">
+        <div
+          class="tab-button"
+          :class="{ active: activeTab === 'video' }"
+          @click="switchTab('video')"
+        >
           视频充值
         </div>
-        <div class="tab-button" :class="{ active: activeTab === 'game' }" @click="switchTab('game')">
+        <div
+          class="tab-button"
+          :class="{ active: activeTab === 'game' }"
+          @click="switchTab('game')"
+        >
           游戏充值
         </div>
       </div>
@@ -667,7 +659,7 @@ onMounted(async () => {
       <!-- 钻石余额区域 -->
       <div class="diamond-balance">
         <div class="balance-content">
-          <img src="@/assets/img/icon-diamond.png" alt="钻石" class="diamond-icon-img">
+          <img src="@/assets/img/icon-diamond.png" alt="钻石" class="diamond-icon-img" />
           <div class="balance-info">
             <div class="balance-label">钻石余额</div>
             <div class="balance-amount">{{ diamondBalance }}</div>
@@ -686,11 +678,20 @@ onMounted(async () => {
           <span>加载支付方式中...</span>
         </div>
         <div v-else class="selection-grid">
-          <div v-for="method in paymentChannels" :key="method.id" class="selection-item"
-            :class="{ active: method.selected }" @click="selectPaymentMethod(method.id)">
+          <div
+            v-for="method in paymentChannels"
+            :key="method.id"
+            class="selection-item"
+            :class="{ active: method.selected }"
+            @click="selectPaymentMethod(method.id)"
+          >
             <div class="item-content">
               <div class="item-icon-container">
-                <img :src="getPaymentIcon(method.type, method.name)" alt="支付方式图标" class="item-icon" />
+                <img
+                  :src="getPaymentIcon(method.type, method.name)"
+                  alt="支付方式图标"
+                  class="item-icon"
+                />
               </div>
               <div class="item-name">{{ method.name }}</div>
             </div>
@@ -704,9 +705,35 @@ onMounted(async () => {
 
     <!-- 可滚动内容区域 -->
     <div class="scrollable-content">
-      <!-- 🔥 删除了"选择充值平台"步骤，直接通过弹窗选择 -->
+      <!-- 第二步：选择支付平台 -->
+      <div
+        v-if="chargeRulesDisplay?.type === 'channels'"
+        class="selection-section platform-selection"
+      >
+        <h3 class="section-title">
+          <span class="step-number">2</span>
+          选择支付平台
+        </h3>
 
-      <!-- 第二步：选择充值金额 -->
+        <div class="platform-grid">
+          <div
+            v-for="channel in chargeRulesDisplay.channels"
+            :key="channel.id"
+            class="platform-card"
+            :class="{ active: selectedSubChannel?.id === channel.id }"
+            @click="selectPlatform(channel)"
+          >
+            <div class="platform-card-content">
+              <div class="platform-name">{{ channel.name }}</div>
+            </div>
+            <div v-if="selectedSubChannel?.id === channel.id" class="check-icon">
+              <van-icon name="success" size="16" color="#fff" />
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 第三步：选择充值金额 -->
       <div v-if="showAmountSelection" class="selection-section">
         <h3 class="section-title">
           <span class="step-number">2</span>
@@ -714,14 +741,17 @@ onMounted(async () => {
         </h3>
 
         <div class="selection-grid amount-grid">
-          <div v-for="item in availableAmounts" :key="item.id" class="selection-item amount-item"
-            :class="{ active: selectedMoneyItem?.id === item.id }" @click="selectAmount(item)">
+          <div
+            v-for="item in availableAmounts"
+            :key="item.id"
+            class="selection-item amount-item"
+            :class="{ active: selectedMoneyItem?.id === item.id }"
+            @click="selectAmount(item)"
+          >
             <div class="item-content">
               <div class="amount-value">{{ item.money }}元</div>
               <div class="coin-value">{{ item.coin }}钻石</div>
-              <div v-if="item.give && item.give !== '0'" class="bonus-tag">
-                送{{ item.give }}
-              </div>
+              <div v-if="item.give && item.give !== '0'" class="bonus-tag">送{{ item.give }}</div>
             </div>
             <div v-if="selectedMoneyItem?.id === item.id" class="check-icon">
               <van-icon name="success" size="16" color="#fff" />
@@ -730,7 +760,10 @@ onMounted(async () => {
         </div>
 
         <!-- 🔥 转账信息或提示信息 -->
-        <div v-if="chargeRulesDisplay?.type === 'simple' && chargeRulesDisplay.accountInfo" class="transfer-info">
+        <div
+          v-if="chargeRulesDisplay?.type === 'simple' && chargeRulesDisplay.accountInfo"
+          class="transfer-info"
+        >
           <!-- 虚拟币转账信息 -->
           <template v-if="selectedPaymentMethod === '2' && transferAccount">
             <div class="transfer-header">
@@ -747,9 +780,7 @@ onMounted(async () => {
               </div>
             </div>
 
-            <div class="transfer-note">
-              复制地址到钱包转账，完成后点击确认按钮
-            </div>
+            <div class="transfer-note">复制地址到钱包转账，完成后点击确认按钮</div>
           </template>
 
           <!-- 银行卡或其他不支持的支付方式信息 -->
@@ -772,12 +803,15 @@ onMounted(async () => {
 
       <!-- 确认充值按钮 - 悬浮底部 -->
       <div class="confirm-section-fixed">
-        <button class="confirm-button" :disabled="!selectedMoneyItem || isCreatingOrder" @click="confirmRecharge">
+        <button
+          class="confirm-button"
+          :disabled="!selectedMoneyItem || isCreatingOrder"
+          @click="confirmRecharge"
+        >
           <van-loading v-if="isCreatingOrder" type="spinner" size="16" color="#fff" />
           <span v-else>确认充值 {{ rechargeAmount ? `￥${rechargeAmount}` : '' }}</span>
         </button>
       </div>
-
 
       <!-- 协议文本 -->
       <div class="agreement-section">
@@ -789,7 +823,6 @@ onMounted(async () => {
 
       <!-- 广告推荐区域 -->
       <div class="ads-section">
-
         <div class="ads-grid">
           <div v-for="ad in adsList" :key="ad.id" class="ad-item" @click="handleAdClick(ad)">
             <div class="ad-icon">
@@ -799,40 +832,15 @@ onMounted(async () => {
           </div>
         </div>
       </div>
-
-
     </div>
   </div>
 
-  <!-- 🔥 充值平台选择弹窗 -->
-  <van-popup v-model:show="showPlatformModal" position="bottom" :style="{ height: '60%' }" round>
-    <div class="platform-modal">
-      <div class="modal-header">
-        <div class="header-top">
-          <span class="header-tip">请优先选择支付宝充值，5分钟未到账及时联系客服处理</span>
-          <van-icon name="cross" @click="showPlatformModal = false" class="close-icon" />
-        </div>
-      </div>
-
-      <div class="modal-content">
-        <div v-if="chargeRulesDisplay?.type === 'channels'" class="platform-list">
-          <div v-for="channel in chargeRulesDisplay.channels" :key="channel.id" class="platform-item"
-            :class="{ active: selectedSubChannel?.id === channel.id }" @click="selectPlatform(channel)">
-            <div class="platform-left">
-              <img :src="getPlatformIcon(channel.name)" :alt="channel.name" class="platform-icon" />
-              <div class="platform-info">
-                <div class="platform-name">{{ channel.name }} ({{ channel.id }})</div>
-              </div>
-            </div>
-            <van-icon name="arrow" size="16" color="#999" />
-          </div>
-        </div>
-      </div>
-    </div>
-  </van-popup>
-
   <!-- 🔥 订单创建成功弹窗 -->
-  <van-popup v-model:show="showOrderSuccessModal" :close-on-click-overlay="false" class="order-success-popup">
+  <van-popup
+    v-model:show="showOrderSuccessModal"
+    :close-on-click-overlay="false"
+    class="order-success-popup"
+  >
     <div class="order-success-modal">
       <div class="success-header">
         <h2 class="success-title">订单创建成功</h2>
@@ -851,12 +859,8 @@ onMounted(async () => {
       </div>
 
       <div class="action-buttons">
-        <button class="failure-btn" @click="handlePaymentFailure">
-          支付失败
-        </button>
-        <button class="success-btn" @click="handlePaymentSuccess">
-          支付成功
-        </button>
+        <button class="failure-btn" @click="handlePaymentFailure">支付失败</button>
+        <button class="success-btn" @click="handlePaymentSuccess">支付成功</button>
       </div>
     </div>
   </van-popup>
@@ -1081,7 +1085,6 @@ onMounted(async () => {
   justify-content: center;
 }
 
-
 .item-icon {
   width: 24px;
   height: 24px;
@@ -1160,7 +1163,7 @@ onMounted(async () => {
 }
 
 .amount-value {
-  font-size: 14px;
+  font-size: 16px;
   font-weight: bold;
   color: #fff;
   margin-bottom: 4px;
@@ -1268,10 +1271,6 @@ onMounted(async () => {
   line-height: 1.3;
 }
 
-
-
-
-
 /* 不支持的支付方式 */
 .unsupported-message {
   display: flex;
@@ -1289,7 +1288,9 @@ onMounted(async () => {
 
 /* 子渠道 */
 .sub-channels {
-  space-y: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
 }
 
 .sub-channel-item {
@@ -1335,7 +1336,12 @@ onMounted(async () => {
   left: 0;
   right: 0;
   padding: 12px 20px;
-  background: linear-gradient(to top, rgba(17, 17, 17, 0.95) 0%, rgba(17, 17, 17, 0.9) 70%, transparent 100%);
+  background: linear-gradient(
+    to top,
+    rgba(17, 17, 17, 0.95) 0%,
+    rgba(17, 17, 17, 0.9) 70%,
+    transparent 100%
+  );
   backdrop-filter: blur(10px);
   z-index: 100;
   border-top: 1px solid rgba(255, 255, 255, 0.1);
@@ -1517,30 +1523,84 @@ onMounted(async () => {
   }
 }
 
-/* 🔥 平台选择按钮样式 */
-.platform-select-button {
-  background-color: #222;
-  border: 2px solid #444;
+/* 平台选择区域样式 */
+.platform-selection {
+  margin-bottom: 20px;
+}
+
+.platform-tip {
+  font-size: 12px;
+  color: #0b971c;
+  margin-left: 10px;
+  font-weight: normal;
+}
+
+.platform-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 10px;
+  margin-top: 15px;
+}
+
+.platform-card {
+  position: relative;
+  background: #222;
+  border: 1px solid #333;
   border-radius: 12px;
-  padding: 16px;
+  padding: 12px 8px;
   cursor: pointer;
   transition: all 0.3s ease;
 }
 
-.platform-select-button:hover {
-  border-color: #ff9500;
-  background-color: rgba(255, 149, 0, 0.1);
+.platform-card:hover {
+  background-color: #333;
 }
 
-.select-button-content {
+.platform-card.active {
+  background: rgba(255, 149, 0, 0.1);
+  border: 2px solid #ff9500;
+}
+
+.platform-card-content {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  color: #ccc;
-  font-size: 16px;
+  justify-content: center;
+  min-height: 36px;
 }
 
-/* 🔥 弹窗样式 - 白色风格 */
+.platform-name {
+  color: #fff;
+  font-size: 14px;
+  text-align: center;
+}
+
+.check-icon {
+  position: absolute;
+  bottom: 0;
+  right: 0;
+  width: 16px;
+  height: 16px;
+  animation: checkIn 0.3s ease;
+}
+
+.check-icon::before {
+  content: '';
+  position: absolute;
+  bottom: 0;
+  right: 0;
+  width: 0;
+  height: 0;
+  border-bottom: 30px solid #ff9500;
+  border-left: 30px solid transparent;
+  border-radius: 0 0 8px 0;
+}
+
+.check-icon .van-icon {
+  position: absolute;
+  bottom: 2px;
+  right: 2px;
+  z-index: 1;
+}
 .platform-modal {
   background-color: #fff;
   height: 100%;
@@ -1561,7 +1621,7 @@ onMounted(async () => {
 }
 
 .header-tip {
-  color: #0B971C;
+  color: #0b971c;
   font-size: 12px;
   line-height: 1.4;
   flex: 1;
@@ -1626,13 +1686,13 @@ onMounted(async () => {
 }
 
 .platform-name {
-  color: #333;
-  font-size: 16px;
+  color: #fff;
+  font-size: 11px;
   font-weight: 500;
 }
 
 .platform-tip {
-  color: #B3B3B3;
+  color: #b3b3b3;
   font-size: 12px;
 }
 
