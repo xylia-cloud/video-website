@@ -1750,16 +1750,10 @@ const performTouristLogin = async () => {
 
 /* 一级导航标签 */
 .nav-tabs {
-  display: flex;
-  overflow-x: auto;
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
   gap: 8px;
   padding: 10px 15px;
-  scrollbar-width: none; /* Firefox */
-  -ms-overflow-style: none; /* IE and Edge */
-}
-
-.nav-tabs::-webkit-scrollbar {
-  display: none; /* Chrome, Safari, Opera */
 }
 
 .tab-item {
@@ -1769,14 +1763,16 @@ const performTouristLogin = async () => {
   text-align: center;
   cursor: pointer;
   background-color: #333;
-  border-radius: 20px;
+  border-radius: 8px;
   border: 1px solid transparent;
   transition: all 0.3s ease;
   white-space: nowrap;
-  flex-shrink: 0;
   display: flex;
   align-items: center;
+  justify-content: center;
   gap: 4px;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .tab-item.active {
@@ -1802,8 +1798,8 @@ const performTouristLogin = async () => {
 
 /* 二级导航标签 */
 .sub-nav-tabs {
-  display: flex;
-  flex-wrap: wrap;
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
   gap: 6px;
   padding: 8px 15px 12px;
   background-color: #1a1a1a;
@@ -1817,10 +1813,12 @@ const performTouristLogin = async () => {
   text-align: center;
   cursor: pointer;
   background-color: #2a2a2a;
-  border-radius: 15px;
+  border-radius: 6px;
   border: 1px solid transparent;
   transition: all 0.3s ease;
   white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .sub-tab-item.active {
