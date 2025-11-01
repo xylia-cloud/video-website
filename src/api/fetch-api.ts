@@ -40,6 +40,8 @@ interface RegisterParams {
 export interface TypeItem {
   type_id: number
   type_name: string
+  type_pid?: number
+  child?: TypeItem[]
 }
 
 // 视频详情数据接口

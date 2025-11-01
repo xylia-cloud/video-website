@@ -116,6 +116,8 @@ const errorMessage = ref<string>('')
 // 栏目列表数据
 const typesList = ref<TypeItem[]>([])
 const activeTypeId = ref<number>(1) // 默认选中首页
+const activeSubTypeId = ref<number | null>(null) // 当前选中的二级分类ID
+const expandedTypeId = ref<number | null>(null) // 当前展开的一级分类ID
 
 // 记录每个标签页的完整状态
 const tabStates = ref<{
@@ -235,10 +237,34 @@ const fetchTypesData = async () => {
   }
 }
 
+// 处理一级分类点击
+const handlePrimaryTypeClick = (type: TypeItem) => {
+  // 如果有子分类，则展开/收起子分类
+  if (type.child && type.child.length > 0) {
+    if (expandedTypeId.value === type.type_id) {
+      // 如果当前分类已展开，则收起
+      expandedTypeId.value = null
+      activeSubTypeId.value = null
+    } else {
+      // 展开当前分类
+      expandedTypeId.value = type.type_id
+      activeSubTypeId.value = null
+    }
+    return
+  }
+
+  // 如果没有子分类，直接切换到该分类
+  switchType(type.type_id)
+}
+
+// 处理二级分类点击
+const handleSubTypeClick = (subType: TypeItem) => {
+  activeSubTypeId.value = subType.type_id
+  switchType(subType.type_id)
+}
+
 // 切换栏目
 const switchType = (typeId: number) => {
-  console.log('切换分类 - 当前activeTypeId:', activeTypeId.value, '目标typeId:', typeId)
-
   if (activeTypeId.value === typeId) return
 
   // 显示全屏loading
@@ -251,7 +277,6 @@ const switchType = (typeId: number) => {
   removeScrollListener()
 
   activeTypeId.value = typeId
-  console.log('切换分类完成 - 新的activeTypeId:', activeTypeId.value)
 
   // 保存当前选中的标签ID到localStorage
   localStorage.setItem('lastActiveTabId', typeId.toString())
@@ -1182,6 +1207,9 @@ onMounted(async () => {
     localStorage.removeItem('lastActiveTabId')
     // 设置为第一个选项卡
     activeTypeId.value = typesList.value.length > 0 ? typesList.value[0].type_id : 1
+    // 重置二级分类状态
+    activeSubTypeId.value = null
+    expandedTypeId.value = null
   }
 
   // 确定是否是首页标签
@@ -1450,16 +1478,46 @@ const performTouristLogin = async () => {
     </div>
 
     <!-- 导航栏 -->
-    <div class="nav-tabs">
+    <div class="nav-container">
+      <!-- 一级分类 -->
+      <div class="nav-tabs">
+        <div
+          v-for="type in typesList"
+          :key="type.type_id"
+          :class="[
+            'tab-item',
+            activeTypeId === type.type_id ||
+            (type.child && type.child.some((child) => child.type_id === activeTypeId))
+              ? 'active'
+              : '',
+            type.child && type.child.length > 0 ? 'has-children' : '',
+          ]"
+          @click="handlePrimaryTypeClick(type)"
+          :data-type-id="type.type_id"
+        >
+          {{ type.type_name }}
+          <van-icon
+            v-if="type.child && type.child.length > 0"
+            :name="expandedTypeId === type.type_id ? 'arrow-up' : 'arrow-down'"
+            size="12"
+            class="expand-icon"
+          />
+        </div>
+      </div>
+
+      <!-- 二级分类 -->
       <div
-        v-for="type in typesList"
-        :key="type.type_id"
-        :class="['tab-item', activeTypeId === type.type_id ? 'active' : '']"
-        @click="switchType(type.type_id)"
-        :data-type-id="type.type_id"
-        :data-active="activeTypeId === type.type_id"
+        v-if="expandedTypeId && typesList.find((t) => t.type_id === expandedTypeId)?.child"
+        class="sub-nav-tabs"
       >
-        {{ type.type_name }}
+        <div
+          v-for="subType in typesList.find((t) => t.type_id === expandedTypeId)?.child"
+          :key="subType.type_id"
+          :class="['sub-tab-item', activeSubTypeId === subType.type_id ? 'active' : '']"
+          @click="handleSubTypeClick(subType)"
+        >
+          {{ subType.type_name }}
+        </div>
       </div>
     </div>
 
@@ -1483,7 +1541,7 @@ const performTouristLogin = async () => {
       </div>
 
       <!-- 分类标签 -->
-      <div class="category-tags" v-if="isTagsLoading || visibleTags.length > 0">
+      <div class="category-tags" v-if="false" style="display: none">
         <div v-if="isTagsLoading" class="tag-loading">
           <van-loading type="spinner" size="24px" color="#ff9500" />
         </div>
@@ -1684,14 +1742,24 @@ const performTouristLogin = async () => {
   width: 24px;
 }
 
-/* 导航标签 */
+/* 导航容器 */
+.nav-container {
+  background-color: #111;
+  border-bottom: 1px solid #222;
+}
+
+/* 一级导航标签 */
 .nav-tabs {
-  display: grid;
-  grid-template-columns: repeat(4, 1fr);
+  display: flex;
+  overflow-x: auto;
   gap: 8px;
   padding: 10px 15px;
-  border-bottom: 1px solid #222;
-  background-color: #111;
+  scrollbar-width: none; /* Firefox */
+  -ms-overflow-style: none; /* IE and Edge */
+}
+
+.nav-tabs::-webkit-scrollbar {
+  display: none; /* Chrome, Safari, Opera */
 }
 
 .tab-item {
@@ -1705,8 +1773,10 @@ const performTouristLogin = async () => {
   border: 1px solid transparent;
   transition: all 0.3s ease;
   white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  gap: 4px;
 }
 
 .tab-item.active {
@@ -1719,6 +1789,50 @@ const performTouristLogin = async () => {
 .tab-item:hover {
   background-color: #444;
   border-color: #666;
+  color: #fff;
+}
+
+.tab-item.has-children {
+  position: relative;
+}
+
+.expand-icon {
+  margin-left: 2px;
+}
+
+/* 二级导航标签 */
+.sub-nav-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding: 8px 15px 12px;
+  background-color: #1a1a1a;
+  border-top: 1px solid #333;
+}
+
+.sub-tab-item {
+  padding: 6px 10px;
+  font-size: 12px;
+  color: #999;
+  text-align: center;
+  cursor: pointer;
+  background-color: #2a2a2a;
+  border-radius: 15px;
+  border: 1px solid transparent;
+  transition: all 0.3s ease;
+  white-space: nowrap;
+}
+
+.sub-tab-item.active {
+  color: #fff !important;
+  font-weight: bold !important;
+  background-color: #ff9500 !important;
+  border-color: #ff9500 !important;
+}
+
+.sub-tab-item:hover {
+  background-color: #3a3a3a;
+  border-color: #555;
   color: #fff;
 }
 
