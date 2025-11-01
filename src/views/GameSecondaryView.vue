@@ -1,0 +1,700 @@
+<script setup lang="ts">
+import { ref, onMounted } from 'vue'
+import { useRoute } from 'vue-router'
+import { NEW_API_BASE_URL } from '@/utils/config'
+import { showToast } from 'vant'
+import HeaderNav from '@/components/HeaderNav.vue'
+
+// 路由相关
+const route = useRoute()
+
+// 从路由参数获取信息
+const topCategoryId = ref(route.params.topCategoryId as string)
+const primaryCategoryId = ref(route.params.primaryCategoryId as string)
+const topCategoryName = ref((route.query.topCategoryName as string) || '')
+const primaryCategoryName = ref((route.query.primaryCategoryName as string) || '')
+
+// 二级分类接口
+interface SecondaryCategory {
+  id: string
+  name: string
+  icon: string
+  primary_id: string
+  ismy?: number
+  expanded?: boolean
+  games?: Game[]
+  loading?: boolean
+  pagination?: PaginationInfo
+  jumpPage?: number
+}
+
+// 游戏数据
+interface Game {
+  id: number
+  name: string
+  imageUrl: string
+  biaoshi: string
+  code?: string
+  type?: string
+}
+
+// 分页信息接口
+interface PaginationInfo {
+  currentPage: number
+  totalCount: number
+  totalPages: number
+  pageSize: number
+}
+
+// 二级分类数据
+const secondaryCategories = ref<SecondaryCategory[]>([])
+const isLoadingSecondaryCategories = ref(false)
+const hasSecondaryCategoriesError = ref(false)
+
+// 二级分类分页数据
+const secondaryCategoriesPagination = ref({
+  currentPage: 1,
+  totalCount: 0,
+  totalPages: 0,
+  pageSize: 12,
+})
+const secondaryCategoriesJumpPage = ref(1)
+
+// 全屏加载状态
+const isGlobalLoading = ref(false)
+
+// 防重复请求标记
+const isSecondaryCategoriesLoading = ref(false)
+
+// 获取游戏列表数据（直接获取该分类下的所有游戏）
+const fetchGamesData = async (page: number = 1) => {
+  if (isSecondaryCategoriesLoading.value) {
+    console.log('🔄 游戏数据正在加载中，跳过重复请求')
+    return
+  }
+
+  isSecondaryCategoriesLoading.value = true
+  isGlobalLoading.value = true
+  isLoadingSecondaryCategories.value = true
+  hasSecondaryCategoriesError.value = false
+
+  try {
+    // 构建查询参数 - 使用gettwoclass获取游戏列表
+    const queryParams = new URLSearchParams({
+      service: 'caipiao.gettwoclass',
+    })
+
+    // 构建POST请求体参数
+    const formData = new URLSearchParams({
+      pid: topCategoryId.value,
+      oneclass_id: primaryCategoryId.value,
+      page: page.toString(),
+      limit: '12',
+    })
+
+    // 发起POST请求
+    const response = await fetch(`${NEW_API_BASE_URL}/?${queryParams.toString()}`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/x-www-form-urlencoded',
+        Accept: 'application/json',
+      },
+      body: formData.toString(),
+    })
+
+    if (!response.ok) {
+      throw new Error(`HTTP error! Status: ${response.status}`)
+    }
+
+    const result = await response.json()
+    console.log('获取游戏列表数据:', result)
+
+    if (
+      result &&
+      result.ret === 200 &&
+      result.data &&
+      result.data.code === 0 &&
+      result.data.info &&
+      Array.isArray(result.data.info.data)
+    ) {
+      // 处理游戏数据
+      const games = result.data.info.data.map((item: Record<string, unknown>) => ({
+        id: Number(item.id) || 0,
+        name: String(item.name || '未命名游戏'),
+        imageUrl: String(item.icon || ''),
+        biaoshi: String(item.biaoshi || ''),
+        code: String(item.code || ''),
+        type: String(item.type || ''),
+      }))
+
+      // 创建一个虚拟的分类来包含所有游戏
+      const gameCategory = {
+        id: 'all-games',
+        name: '全部游戏',
+        icon: '',
+        primary_id: primaryCategoryId.value,
+        ismy: 0,
+        expanded: true,
+        games: games,
+        loading: false,
+        pagination: {
+          currentPage: page,
+          totalCount: parseInt(result.data.info.total || '0'),
+          totalPages: Math.ceil(parseInt(result.data.info.total || '0') / 12),
+          pageSize: 12,
+        },
+      }
+
+      secondaryCategories.value = [gameCategory]
+
+      // 从后端响应中获取分页信息
+      const totalCount = parseInt(result.data.info.total || '0')
+      const pageSize = 12
+      const totalPages = Math.ceil(totalCount / pageSize)
+
+      // 更新分页信息
+      secondaryCategoriesPagination.value = {
+        currentPage: page,
+        totalCount,
+        totalPages,
+        pageSize,
+      }
+      console.log('处理后的游戏数据:', games)
+    } else {
+      console.log(`没有获取到分类 ${primaryCategoryId.value} 的游戏数据`)
+      secondaryCategories.value = []
+    }
+  } catch (error) {
+    console.error('获取游戏数据失败:', error)
+    hasSecondaryCategoriesError.value = true
+    secondaryCategories.value = []
+  } finally {
+    isSecondaryCategoriesLoading.value = false
+    isGlobalLoading.value = false
+    isLoadingSecondaryCategories.value = false
+  }
+}
+
+// 处理二级分类点击（现在不需要，因为直接显示游戏）
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+const handleSecondaryCategoryClick = (secondaryCategory: SecondaryCategory) => {
+  console.log('点击分类:', secondaryCategory)
+  // 由于现在直接显示游戏列表，这个函数暂时不需要特殊处理
+}
+
+// 处理游戏点击
+const handleGameClick = (game: Game) => {
+  console.log('点击游戏:', game)
+  showToast(`即将进入游戏: ${game.name}`)
+  // 这里可以添加进入游戏的逻辑
+}
+
+// 处理分页点击
+const handlePageChange = (secondaryCategory: SecondaryCategory, page: number) => {
+  if (page < 1 || page > (secondaryCategory.pagination?.totalPages || 1)) return
+  if (page === secondaryCategory.pagination?.currentPage) return
+
+  fetchGamesData(page)
+}
+
+// 处理跳转页码
+const handleJumpPage = (secondaryCategory: SecondaryCategory) => {
+  const jumpPage = secondaryCategory.jumpPage
+  if (!jumpPage || !secondaryCategory.pagination) return
+
+  const targetPage = Number(jumpPage)
+  if (targetPage >= 1 && targetPage <= secondaryCategory.pagination.totalPages) {
+    handlePageChange(secondaryCategory, targetPage)
+  }
+
+  secondaryCategory.jumpPage = undefined
+}
+
+// 处理游戏列表分页点击
+const handleSecondaryCategoriesPageChange = (page: number) => {
+  if (page < 1 || page > secondaryCategoriesPagination.value.totalPages) return
+  if (page === secondaryCategoriesPagination.value.currentPage) return
+
+  fetchGamesData(page)
+}
+
+// 处理二级分类跳转页面
+const handleSecondaryCategoriesJumpPage = () => {
+  const jumpPage = secondaryCategoriesJumpPage.value
+  if (jumpPage && jumpPage >= 1 && jumpPage <= secondaryCategoriesPagination.value.totalPages) {
+    handleSecondaryCategoriesPageChange(jumpPage)
+  } else {
+    // 重置为当前页
+    secondaryCategoriesJumpPage.value = secondaryCategoriesPagination.value.currentPage
+  }
+}
+
+// 组件挂载时获取数据
+onMounted(() => {
+  console.log('二级分类页面参数:', {
+    topCategoryId: topCategoryId.value,
+    primaryCategoryId: primaryCategoryId.value,
+    topCategoryName: topCategoryName.value,
+    primaryCategoryName: primaryCategoryName.value,
+  })
+
+  if (primaryCategoryId.value) {
+    fetchGamesData(1)
+  }
+})
+</script>
+
+<template>
+  <div class="game-secondary">
+    <!-- 全屏Loading -->
+    <div v-if="isGlobalLoading" class="fullscreen-loading">
+      <div class="custom-spinner"></div>
+      <div class="loading-text">加载中...</div>
+    </div>
+
+    <!-- 头部导航 -->
+    <HeaderNav :title="primaryCategoryName" />
+
+    <!-- 内容区域 -->
+    <div class="content">
+      <!-- 游戏列表加载状态 -->
+      <div v-if="isLoadingSecondaryCategories" class="secondary-loading">
+        <div class="custom-spinner"></div>
+        <div class="loading-text">加载游戏中...</div>
+      </div>
+
+      <!-- 游戏列表错误状态 -->
+      <div v-else-if="hasSecondaryCategoriesError" class="error-state">
+        <van-icon name="warning-o" size="24" color="#ff9500" />
+        <div class="error-text">加载游戏失败</div>
+      </div>
+
+      <!-- 当前选中二级分类的游戏展示区域 -->
+      <div class="selected-secondary-games">
+        <div v-for="secondaryCategory in secondaryCategories" :key="secondaryCategory.id">
+          <!-- 只显示展开的分类的游戏 -->
+          <div v-if="secondaryCategory.expanded" class="games-section">
+            <!-- 游戏加载状态 -->
+            <div v-if="secondaryCategory.loading" class="games-loading">
+              <div class="custom-spinner"></div>
+              <div class="loading-text">加载游戏中...</div>
+            </div>
+
+            <!-- 游戏网格 -->
+            <div v-else-if="secondaryCategory.games && secondaryCategory.games.length > 0">
+              <div class="games-grid">
+                <div
+                  class="game-item"
+                  v-for="game in secondaryCategory.games"
+                  :key="game.id"
+                  @click="handleGameClick(game)"
+                >
+                  <div class="game-image">
+                    <img v-if="game.imageUrl" :src="game.imageUrl" :alt="game.name" />
+                  </div>
+                  <div class="game-name">{{ game.name }}</div>
+                </div>
+              </div>
+
+              <!-- 精简分页控件 -->
+              <div
+                v-if="secondaryCategory.pagination && secondaryCategory.pagination.totalPages > 1"
+                class="pagination-compact"
+              >
+                <!-- 上一页 -->
+                <button
+                  class="page-btn-compact"
+                  :disabled="secondaryCategory.pagination.currentPage <= 1"
+                  @click="
+                    handlePageChange(
+                      secondaryCategory,
+                      secondaryCategory.pagination.currentPage - 1,
+                    )
+                  "
+                >
+                  <van-icon name="arrow-left" size="14" />
+                </button>
+
+                <!-- 当前页信息 -->
+                <span class="page-info-compact">
+                  {{ secondaryCategory.pagination.currentPage }}/{{
+                    secondaryCategory.pagination.totalPages
+                  }}
+                </span>
+
+                <!-- 下一页 -->
+                <button
+                  class="page-btn-compact"
+                  :disabled="
+                    secondaryCategory.pagination.currentPage >=
+                    secondaryCategory.pagination.totalPages
+                  "
+                  @click="
+                    handlePageChange(
+                      secondaryCategory,
+                      secondaryCategory.pagination.currentPage + 1,
+                    )
+                  "
+                >
+                  <van-icon name="arrow" size="14" />
+                </button>
+
+                <!-- 跳转输入框 -->
+                <div class="page-jump">
+                  <span class="jump-label">跳转</span>
+                  <input
+                    v-model="secondaryCategory.jumpPage"
+                    type="number"
+                    class="jump-input"
+                    :min="1"
+                    :max="secondaryCategory.pagination.totalPages"
+                    @keyup.enter="handleJumpPage(secondaryCategory)"
+                    @blur="handleJumpPage(secondaryCategory)"
+                    placeholder=""
+                  />
+                  <span class="jump-total">页</span>
+                </div>
+
+                <!-- 总数信息 -->
+                <span class="total-info">共{{ secondaryCategory.pagination.totalCount }}项</span>
+              </div>
+            </div>
+
+            <!-- 无游戏状态 -->
+            <div v-else class="no-games">
+              <div class="no-games-text">暂无游戏</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 无游戏时的提示 -->
+      <div
+        v-if="
+          !isLoadingSecondaryCategories &&
+          !hasSecondaryCategoriesError &&
+          secondaryCategories.length === 0
+        "
+        class="no-selected-category"
+      >
+        <div class="no-selected-text">该分类下暂无游戏</div>
+      </div>
+    </div>
+  </div>
+</template>
+
+<style scoped>
+.game-secondary {
+  background-color: #111;
+  color: #fff;
+  min-height: 100vh;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+/* 内容区域 */
+.content {
+  padding: 15px;
+  margin-top: 50px; /* 为固定定位的HeaderNav留出空间 */
+}
+
+/* 全屏Loading */
+.fullscreen-loading {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(17, 17, 17, 0.9);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  z-index: 9999;
+}
+
+.custom-spinner {
+  width: 40px;
+  height: 40px;
+  border: 3px solid rgba(255, 149, 0, 0.3);
+  border-top: 3px solid #ff9500;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  0% {
+    transform: rotate(0deg);
+  }
+  100% {
+    transform: rotate(360deg);
+  }
+}
+
+.loading-text {
+  margin-top: 15px;
+  color: #ff9500;
+  font-size: 16px;
+  font-weight: 500;
+}
+
+/* 错误状态 */
+.error-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 40px 20px;
+  color: #999;
+  text-align: center;
+}
+
+.error-text {
+  margin-top: 15px;
+  font-size: 14px;
+  color: #ff9500;
+  font-weight: bold;
+}
+
+/* 二级分类网格 */
+.secondary-categories-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+  padding: 15px 0;
+}
+
+.secondary-category-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 8px;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.secondary-category-item:hover {
+  background: rgba(255, 255, 255, 0.1);
+  border-color: rgba(255, 149, 0, 0.5);
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(255, 149, 0, 0.2);
+}
+
+.secondary-category-icon {
+  width: 48px;
+  height: 48px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 8px;
+}
+
+.secondary-category-icon img {
+  border-radius: 6px;
+  width: 48px;
+  height: 48px;
+  object-fit: contain;
+}
+
+.placeholder-icon {
+  width: 48px;
+  height: 48px;
+  background: linear-gradient(135deg, #333, #555);
+  border-radius: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.secondary-category-name {
+  font-size: 12px;
+  font-weight: 500;
+  text-align: center;
+  line-height: 1.2;
+  word-break: break-word;
+  color: #fff;
+}
+
+/* 二级分类加载状态 */
+.secondary-loading {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 40px 20px;
+  gap: 15px;
+}
+
+/* 分页控件 */
+.pagination-compact {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  padding: 15px 0;
+  margin: 15px 0;
+}
+
+.page-btn-compact {
+  width: 32px;
+  height: 32px;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  background: rgba(255, 255, 255, 0.05);
+  color: #fff;
+  border-radius: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.page-btn-compact:hover:not(:disabled) {
+  background: rgba(255, 149, 0, 0.2);
+  border-color: #ff9500;
+}
+
+.page-btn-compact:disabled {
+  opacity: 0.3;
+  cursor: not-allowed;
+}
+
+.page-info-compact {
+  font-size: 14px;
+  color: #fff;
+  min-width: 60px;
+  text-align: center;
+}
+
+.page-jump {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.jump-label,
+.jump-total {
+  font-size: 12px;
+  color: #999;
+}
+
+.jump-input {
+  width: 50px;
+  height: 28px;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 4px;
+  color: #fff;
+  text-align: center;
+  font-size: 12px;
+}
+
+.total-info {
+  font-size: 12px;
+  color: #999;
+}
+
+/* 游戏区域 */
+.selected-secondary-games {
+  margin-top: 20px;
+}
+
+.games-section {
+  margin-bottom: 20px;
+}
+
+.games-loading {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 40px 20px;
+  color: #999;
+  text-align: center;
+  background-color: #2a2a2a;
+  border-radius: 8px;
+  margin: 10px 0;
+}
+
+.games-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 10px;
+  margin-bottom: 15px;
+}
+
+.game-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding: 10px;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.game-item:hover {
+  background: rgba(255, 255, 255, 0.1);
+  border-color: rgba(255, 149, 0, 0.5);
+  transform: translateY(-2px);
+}
+
+.game-image {
+  width: 60px;
+  height: 60px;
+  border-radius: 8px;
+  overflow: hidden;
+  background: linear-gradient(135deg, #333, #555);
+}
+
+.game-image img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.game-name {
+  font-size: 12px;
+  color: #fff;
+  text-align: center;
+  line-height: 1.2;
+  word-break: break-word;
+}
+
+.no-games {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 40px 20px;
+  color: #999;
+  text-align: center;
+}
+
+.no-games-text {
+  font-size: 14px;
+  color: #999;
+}
+
+.no-selected-category {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 40px 20px;
+  color: #999;
+  text-align: center;
+}
+
+.no-selected-text {
+  font-size: 14px;
+  color: #999;
+}
+</style>

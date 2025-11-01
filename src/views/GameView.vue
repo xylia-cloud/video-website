@@ -55,18 +55,31 @@ const selectedTopCategory = ref<string>('0')
 const isLoadingTopCategories = ref(false)
 const hasTopCategoriesError = ref(false)
 
-// 二级游戏分类数据
-const secondaryCategories = ref<SubGameCategory[]>([])
-const isLoadingSecondaryCategories = ref(false)
-const hasSecondaryCategoriesError = ref(false)
+// 一级游戏分类数据（原来的二级分类现在改为一级分类）
+const primaryCategories = ref<SubGameCategory[]>([])
+const isLoadingPrimaryCategories = ref(false)
+const hasPrimaryCategoriesError = ref(false)
 
-// 二级分类分页数据
-const secondaryCategoriesPagination = ref({
+// 一级分类分页数据
+const primaryCategoriesPagination = ref({
   currentPage: 1,
   totalCount: 0,
   totalPages: 0,
   pageSize: 12, // 后端每页返回12条数据
 })
+const primaryCategoriesJumpPage = ref(1)
+
+// 二级分类相关（保留用于兼容性，但不再使用）
+const secondaryCategories = ref<SubGameCategory[]>([])
+const isLoadingSecondaryCategories = ref(false)
+const hasSecondaryCategoriesError = ref(false)
+const secondaryCategoriesPagination = ref({
+  currentPage: 1,
+  totalCount: 0,
+  totalPages: 0,
+  pageSize: 12,
+})
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 const secondaryCategoriesJumpPage = ref(1)
 
 // 全屏加载状态
@@ -120,6 +133,7 @@ const fetchRechargeNotice = async () => {
 // 防重复请求标记
 const isTopCategoriesLoading = ref(false)
 const isSecondaryCategoriesLoading = ref(false)
+const isPrimaryCategoriesLoading = ref(false)
 
 // 获取顶级游戏分类数据
 const fetchTopCategories = async () => {
@@ -180,8 +194,8 @@ const fetchTopCategories = async () => {
       // 默认选中第一个分类
       if (topCategories.value.length > 0) {
         selectedTopCategory.value = String(topCategories.value[0].id)
-        // 加载第一个顶级分类的二级分类列表
-        fetchSecondaryCategories(selectedTopCategory.value)
+        // 加载第一个顶级分类的一级分类列表
+        fetchPrimaryCategories(selectedTopCategory.value)
       }
 
       console.log('处理后的顶级游戏分类数据:', topCategories.value)
@@ -200,7 +214,103 @@ const fetchTopCategories = async () => {
   }
 }
 
-// 获取二级游戏分类数据
+// 获取一级游戏分类数据
+const fetchPrimaryCategories = async (topCategoryId: string, page: number = 1) => {
+  // 防重复请求
+  const requestKey = `${topCategoryId}-${page}`
+  if (isPrimaryCategoriesLoading.value) {
+    console.log('🔄 一级分类正在加载中，跳过重复请求:', requestKey)
+    return
+  }
+
+  isPrimaryCategoriesLoading.value = true
+  isGlobalLoading.value = true
+  isLoadingPrimaryCategories.value = true
+  hasPrimaryCategoriesError.value = false
+
+  try {
+    // 构建查询参数
+    const queryParams = new URLSearchParams({
+      service: 'caipiao.getoneclass',
+      pid: topCategoryId,
+    })
+
+    // 发起GET请求
+    const response = await fetch(`${NEW_API_BASE_URL}/?${queryParams.toString()}`, {
+      method: 'GET',
+      headers: {
+        Accept: 'application/json',
+      },
+    })
+
+    if (!response.ok) {
+      throw new Error(`HTTP error! Status: ${response.status}`)
+    }
+
+    const result = await response.json()
+    console.log('获取二级游戏分类数据:', result)
+    console.log('数据结构检查 - result.data.info:', result.data?.info)
+    console.log('是否为数组:', Array.isArray(result.data?.info))
+
+    if (
+      result &&
+      result.ret === 200 &&
+      result.data &&
+      result.data.code === 0 &&
+      result.data.info &&
+      Array.isArray(result.data.info)
+    ) {
+      // 处理一级分类数据
+      const allCategories = result.data.info.map((item: Record<string, unknown>) => ({
+        id: String(item.id || ''),
+        name: String(item.name || '未命名分类'),
+        icon: String(item.icon || ''),
+        topclass_id: String(item.topclass_id || ''),
+        ismy: Number(item.ismy) || 0,
+        expanded: false, // 默认不展开
+        games: [], // 初始化游戏列表
+        loading: false, // 初始化加载状态
+        pagination: {
+          // 初始化分页信息
+          currentPage: 1,
+          totalCount: 0,
+          totalPages: 0,
+          pageSize: 12,
+        },
+      }))
+
+      // 直接使用后端返回的数据，不进行前端分页
+      primaryCategories.value = allCategories
+
+      // 从后端响应中获取分页信息
+      const totalCount = parseInt(result.data.info.total || '0')
+      const pageSize = 12 // 后端每页返回12条
+      const totalPages = Math.ceil(totalCount / pageSize)
+
+      // 更新分页信息
+      primaryCategoriesPagination.value = {
+        currentPage: page,
+        totalCount,
+        totalPages,
+        pageSize,
+      }
+      console.log('处理后的一级游戏分类数据:', allCategories)
+    } else {
+      console.log(`没有获取到顶级分类 ${topCategoryId} 的一级分类数据`)
+      primaryCategories.value = []
+    }
+  } catch (error) {
+    console.error('获取一级游戏分类失败:', error)
+    hasPrimaryCategoriesError.value = true
+    primaryCategories.value = []
+  } finally {
+    isPrimaryCategoriesLoading.value = false
+    isGlobalLoading.value = false
+    isLoadingPrimaryCategories.value = false
+  }
+}
+
+// 获取二级游戏分类数据（保留用于兼容性）
 const fetchSecondaryCategories = async (topCategoryId: string, page: number = 1) => {
   // 防重复请求
   const requestKey = `${topCategoryId}-${page}`
@@ -217,15 +327,14 @@ const fetchSecondaryCategories = async (topCategoryId: string, page: number = 1)
   try {
     // 构建查询参数
     const queryParams = new URLSearchParams({
-      service: 'caipiao.twoclass',
+      service: 'caipiao.getoneclass',
       pid: topCategoryId,
     })
 
-    // 发起POST请求
+    // 发起GET请求
     const response = await fetch(`${NEW_API_BASE_URL}/?${queryParams.toString()}`, {
-      method: 'POST',
+      method: 'GET',
       headers: {
-        'Content-Type': 'application/x-www-form-urlencoded',
         Accept: 'application/json',
       },
     })
@@ -243,10 +352,10 @@ const fetchSecondaryCategories = async (topCategoryId: string, page: number = 1)
       result.data &&
       result.data.code === 0 &&
       result.data.info &&
-      Array.isArray(result.data.info.data)
+      Array.isArray(result.data.info)
     ) {
       // 处理二级分类数据
-      const allCategories = result.data.info.data.map((item: Record<string, unknown>) => ({
+      const allCategories = result.data.info.map((item: Record<string, unknown>) => ({
         id: String(item.id || ''),
         name: String(item.name || '未命名分类'),
         icon: String(item.icon || ''),
@@ -423,31 +532,34 @@ const handleTopCategoryClick = (categoryId: string) => {
   console.log('更新选中的顶级分类为:', categoryId)
 
   // 重置分页到第一页
-  secondaryCategoriesPagination.value.currentPage = 1
-  secondaryCategoriesJumpPage.value = 1
+  primaryCategoriesPagination.value.currentPage = 1
+  primaryCategoriesJumpPage.value = 1
 
-  // 获取该顶级分类下的二级分类列表
-  fetchSecondaryCategories(categoryId, 1)
+  // 获取该顶级分类下的一级分类列表
+  fetchPrimaryCategories(categoryId, 1)
 }
 
-// 处理二级分类点击
-const handleSecondaryCategoryClick = (secondaryCategory: SubGameCategory) => {
-  // 先关闭所有其他分类的展开状态
-  secondaryCategories.value.forEach((cat) => {
-    cat.expanded = false
+// 处理一级分类点击 - 跳转到新界面显示二级分类
+const handlePrimaryCategoryClick = (primaryCategory: SubGameCategory) => {
+  console.log('点击一级分类:', primaryCategory)
+
+  // 跳转到二级分类页面，传递一级分类信息
+  router.push({
+    name: 'game-secondary',
+    params: {
+      topCategoryId: selectedTopCategory.value,
+      primaryCategoryId: primaryCategory.id,
+    },
+    query: {
+      topCategoryName:
+        topCategories.value.find((cat) => cat.id === selectedTopCategory.value)?.name || '',
+      primaryCategoryName: primaryCategory.name,
+    },
   })
-
-  // 展开当前选中的分类
-  secondaryCategory.expanded = true
-
-  // 如果还没有加载过游戏，则加载游戏
-  if (!secondaryCategory.games || secondaryCategory.games.length === 0) {
-    fetchGamesForSubCategory(selectedTopCategory.value, secondaryCategory.id, 1)
-  }
-  // 如果已经有数据，直接展开，不做任何网络请求
 }
 
-// 处理分页点击
+// 处理分页点击（保留用于游戏分页功能）
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 const handlePageChange = (subCategory: SubGameCategory, page: number) => {
   if (page < 1 || page > (subCategory.pagination?.totalPages || 1)) return
   if (page === subCategory.pagination?.currentPage) return
@@ -455,47 +567,32 @@ const handlePageChange = (subCategory: SubGameCategory, page: number) => {
   fetchGamesForSubCategory(selectedTopCategory.value, subCategory.id, page)
 }
 
-// 处理跳转页面
-const handleJumpPage = (subCategory: SubGameCategory) => {
-  const jumpPage = subCategory.jumpPage
-  if (!jumpPage || !subCategory.pagination) return
+// 处理一级分类分页点击
+const handlePrimaryCategoriesPageChange = (page: number) => {
+  if (page < 1 || page > primaryCategoriesPagination.value.totalPages) return
+  if (page === primaryCategoriesPagination.value.currentPage) return
 
-  const targetPage = parseInt(jumpPage.toString())
-  if (isNaN(targetPage)) {
-    subCategory.jumpPage = undefined
-    return
-  }
-
-  const maxPage = subCategory.pagination.totalPages
-  if (targetPage < 1 || targetPage > maxPage) {
-    subCategory.jumpPage = undefined
-    return
-  }
-
-  if (targetPage !== subCategory.pagination.currentPage) {
-    handlePageChange(subCategory, targetPage)
-  }
-
-  subCategory.jumpPage = undefined
+  fetchPrimaryCategories(selectedTopCategory.value, page)
 }
 
-// 处理二级分类分页点击
+// 处理一级分类跳转页面
+const handlePrimaryCategoriesJumpPage = () => {
+  const jumpPage = primaryCategoriesJumpPage.value
+  if (jumpPage && jumpPage >= 1 && jumpPage <= primaryCategoriesPagination.value.totalPages) {
+    handlePrimaryCategoriesPageChange(jumpPage)
+  } else {
+    // 重置为当前页
+    primaryCategoriesJumpPage.value = primaryCategoriesPagination.value.currentPage
+  }
+}
+
+// 处理二级分类分页点击（保留用于兼容性）
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 const handleSecondaryCategoriesPageChange = (page: number) => {
   if (page < 1 || page > secondaryCategoriesPagination.value.totalPages) return
   if (page === secondaryCategoriesPagination.value.currentPage) return
 
   fetchSecondaryCategories(selectedTopCategory.value, page)
-}
-
-// 处理二级分类跳转页面
-const handleSecondaryCategoriesJumpPage = () => {
-  const jumpPage = secondaryCategoriesJumpPage.value
-  if (jumpPage && jumpPage >= 1 && jumpPage <= secondaryCategoriesPagination.value.totalPages) {
-    handleSecondaryCategoriesPageChange(jumpPage)
-  } else {
-    // 重置为当前页
-    secondaryCategoriesJumpPage.value = secondaryCategoriesPagination.value.currentPage
-  }
 }
 
 // 游戏确认弹窗状态
@@ -528,36 +625,8 @@ const cancelStartGame = () => {
   currentGameUrl.value = ''
 }
 
-// 处理游戏点击
-const handleGameClick = (game: Game) => {
-  // 检查是否为占位数据
-  if (game.id < 0) {
-    return // 占位数据不可点击
-  }
-
-  // 检查必要的游戏信息
-  if (!game.biaoshi) {
-    console.error('游戏信息不完整，无法进入游戏', game)
-    return
-  }
-
-  // 获取用户信息
-  const userInfo = getUserInfo()
-  if (!userInfo || !userInfo.user_id || !userInfo.token) {
-    // 用户未登录，跳转到登录页
-    router.push('/login')
-    return
-  }
-
-  // 使用biaoshi作为所有必要参数
-  const type = game.type || game.biaoshi
-  const code = game.code || game.biaoshi
-
-  // 进入游戏
-  enterGame(userInfo.user_id, userInfo.token, game.biaoshi, type, code, game)
-}
-
-// 进入游戏接口
+// 进入游戏接口（保留用于游戏功能）
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 const enterGame = async (
   uid: number,
   token: string,
@@ -689,67 +758,57 @@ onMounted(() => {
     </div>
 
     <!-- 充值版块 -->
-    <div class="recharge-section">
-      <!-- 三个点装饰 -->
-      <div class="dots-decoration">
-        <span class="dot"></span>
-        <span class="dot"></span>
-        <span class="dot"></span>
-      </div>
-
-      <!-- 已登录状态 - 显示余额和操作按钮 -->
-      <div v-if="isUserLoggedIn">
-        <!-- 余额显示区域 -->
-        <div class="balance-display-section">
-          <div class="balance-item">
-            <span class="balance-label">账户余额：</span>
-            <span class="balance-value">{{ userBalance.toFixed(2) }}</span>
-          </div>
-          <div class="balance-item">
-            <span class="balance-label">游戏余额：</span>
-            <span class="balance-value">{{ gameBalance.toFixed(2) }}</span>
-          </div>
+    <div v-if="isUserLoggedIn" class="recharge-section">
+      <!-- 左侧余额显示 -->
+      <div class="balance-display">
+        <div class="balance-item">
+          <span class="balance-label">账户余额：</span>
+          <span class="balance-value">{{ userBalance.toFixed(2) }}</span>
         </div>
-
-        <!-- 操作按钮区域 -->
-        <div class="action-buttons-section">
-          <button class="action-btn recharge-btn" @click="goToRecharge">
-            <van-icon name="plus" />
-            <span>充值</span>
-          </button>
-          <button class="action-btn withdraw-btn" @click="goToWithdraw">
-            <van-icon name="credit-pay" />
-            <span>提现</span>
-          </button>
-          <button class="action-btn record-btn" @click="goToGameRecord">
-            <van-icon name="orders-o" />
-            <span>游戏记录</span>
-          </button>
+        <div class="balance-item">
+          <span class="balance-label">游戏余额：</span>
+          <span class="balance-value">{{ gameBalance.toFixed(2) }}</span>
         </div>
       </div>
 
-      <!-- 未登录状态 - 显示登录提示 -->
-      <div v-else class="login-prompt-section">
-        <!-- 登录提示信息 -->
-        <div class="login-prompt-content">
-          <div class="login-icon">
-            <van-icon name="user-o" size="32" color="#ff9500" />
-          </div>
-          <div class="login-message">
-            <div class="login-title">您还未登录</div>
-            <div class="login-subtitle">登录后可享受充值、游戏等完整功能</div>
-          </div>
+      <!-- 右侧操作区域 -->
+      <div class="action-items">
+        <div class="action-item" @click="goToRecharge">
+          <img src="@/assets/img/icon-chongzhi.png" alt="充值" class="action-icon" />
+          <span class="action-title">充值</span>
         </div>
+        <div class="action-item" @click="goToWithdraw">
+          <img src="@/assets/img/icon-tixian.png" alt="提现" class="action-icon" />
+          <span class="action-title">提现</span>
+        </div>
+        <div class="action-item" @click="goToGameRecord">
+          <img src="@/assets/img/icon-youxijilu.png" alt="游戏记录" class="action-icon" />
+          <span class="action-title">游戏记录</span>
+        </div>
+      </div>
+    </div>
 
-        <!-- 登录注册按钮 -->
-        <div class="login-actions">
-          <button class="login-btn" @click="goToLogin">
-            <span>立即登录</span>
-          </button>
-          <button class="register-btn" @click="goToRegister">
-            <span>免费注册</span>
-          </button>
+    <!-- 未登录状态 - 显示登录提示 -->
+    <div v-else class="login-prompt-section">
+      <!-- 登录提示信息 -->
+      <div class="login-prompt-content">
+        <div class="login-icon">
+          <van-icon name="user-o" size="32" color="#ff9500" />
         </div>
+        <div class="login-message">
+          <div class="login-title">您还未登录</div>
+          <div class="login-subtitle">登录后可享受充值、游戏等完整功能</div>
+        </div>
+      </div>
+
+      <!-- 登录注册按钮 -->
+      <div class="login-actions">
+        <button class="login-btn" @click="goToLogin">
+          <span>立即登录</span>
+        </button>
+        <button class="register-btn" @click="goToRegister">
+          <span>免费注册</span>
+        </button>
       </div>
     </div>
 
@@ -798,60 +857,52 @@ onMounted(() => {
 
         <!-- 游戏内容区域 -->
         <div class="game-content-area">
-          <!-- 二级分类加载状态 -->
-          <div v-if="isLoadingSecondaryCategories" class="secondary-loading">
+          <!-- 一级分类加载状态 -->
+          <div v-if="isLoadingPrimaryCategories" class="primary-loading">
             <div class="custom-spinner"></div>
             <div class="loading-text">加载分类中...</div>
           </div>
 
-          <!-- 二级分类错误状态 -->
-          <div v-else-if="hasSecondaryCategoriesError" class="error-state">
+          <!-- 一级分类错误状态 -->
+          <div v-else-if="hasPrimaryCategoriesError" class="error-state">
             <van-icon name="warning-o" size="24" color="#ff9500" />
-            <div class="error-text">加载二级分类失败</div>
+            <div class="error-text">加载一级分类失败</div>
           </div>
 
-          <!-- 二级分类网格 -->
+          <!-- 一级分类网格 -->
           <div
             v-if="
-              !isLoadingSecondaryCategories &&
-              !hasSecondaryCategoriesError &&
-              secondaryCategories.length > 0
+              !isLoadingPrimaryCategories &&
+              !hasPrimaryCategoriesError &&
+              primaryCategories.length > 0
             "
-            class="secondary-categories-grid"
+            class="primary-categories-grid"
           >
             <div
-              v-for="secondaryCategory in secondaryCategories"
-              :key="secondaryCategory.id"
-              class="secondary-category-item"
-              @click="handleSecondaryCategoryClick(secondaryCategory)"
+              v-for="primaryCategory in primaryCategories"
+              :key="primaryCategory.id"
+              class="primary-category-item"
+              @click="handlePrimaryCategoryClick(primaryCategory)"
             >
-              <div class="secondary-category-icon">
+              <div class="primary-category-icon">
                 <img
-                  v-if="secondaryCategory.icon"
-                  :src="secondaryCategory.icon"
-                  :alt="secondaryCategory.name"
+                  v-if="primaryCategory.icon"
+                  :src="primaryCategory.icon"
+                  :alt="primaryCategory.name"
                 />
-                <div v-else class="placeholder-icon"></div>
               </div>
-              <div class="secondary-category-name">{{ secondaryCategory.name }}</div>
+              <div class="primary-category-name">{{ primaryCategory.name }}</div>
             </div>
           </div>
 
-          <!-- 二级分类分页控件 -->
-          <div
-            v-if="
-              !isLoadingSecondaryCategories &&
-              !hasSecondaryCategoriesError &&
-              secondaryCategoriesPagination.totalPages > 1
-            "
-            class="pagination-compact secondary-pagination"
-          >
+          <!-- 一级分类分页控件 -->
+          <div v-if="false" class="pagination-compact primary-pagination">
             <!-- 上一页 -->
             <button
               class="page-btn-compact"
-              :disabled="secondaryCategoriesPagination.currentPage <= 1"
+              :disabled="primaryCategoriesPagination.currentPage <= 1"
               @click="
-                handleSecondaryCategoriesPageChange(secondaryCategoriesPagination.currentPage - 1)
+                handlePrimaryCategoriesPageChange(primaryCategoriesPagination.currentPage - 1)
               "
             >
               <van-icon name="arrow-left" size="14" />
@@ -859,8 +910,8 @@ onMounted(() => {
 
             <!-- 当前页信息 -->
             <span class="page-info-compact">
-              {{ secondaryCategoriesPagination.currentPage }}/{{
-                secondaryCategoriesPagination.totalPages
+              {{ primaryCategoriesPagination.currentPage }}/{{
+                primaryCategoriesPagination.totalPages
               }}
             </span>
 
@@ -868,11 +919,10 @@ onMounted(() => {
             <button
               class="page-btn-compact"
               :disabled="
-                secondaryCategoriesPagination.currentPage >=
-                secondaryCategoriesPagination.totalPages
+                primaryCategoriesPagination.currentPage >= primaryCategoriesPagination.totalPages
               "
               @click="
-                handleSecondaryCategoriesPageChange(secondaryCategoriesPagination.currentPage + 1)
+                handlePrimaryCategoriesPageChange(primaryCategoriesPagination.currentPage + 1)
               "
             >
               <van-icon name="arrow" size="14" />
@@ -882,135 +932,32 @@ onMounted(() => {
             <div class="page-jump">
               <span class="jump-label">跳转</span>
               <input
-                v-model="secondaryCategoriesJumpPage"
+                v-model="primaryCategoriesJumpPage"
                 type="number"
                 class="jump-input"
                 :min="1"
-                :max="secondaryCategoriesPagination.totalPages"
-                @keyup.enter="handleSecondaryCategoriesJumpPage"
-                @blur="handleSecondaryCategoriesJumpPage"
+                :max="primaryCategoriesPagination.totalPages"
+                @keyup.enter="handlePrimaryCategoriesJumpPage"
+                @blur="handlePrimaryCategoriesJumpPage"
                 placeholder=""
               />
               <span class="jump-total">页</span>
             </div>
 
             <!-- 总数信息 -->
-            <span class="total-info">共{{ secondaryCategoriesPagination.totalCount }}项</span>
+            <span class="total-info">共{{ primaryCategoriesPagination.totalCount }}项</span>
           </div>
 
-          <!-- 当前选中二级分类的游戏展示区域 -->
-          <div class="selected-secondary-games">
-            <div v-for="secondaryCategory in secondaryCategories" :key="secondaryCategory.id">
-              <!-- 只显示展开的分类的游戏 -->
-              <div v-if="secondaryCategory.expanded" class="games-section">
-                <!-- 游戏加载状态 -->
-                <div v-if="secondaryCategory.loading" class="games-loading">
-                  <div class="custom-spinner"></div>
-                  <div class="loading-text">加载游戏中...</div>
-                </div>
-
-                <!-- 游戏网格 -->
-                <div v-else-if="secondaryCategory.games && secondaryCategory.games.length > 0">
-                  <div class="games-grid">
-                    <div
-                      class="game-item"
-                      v-for="game in secondaryCategory.games"
-                      :key="game.id"
-                      @click="handleGameClick(game)"
-                    >
-                      <div class="game-image">
-                        <img v-if="game.imageUrl" :src="game.imageUrl" :alt="game.name" />
-                      </div>
-                      <div class="game-name">{{ game.name }}</div>
-                    </div>
-                  </div>
-
-                  <!-- 精简分页控件 -->
-                  <div
-                    v-if="
-                      secondaryCategory.pagination && secondaryCategory.pagination.totalPages > 1
-                    "
-                    class="pagination-compact"
-                  >
-                    <!-- 上一页 -->
-                    <button
-                      class="page-btn-compact"
-                      :disabled="secondaryCategory.pagination.currentPage <= 1"
-                      @click="
-                        handlePageChange(
-                          secondaryCategory,
-                          secondaryCategory.pagination.currentPage - 1,
-                        )
-                      "
-                    >
-                      <van-icon name="arrow-left" size="14" />
-                    </button>
-
-                    <!-- 当前页信息 -->
-                    <span class="page-info-compact">
-                      {{ secondaryCategory.pagination.currentPage }}/{{
-                        secondaryCategory.pagination.totalPages
-                      }}
-                    </span>
-
-                    <!-- 下一页 -->
-                    <button
-                      class="page-btn-compact"
-                      :disabled="
-                        secondaryCategory.pagination.currentPage >=
-                        secondaryCategory.pagination.totalPages
-                      "
-                      @click="
-                        handlePageChange(
-                          secondaryCategory,
-                          secondaryCategory.pagination.currentPage + 1,
-                        )
-                      "
-                    >
-                      <van-icon name="arrow" size="14" />
-                    </button>
-
-                    <!-- 跳转输入框 -->
-                    <div class="page-jump">
-                      <span class="jump-label">跳转</span>
-                      <input
-                        v-model="secondaryCategory.jumpPage"
-                        type="number"
-                        class="jump-input"
-                        :min="1"
-                        :max="secondaryCategory.pagination.totalPages"
-                        @keyup.enter="handleJumpPage(secondaryCategory)"
-                        @blur="handleJumpPage(secondaryCategory)"
-                        placeholder=""
-                      />
-                      <span class="jump-total">页</span>
-                    </div>
-
-                    <!-- 总数信息 -->
-                    <span class="total-info"
-                      >共{{ secondaryCategory.pagination.totalCount }}项</span
-                    >
-                  </div>
-                </div>
-
-                <!-- 无游戏状态 -->
-                <div v-else class="no-games">
-                  <div class="no-games-text">暂无游戏</div>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <!-- 无二级分类时的提示 -->
+          <!-- 无一级分类时的提示 -->
           <div
             v-if="
-              !isLoadingSecondaryCategories &&
-              !hasSecondaryCategoriesError &&
-              secondaryCategories.length === 0
+              !isLoadingPrimaryCategories &&
+              !hasPrimaryCategoriesError &&
+              primaryCategories.length === 0
             "
             class="no-selected-category"
           >
-            <div class="no-selected-text">该分类下暂无游戏</div>
+            <div class="no-selected-text">该分类下暂无子分类</div>
           </div>
         </div>
       </div>
@@ -1174,16 +1121,6 @@ onMounted(() => {
   }
 }
 
-/* 充值版块样式 */
-.recharge-section {
-  background: #2c2c2c;
-  padding: 26px 16px 16px 16px;
-  margin: 12px;
-  flex-shrink: 0;
-  position: relative;
-  border-radius: 8px;
-}
-
 /* 三个点装饰 */
 .dots-decoration {
   position: absolute;
@@ -1213,27 +1150,35 @@ onMounted(() => {
   background-color: #ffffff;
 }
 
-/* 余额显示区域 */
-.balance-display-section {
-  padding: 0 0px 10px 0px;
+/* 充值版块样式 */
+.recharge-section {
+  background: #2c2c2c url('@/assets/img/bg-game.png') no-repeat center center;
+  background-size: cover;
+  margin: 12px;
+  flex-shrink: 0;
   display: flex;
-  justify-content: space-around;
   align-items: center;
+  justify-content: space-between;
+  padding: 10px 15px;
+  border-radius: 8px;
+}
+
+/* 左侧余额显示 */
+.balance-display {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
 }
 
 .balance-item {
-  text-align: center;
-  flex: 1;
   display: flex;
-  flex-direction: row;
   align-items: center;
-  justify-content: center;
-  gap: 8px;
+  gap: 6px;
 }
 
 .balance-label {
-  font-size: 14px;
-  color: #ffffff;
+  font-size: 13px;
+  color: #cccccc;
   font-weight: normal;
 }
 
@@ -1243,132 +1188,96 @@ onMounted(() => {
   color: #ffffff;
 }
 
-/* 操作按钮区域 */
-.action-buttons-section {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 12px;
-  padding: 0;
+/* 右侧操作区域 */
+.action-items {
+  display: flex;
+  gap: 0;
 }
 
-.action-btn {
+.action-item {
   display: flex;
-  flex-direction: row;
+  flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 8px;
-  padding: 12px 16px;
-  border-radius: 8px;
-  border: none;
-  color: white;
-  font-size: 14px;
-  font-weight: 600;
   cursor: pointer;
-  transition: all 0.2s ease;
-  min-height: 50px;
+  padding: 0 15px;
 }
 
-/* 充值按钮 - 绿色 */
-.recharge-btn {
-  background: #ff9500;
+.action-item:hover {
+  opacity: 0.8;
 }
 
-.recharge-btn:hover {
-  background: #ff9500;
-  transform: translateY(-2px);
+.action-title {
+  color: white;
+  font-size: 12px;
+  font-weight: 500;
+  margin-top: 4px;
 }
 
-/* 提现按钮 - 红色 */
-.withdraw-btn {
-  background: #ff9500;
+.action-icon {
+  width: 36px;
+  height: 36px;
+  object-fit: contain;
 }
 
-.withdraw-btn:hover {
-  background: #ff9500;
-  transform: translateY(-2px);
-}
-
-/* 记录按钮 - 蓝色 */
-.record-btn {
-  background: #ff9500;
-}
-
-.record-btn:hover {
-  background: #ff9500;
-  transform: translateY(-2px);
-}
-
-.action-btn span {
-  white-space: nowrap;
-}
-
-.action-btn .van-icon {
-  font-size: 18px;
-}
-
-/* 移动端按钮响应式 */
+/* 移动端响应式设计 */
 @media (max-width: 768px) {
-  .action-buttons-section {
-    grid-template-columns: repeat(3, 1fr);
-    gap: 10px;
+  .recharge-section {
+    padding: 16px;
   }
 
-  .action-btn {
-    font-size: 13px;
-    padding: 10px 12px;
-    gap: 6px;
-    min-height: 45px;
-    border-radius: 8px;
+  .action-items {
+    gap: 0;
   }
 
-  .action-btn .van-icon {
-    font-size: 16px;
+  .action-item {
+    padding: 0 12px;
+  }
+
+  .action-icon {
+    width: 32px;
+    height: 32px;
+  }
+
+  .action-title {
+    font-size: 11px;
   }
 }
 
 @media (max-width: 480px) {
-  .action-buttons-section {
-    grid-template-columns: repeat(3, 1fr);
-    gap: 8px;
+  .recharge-section {
+    padding: 16px;
   }
 
-  .action-btn {
-    font-size: 12px;
-    padding: 8px 10px;
-    gap: 5px;
-    min-height: 40px;
-    border-radius: 8px;
+  .action-items {
+    gap: 0;
   }
 
-  .action-btn .van-icon {
-    font-size: 14px;
-  }
-}
-
-@media (max-width: 375px) {
-  .action-buttons-section {
-    gap: 6px;
+  .action-item {
+    padding: 0 4px;
   }
 
-  .action-btn {
-    font-size: 11px;
-    padding: 6px 8px;
-    gap: 4px;
-    min-height: 36px;
+  .action-icon {
+    width: 48px;
+    height: 48px;
   }
 
-  .action-btn .van-icon {
+  .action-title {
+    font-size: 10px;
+  }
+
+  .balance-label {
     font-size: 12px;
   }
 
-  .action-btn span {
-    font-size: 13px;
+  .balance-value {
+    font-size: 18px;
   }
 }
 
 /* 未登录状态样式 */
 .login-prompt-section {
-  padding: 15px 0px 0px 0px;
+  padding: 15px;
 }
 
 .login-prompt-content {
@@ -1458,12 +1367,9 @@ onMounted(() => {
 
 /* 游戏区域 */
 .game-container {
-  background: #2c2c2c;
   box-sizing: border-box;
   margin: 12px;
   margin-top: 0;
-  padding: 12px;
-  border-radius: 8px;
   flex: 1;
   display: flex;
   flex-direction: column;
@@ -1532,7 +1438,6 @@ onMounted(() => {
   flex: 1;
   display: flex;
   flex-direction: column;
-  overflow: hidden;
   min-height: 0;
 }
 
@@ -1553,39 +1458,39 @@ onMounted(() => {
   display: flex;
   gap: 8px;
   width: 100%;
+  overflow-x: auto;
+  scrollbar-width: none; /* Firefox */
+  -ms-overflow-style: none; /* IE and Edge */
+  padding: 0;
+}
+
+.top-categories-list::-webkit-scrollbar {
+  display: none; /* Chrome, Safari, Opera */
 }
 
 .top-category-horizontal-item {
   display: flex;
-  flex-direction: column;
   align-items: center;
-  flex: 1;
-  padding: 12px 8px;
-  border-radius: 8px;
-  background: rgba(255, 255, 255, 0.05);
-  border: 2px solid transparent;
+  justify-content: center;
   cursor: pointer;
-  transition: all 0.3s ease;
+  flex-shrink: 0;
+  transition: opacity 0.3s ease;
 }
 
 .top-category-horizontal-item:hover {
-  background: rgba(255, 255, 255, 0.1);
-  border-color: rgba(255, 149, 0, 0.3);
+  opacity: 0.8;
 }
 
 .top-category-horizontal-item.active {
-  background: rgba(255, 149, 0, 0.1);
-  border-color: #ff9500;
-  color: #ff9500;
+  opacity: 1;
 }
 
 .top-category-horizontal-icon {
-  width: 40px;
-  height: 40px;
+  width: 70px;
+  height: 70px;
   display: flex;
   align-items: center;
   justify-content: center;
-  margin-bottom: 6px;
   flex-shrink: 0;
 }
 
@@ -1593,10 +1498,11 @@ onMounted(() => {
   width: 100%;
   height: 100%;
   object-fit: contain;
+  border-radius: 6px;
 }
 
 .top-category-horizontal-name {
-  font-size: 14px;
+  display: none; /* 隐藏顶级分类名称 */
   font-weight: 600;
   text-align: center;
   line-height: 1.2;
@@ -1613,7 +1519,7 @@ onMounted(() => {
   flex: 1;
   display: flex;
   flex-direction: column;
-  overflow: hidden;
+  overflow-y: auto;
   min-height: 0;
 }
 
@@ -2308,21 +2214,12 @@ onMounted(() => {
 /* 响应式适配 */
 @media (max-width: 768px) {
   .top-categories-list {
-    gap: 8px;
-  }
-
-  .top-category-horizontal-item {
-    padding: 10px 6px;
+    gap: 6px;
   }
 
   .top-category-horizontal-icon {
-    width: 35px;
-    height: 35px;
-    margin-bottom: 5px;
-  }
-
-  .top-category-horizontal-name {
-    font-size: 13px;
+    width: 70px;
+    height: 70px;
   }
 
   .games-grid {
@@ -2333,17 +2230,12 @@ onMounted(() => {
 
 @media (max-width: 480px) {
   .top-categories-list {
-    gap: 8px;
-  }
-
-  .top-category-horizontal-item {
-    padding: 8px 4px;
+    gap: 4px;
   }
 
   .top-category-horizontal-icon {
-    width: 30px;
-    height: 30px;
-    margin-bottom: 4px;
+    width: 60px;
+    height: 60px;
   }
 
   .top-category-horizontal-name {
@@ -2354,6 +2246,37 @@ onMounted(() => {
     grid-template-columns: repeat(3, 1fr);
     gap: 8px;
   }
+}
+
+/* 一级分类网格 - 卡片式布局 */
+.primary-categories-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  overflow-y: auto;
+  flex: 1;
+}
+
+.primary-category-item {
+  width: 100%;
+  cursor: pointer;
+}
+
+.primary-category-icon {
+  width: 100%;
+  position: relative;
+}
+
+.primary-category-icon img {
+  width: 100%;
+  height: auto;
+  object-fit: contain;
+  border-radius: 10px;
+  display: block;
+}
+
+.primary-category-name {
+  display: none; /* 隐藏名称 */
 }
 
 /* 二级分类网格 */
@@ -2408,6 +2331,16 @@ onMounted(() => {
   line-height: 1.2;
 }
 
+/* 一级分类加载状态 */
+.primary-loading {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 40px 20px;
+  gap: 15px;
+}
+
 /* 二级分类加载状态 */
 .secondary-loading {
   display: flex;
@@ -2424,20 +2357,4 @@ onMounted(() => {
 }
 
 /* 二级分类分页样式 */
-
-/* 占位符图标 */
-.placeholder-icon {
-  width: 100%;
-  height: 100%;
-  background: rgba(255, 255, 255, 0.1);
-  border-radius: 4px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.placeholder-icon::before {
-  content: '🎮';
-  font-size: 16px;
-}
 </style>
