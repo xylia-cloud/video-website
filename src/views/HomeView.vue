@@ -153,6 +153,9 @@ const isLoadingMore = ref(false)
 const hasMoreVideos = ref(true)
 const isFirstLoad = ref(true) // 标记是否为第一次加载
 
+// 全屏loading状态
+const isFullScreenLoading = ref(false)
+
 // 新增：最新视频数据
 const latestVideoData = ref<VideoItem[]>([])
 const isLoadingLatest = ref(false)
@@ -234,7 +237,12 @@ const fetchTypesData = async () => {
 
 // 切换栏目
 const switchType = (typeId: number) => {
+  console.log('切换分类 - 当前activeTypeId:', activeTypeId.value, '目标typeId:', typeId)
+
   if (activeTypeId.value === typeId) return
+
+  // 显示全屏loading
+  isFullScreenLoading.value = true
 
   // 保存当前标签的状态
   saveCurrentTabState()
@@ -243,6 +251,7 @@ const switchType = (typeId: number) => {
   removeScrollListener()
 
   activeTypeId.value = typeId
+  console.log('切换分类完成 - 新的activeTypeId:', activeTypeId.value)
 
   // 保存当前选中的标签ID到localStorage
   localStorage.setItem('lastActiveTabId', typeId.toString())
@@ -515,6 +524,9 @@ const fetchRecommendVideosData = async (page = 1, tid = VIDEO_CATEGORIES.ALL, lo
     // 数据加载完成后立即更新缓存
     updateTabCache(tid)
 
+    // 关闭全屏loading
+    isFullScreenLoading.value = false
+
     console.log('处理后的视频数据:', videoData.value)
     console.log(`当前页: ${currentPage.value}, 总页数: ${totalPages.value}`)
   } catch (error: any) {
@@ -533,6 +545,8 @@ const fetchRecommendVideosData = async (page = 1, tid = VIDEO_CATEGORIES.ALL, lo
   } finally {
     isLoading.value = false
     isLoadingMore.value = false
+    // 确保在任何情况下都关闭全屏loading
+    isFullScreenLoading.value = false
   }
 }
 
@@ -1404,6 +1418,12 @@ const performTouristLogin = async () => {
 
 <template>
   <div class="home">
+    <!-- 全屏Loading -->
+    <div v-if="isFullScreenLoading" class="fullscreen-loading">
+      <van-loading type="spinner" size="40px" color="#ff9500" />
+      <div class="loading-text">加载中...</div>
+    </div>
+
     <!-- 顶部搜索栏 -->
     <div class="search-bar">
       <div class="search-input">
@@ -1436,6 +1456,8 @@ const performTouristLogin = async () => {
         :key="type.type_id"
         :class="['tab-item', activeTypeId === type.type_id ? 'active' : '']"
         @click="switchType(type.type_id)"
+        :data-type-id="type.type_id"
+        :data-active="activeTypeId === type.type_id"
       >
         {{ type.type_name }}
       </div>
@@ -1664,46 +1686,40 @@ const performTouristLogin = async () => {
 
 /* 导航标签 */
 .nav-tabs {
-  display: flex;
-  justify-content: space-between;
-  overflow-x: auto;
-  white-space: nowrap;
-  padding: 0 10px;
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 8px;
+  padding: 10px 15px;
   border-bottom: 1px solid #222;
-  scrollbar-width: none;
-  /* Firefox */
-  -ms-overflow-style: none;
-  /* IE and Edge */
-}
-
-.nav-tabs::-webkit-scrollbar {
-  display: none;
-  /* Chrome, Safari, Opera */
+  background-color: #111;
 }
 
 .tab-item {
-  padding: 12px 10px;
-  font-size: 14px;
+  padding: 8px 12px;
+  font-size: 13px;
   color: #ccc;
-  position: relative;
+  text-align: center;
+  cursor: pointer;
+  background-color: #333;
+  border-radius: 20px;
+  border: 1px solid transparent;
+  transition: all 0.3s ease;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .tab-item.active {
-  color: #ff9500;
-  font-weight: bold;
-  font-size: 18px;
+  color: #fff !important;
+  font-weight: bold !important;
+  background-color: #ff9500 !important;
+  border-color: #ff9500 !important;
 }
 
-.tab-item.active::after {
-  content: '';
-  position: absolute;
-  bottom: 0;
-  left: 50%;
-  transform: translateX(-50%);
-  width: 20px;
-  height: 3px;
-  background-color: #ff9500;
-  border-radius: 3px;
+.tab-item:hover {
+  background-color: #444;
+  border-color: #666;
+  color: #fff;
 }
 
 /* 内容区域 */
@@ -1985,5 +2001,27 @@ const performTouristLogin = async () => {
   margin-bottom: 15px;
   color: #999;
   font-size: 14px;
+}
+
+/* 全屏Loading样式 */
+.fullscreen-loading {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(17, 17, 17, 0.9);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  z-index: 9999;
+}
+
+.fullscreen-loading .loading-text {
+  margin-top: 15px;
+  color: #ff9500;
+  font-size: 16px;
+  font-weight: 500;
 }
 </style>
