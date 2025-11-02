@@ -177,12 +177,16 @@ const fetchTopCategories = async () => {
       result.data.code === 0 &&
       Array.isArray(result.data.info)
     ) {
-      // 按照paixu排序，并确保ID是字符串类型
+      // 按照paixu排序，并确保ID是字符串类型，过滤掉ID为0的彩票分类
       const sortedCategories = [...result.data.info]
         .map((category) => ({
           ...category,
           id: String(category.id), // 确保ID是字符串类型
         }))
+        .filter((category) => {
+          // 只过滤掉ID为0的彩票分类（没有paixu的那个）
+          return category.id !== '0'
+        })
         .sort((a, b) => {
           const paixuA = a.paixu ? parseInt(a.paixu) : 999
           const paixuB = b.paixu ? parseInt(b.paixu) : 999
@@ -1456,24 +1460,22 @@ onMounted(() => {
 
 .top-categories-list {
   display: flex;
-  gap: 8px;
+  gap: 4px;
   width: 100%;
-  overflow-x: auto;
-  scrollbar-width: none; /* Firefox */
-  -ms-overflow-style: none; /* IE and Edge */
-  padding: 0;
+  justify-content: space-evenly;
+  align-items: center;
+  padding: 0 8px;
 }
 
-.top-categories-list::-webkit-scrollbar {
-  display: none; /* Chrome, Safari, Opera */
-}
+/* 移除滚动条样式，因为不再需要滚动 */
 
 .top-category-horizontal-item {
   display: flex;
   align-items: center;
   justify-content: center;
   cursor: pointer;
-  flex-shrink: 0;
+  flex: 0 1 auto;
+  min-width: 0;
   transition: opacity 0.3s ease;
 }
 
@@ -1486,8 +1488,9 @@ onMounted(() => {
 }
 
 .top-category-horizontal-icon {
-  width: 70px;
-  height: 70px;
+  width: 100%;
+  max-width: 60px;
+  height: 60px;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -2214,12 +2217,13 @@ onMounted(() => {
 /* 响应式适配 */
 @media (max-width: 768px) {
   .top-categories-list {
-    gap: 6px;
+    gap: 3px;
+    padding: 0 4px;
   }
 
   .top-category-horizontal-icon {
-    width: 70px;
-    height: 70px;
+    max-width: 55px;
+    height: 55px;
   }
 
   .games-grid {
@@ -2230,12 +2234,13 @@ onMounted(() => {
 
 @media (max-width: 480px) {
   .top-categories-list {
-    gap: 4px;
+    gap: 2px;
+    padding: 0 2px;
   }
 
   .top-category-horizontal-icon {
-    width: 60px;
-    height: 60px;
+    max-width: 49px;
+    height: 49px;
   }
 
   .top-category-horizontal-name {
