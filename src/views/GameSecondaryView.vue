@@ -4,6 +4,7 @@ import { useRoute } from 'vue-router'
 import { NEW_API_BASE_URL } from '@/utils/config'
 import { showToast } from 'vant'
 import HeaderNav from '@/components/HeaderNav.vue'
+import { getUserInfo } from '@/api/fetch-api'
 
 // 路由相关
 const route = useRoute()
@@ -65,6 +66,76 @@ const isGlobalLoading = ref(false)
 
 // 防重复请求标记
 const isSecondaryCategoriesLoading = ref(false)
+
+// 进入游戏接口
+const enterGame = async (params: {
+  uid: number
+  token: string
+  biaoshi: string
+  type: string
+  code: string
+}) => {
+  console.log('调用进入游戏接口，参数:', params)
+
+  // 构建查询参数
+  const queryParams = new URLSearchParams({
+    service: 'gameapi.entergame',
+  })
+
+  // 构建POST请求体参数
+  const formData = new URLSearchParams({
+    uid: String(params.uid),
+    token: params.token,
+    biaoshi: params.biaoshi,
+    type: params.type,
+    code: params.code,
+  })
+
+  try {
+    // 发起POST请求
+    const response = await fetch(`${NEW_API_BASE_URL}/?${queryParams.toString()}`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/x-www-form-urlencoded',
+        Accept: 'application/json',
+      },
+      body: formData.toString(),
+    })
+
+    if (!response.ok) {
+      throw new Error(`HTTP error! Status: ${response.status}`)
+    }
+
+    const result = await response.json()
+    console.log('进入游戏接口返回:', result)
+
+    // 处理接口返回结果
+    if (result && result.ret === 200 && result.data) {
+      if (result.data.code === 0) {
+        return {
+          code: 1,
+          data: result.data.info || {},
+          msg: result.data.msg || '进入游戏成功',
+        }
+      } else {
+        return {
+          code: 0,
+          data: null,
+          msg: result.data.msg || '进入游戏失败',
+        }
+      }
+    } else {
+      return {
+        code: 0,
+        data: null,
+        msg: result?.msg || '进入游戏失败',
+      }
+    }
+  } catch (error) {
+    console.error('进入游戏接口请求错误:', error)
+    throw error
+  }
+}
 
 // 获取游戏列表数据（直接获取该分类下的所有游戏）
 const fetchGamesData = async (page: number = 1) => {
@@ -183,10 +254,67 @@ const handleSecondaryCategoryClick = (secondaryCategory: SecondaryCategory) => {
 }
 
 // 处理游戏点击
-const handleGameClick = (game: Game) => {
+const handleGameClick = async (game: Game) => {
   console.log('点击游戏:', game)
-  showToast(`即将进入游戏: ${game.name}`)
-  // 这里可以添加进入游戏的逻辑
+
+  try {
+    // 检查用户登录状态
+    const userInfo = getUserInfo()
+    if (!userInfo || !userInfo.token) {
+      showToast('请先登录再进入游戏')
+      return
+    }
+
+    // 兼容游客用户和正式用户的数据结构
+    const uid = userInfo.user_id || userInfo.id
+    if (!uid) {
+      showToast('用户信息不完整，请重新登录')
+      return
+    }
+
+    // 显示加载提示
+    showToast('正在进入游戏...')
+
+    // 调用进入游戏接口
+    const result = await enterGame({
+      uid: uid,
+      token: userInfo.token,
+      biaoshi: game.biaoshi,
+      type: game.type || '',
+      code: game.code || String(game.id),
+    })
+
+    if (result && result.code === 1) {
+      // 进入游戏成功
+      console.log('进入游戏成功:', result)
+      showToast(`成功进入游戏: ${game.name}`)
+
+      // 处理游戏链接跳转 - 参考充值界面的iOS兼容方案
+      if (result.data && result.data.purl) {
+        const gameUrl = result.data.purl
+        console.log('🔗 准备跳转到游戏页面:', gameUrl)
+
+        // 使用 window.location.href 替代 window.open 以兼容iOS（参考充值界面实现）
+        showToast('正在跳转到游戏...')
+
+        // 延迟跳转，让用户看到提示
+        setTimeout(() => {
+          window.location.href = gameUrl
+        }, 500)
+      } else {
+        console.warn('返回数据中没有找到游戏链接 (purl)')
+        showToast('游戏启动成功，但未获取到游戏链接')
+      }
+    } else {
+      // 进入游戏失败
+      const errorMsg = result?.msg || '进入游戏失败'
+      console.error('进入游戏失败:', errorMsg)
+      showToast(errorMsg)
+    }
+  } catch (error) {
+    console.error('进入游戏请求错误:', error)
+    showToast('进入游戏失败，请稍后重试')
+  }
 }
 
 // 处理分页点击
@@ -219,6 +347,7 @@ const handleSecondaryCategoriesPageChange = (page: number) => {
 }
 
 // 处理二级分类跳转页面
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 const handleSecondaryCategoriesJumpPage = () => {
   const jumpPage = secondaryCategoriesJumpPage.value
   if (jumpPage && jumpPage >= 1 && jumpPage <= secondaryCategoriesPagination.value.totalPages) {

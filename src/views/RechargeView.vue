@@ -73,6 +73,7 @@ interface ChargeRulesDisplay {
 const router = useRouter()
 
 // 修复返回按钮
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 const goBack = () => {
   router.back()
 }
@@ -696,7 +697,7 @@ onMounted(async () => {
               <div class="item-name">{{ method.name }}</div>
             </div>
             <div v-if="method.selected" class="check-icon">
-              <van-icon name="success" size="16" color="#fff" />
+              <van-icon name="success" size="10" color="#fff" />
             </div>
           </div>
         </div>
@@ -727,7 +728,7 @@ onMounted(async () => {
               <div class="platform-name">{{ channel.name }}</div>
             </div>
             <div v-if="selectedSubChannel?.id === channel.id" class="check-icon">
-              <van-icon name="success" size="16" color="#fff" />
+              <van-icon name="success" size="10" color="#fff" />
             </div>
           </div>
         </div>
@@ -754,7 +755,7 @@ onMounted(async () => {
               <div v-if="item.give && item.give !== '0'" class="bonus-tag">送{{ item.give }}</div>
             </div>
             <div v-if="selectedMoneyItem?.id === item.id" class="check-icon">
-              <van-icon name="success" size="16" color="#fff" />
+              <van-icon name="success" size="10" color="#fff" />
             </div>
           </div>
         </div>
@@ -1006,12 +1007,18 @@ onMounted(async () => {
 .selection-grid {
   display: grid;
   grid-template-columns: repeat(4, 1fr);
-  gap: 10px;
+  gap: 4px;
+  grid-auto-rows: auto;
+}
+
+/* 确保支付方式选择保持4列 */
+.selection-grid:not(.platform-grid):not(.amount-grid) {
+  grid-template-columns: repeat(4, 1fr) !important;
 }
 
 .selection-grid.platform-grid,
 .selection-grid.amount-grid {
-  grid-template-columns: repeat(3, 1fr);
+  grid-template-columns: repeat(3, 1fr) !important;
   gap: 12px;
 }
 
@@ -1019,9 +1026,9 @@ onMounted(async () => {
   position: relative;
   display: flex;
   align-items: center;
-  padding: 16px;
+  padding: 6px;
   background-color: #222;
-  border-radius: 12px;
+  border-radius: 8px;
   border: 1px solid #333;
   transition: all 0.3s ease;
   cursor: pointer;
@@ -1034,31 +1041,40 @@ onMounted(async () => {
 
 .selection-item.active {
   background-color: rgba(255, 149, 0, 0.1);
-  border: 2px solid #ff9500;
+  border: 1px solid #ff9500;
   transform: translateY(-2px);
   box-shadow: 0 4px 12px rgba(255, 149, 0, 0.2);
 }
 
-/* 支付方式选择 - 保持原来的垂直布局 */
+/* 支付方式选择 - 改为水平布局 */
 .selection-grid:not(.platform-grid):not(.amount-grid) .selection-item {
-  flex-direction: column;
-  padding: 15px 8px;
+  flex-direction: row;
+  padding: 6px;
 }
 
-.selection-grid:not(.platform-grid):not(.amount-grid) .item-content {
-  flex-direction: column;
+.selection-grid:not(.platform-grid):not(.amount-grid) .selection-item .item-content {
+  flex-direction: row !important;
   gap: 6px;
+  align-items: center;
+  flex: 1;
+  display: flex;
 }
 
-.selection-grid:not(.platform-grid):not(.amount-grid) .item-icon-container {
-  width: 32px;
-  height: 32px;
+.selection-grid:not(.platform-grid):not(.amount-grid) .selection-item .item-icon-container {
+  width: 20px;
+  height: 20px;
   margin-bottom: 0;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
-.selection-grid:not(.platform-grid):not(.amount-grid) .item-name {
+.selection-grid:not(.platform-grid):not(.amount-grid) .selection-item .item-name {
   font-size: 12px;
-  text-align: center;
+  text-align: left;
+  flex: 1;
+  margin: 0;
 }
 
 /* 平台选择 - 居中布局 */
@@ -1101,8 +1117,8 @@ onMounted(async () => {
   position: absolute;
   bottom: 0;
   right: 0;
-  width: 16px;
-  height: 16px;
+  width: 12px;
+  height: 12px;
   animation: checkIn 0.3s ease;
 }
 
@@ -1113,16 +1129,16 @@ onMounted(async () => {
   right: 0;
   width: 0;
   height: 0;
-  border-bottom: 24px solid #ff9500;
-  border-left: 24px solid transparent;
-  border-radius: 0 0 6px 0;
+  border-bottom: 16px solid #ff9500;
+  border-left: 16px solid transparent;
+  border-radius: 0 0 4px 0;
 }
 
 .check-icon .van-icon {
   position: absolute;
   bottom: 0px;
   right: 0px;
-  font-size: 12px;
+  font-size: 8px;
   color: #fff;
   z-index: 10;
 }
@@ -1390,6 +1406,7 @@ onMounted(async () => {
 
 /* 广告推荐区域 */
 .ads-section {
+  display: none;
   padding: 0 20px 20px;
 }
 
@@ -1465,6 +1482,12 @@ onMounted(async () => {
 }
 
 /* 响应式设计 */
+@media (max-width: 480px) {
+  .selection-grid:not(.platform-grid):not(.amount-grid) {
+    grid-template-columns: repeat(3, 1fr);
+  }
+}
+
 @media (max-width: 375px) {
   .payment-methods {
     grid-template-columns: repeat(2, 1fr);
@@ -1558,7 +1581,7 @@ onMounted(async () => {
 
 .platform-card.active {
   background: rgba(255, 149, 0, 0.1);
-  border: 2px solid #ff9500;
+  border: 1px solid #ff9500;
 }
 
 .platform-card-content {
@@ -1574,33 +1597,7 @@ onMounted(async () => {
   text-align: center;
 }
 
-.check-icon {
-  position: absolute;
-  bottom: 0;
-  right: 0;
-  width: 16px;
-  height: 16px;
-  animation: checkIn 0.3s ease;
-}
-
-.check-icon::before {
-  content: '';
-  position: absolute;
-  bottom: 0;
-  right: 0;
-  width: 0;
-  height: 0;
-  border-bottom: 30px solid #ff9500;
-  border-left: 30px solid transparent;
-  border-radius: 0 0 8px 0;
-}
-
-.check-icon .van-icon {
-  position: absolute;
-  bottom: 2px;
-  right: 2px;
-  z-index: 1;
-}
+/* 重复的check-icon样式已在上面定义，这里移除重复 */
 .platform-modal {
   background-color: #fff;
   height: 100%;

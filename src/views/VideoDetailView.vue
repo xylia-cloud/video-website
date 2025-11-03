@@ -2764,6 +2764,7 @@ const handleAdClick = (ad: ListAd) => {
     height: 100%;
     pointer-events: none;
     z-index: 2;
+    display: none;
   }
 
   .corner-rectangle {
