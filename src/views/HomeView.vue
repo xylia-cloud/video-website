@@ -250,6 +250,9 @@ const handlePrimaryTypeClick = (type: TypeItem) => {
       expandedTypeId.value = type.type_id
       activeSubTypeId.value = null
     }
+
+    // 保存分类状态
+    saveSessionData()
     return
   }
 
@@ -261,6 +264,9 @@ const handlePrimaryTypeClick = (type: TypeItem) => {
 const handleSubTypeClick = (subType: TypeItem) => {
   activeSubTypeId.value = subType.type_id
   switchType(subType.type_id)
+
+  // 保存分类状态
+  saveSessionData()
 }
 
 // 切换栏目
@@ -280,6 +286,9 @@ const switchType = (typeId: number) => {
 
   // 保存当前选中的标签ID到localStorage
   localStorage.setItem('lastActiveTabId', typeId.toString())
+
+  // 保存完整的分类状态到sessionStorage
+  saveSessionData()
 
   // 恢复这个标签的状态，如果有有效缓存的话
   const targetTabState = tabStates.value[typeId]
@@ -1291,6 +1300,17 @@ onMounted(async () => {
 onActivated(() => {
   console.log('首页被重新激活')
 
+  // 尝试恢复完整的首页状态（包括分类状态）
+  const restoredFromSession = restoreSessionData()
+
+  if (restoredFromSession) {
+    console.log('从详情页返回，已恢复分类状态:', {
+      activeTypeId: activeTypeId.value,
+      activeSubTypeId: activeSubTypeId.value,
+      expandedTypeId: expandedTypeId.value,
+    })
+  }
+
   // 确定是否是首页标签
   const firstTypeId = typesList.value.length > 0 ? typesList.value[0].type_id : 1
   const isFirstTab = activeTypeId.value === firstTypeId
@@ -1366,9 +1386,19 @@ const openAppDownload = () => {
 // 保存会话数据到sessionStorage
 const saveSessionData = () => {
   try {
-    // 将当前的tabStates转换为JSON字符串并保存
+    // 保存完整的分类状态信息
+    const sessionData = {
+      tabStates: tabStates.value,
+      activeTypeId: activeTypeId.value,
+      activeSubTypeId: activeSubTypeId.value,
+      expandedTypeId: expandedTypeId.value,
+      lastUpdateTime: Date.now(),
+    }
+
+    sessionStorage.setItem('homeViewState', JSON.stringify(sessionData))
+    // 保持原有的tabStates存储以兼容现有逻辑
     sessionStorage.setItem('tabStates', JSON.stringify(tabStates.value))
-    console.log('保存会话数据到sessionStorage')
+    console.log('保存完整的首页状态到sessionStorage')
   } catch (error) {
     console.error('保存会话数据失败:', error)
   }
@@ -1377,10 +1407,36 @@ const saveSessionData = () => {
 // 从sessionStorage恢复会话数据
 const restoreSessionData = () => {
   try {
+    // 优先尝试恢复完整的首页状态
+    const homeViewStateData = sessionStorage.getItem('homeViewState')
+    if (homeViewStateData) {
+      const sessionData = JSON.parse(homeViewStateData)
+
+      // 检查数据是否在有效期内（30分钟）
+      const CACHE_DURATION = 30 * 60 * 1000 // 30分钟
+      if (Date.now() - sessionData.lastUpdateTime < CACHE_DURATION) {
+        tabStates.value = sessionData.tabStates || {}
+        activeTypeId.value = sessionData.activeTypeId || 1
+        activeSubTypeId.value = sessionData.activeSubTypeId || null
+        expandedTypeId.value = sessionData.expandedTypeId || null
+
+        console.log('从sessionStorage恢复完整的首页状态:', {
+          activeTypeId: activeTypeId.value,
+          activeSubTypeId: activeSubTypeId.value,
+          expandedTypeId: expandedTypeId.value,
+        })
+        return true
+      } else {
+        console.log('首页状态缓存已过期，清除缓存')
+        sessionStorage.removeItem('homeViewState')
+      }
+    }
+
+    // 降级：尝试恢复原有的tabStates数据
     const savedData = sessionStorage.getItem('tabStates')
     if (savedData) {
       tabStates.value = JSON.parse(savedData)
-      console.log('从sessionStorage恢复会话数据')
+      console.log('从sessionStorage恢复基础会话数据')
       return true
     }
   } catch (error) {
