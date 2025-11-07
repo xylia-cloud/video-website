@@ -2,7 +2,7 @@
 import { ref, onMounted } from 'vue'
 import { useRoute } from 'vue-router'
 import { NEW_API_BASE_URL } from '@/utils/config'
-import { showToast } from 'vant'
+import { showToast, closeToast } from 'vant'
 import HeaderNav from '@/components/HeaderNav.vue'
 import { getUserInfo } from '@/api/fetch-api'
 
@@ -66,6 +66,12 @@ const isGlobalLoading = ref(false)
 
 // 防重复请求标记
 const isSecondaryCategoriesLoading = ref(false)
+
+// 搜索相关
+const searchKeyword = ref('')
+const isSearching = ref(false)
+const searchResults = ref<Game[]>([])
+const hasSearchResults = ref(false)
 
 // 进入游戏接口
 const enterGame = async (params: {
@@ -136,6 +142,124 @@ const enterGame = async (params: {
     throw error
   }
 }
+
+// 搜索游戏
+const searchGames = async (keyword: string) => {
+  if (!keyword.trim()) {
+    // 如果搜索关键词为空，清空搜索结果
+    searchResults.value = []
+    hasSearchResults.value = false
+    return
+  }
+
+  isSearching.value = true
+  // 显示搜索中的toast
+  showToast({
+    type: 'loading',
+    message: '搜索中...',
+    duration: 0, // 持续显示，直到手动关闭
+    forbidClick: true, // 禁止点击
+    loadingType: 'spinner',
+  })
+
+  try {
+    console.log('🔍 开始搜索游戏，关键词:', keyword)
+
+    // 构建查询参数 - 使用gettwoclass接口进行搜索
+    const queryParams = new URLSearchParams({
+      service: 'Caipiao.Gettwoclass',
+    })
+
+    // 构建GET请求参数
+    const searchParams = new URLSearchParams({
+      pid: topCategoryId.value,
+      oneclass_id: primaryCategoryId.value,
+      game_name: keyword.trim(),
+    })
+
+    // 发起GET请求（根据API示例使用GET方法）
+    const response = await fetch(
+      `${NEW_API_BASE_URL}/?${queryParams.toString()}&${searchParams.toString()}`,
+      {
+        method: 'GET',
+        headers: {
+          Accept: 'application/json',
+        },
+      },
+    )
+
+    if (!response.ok) {
+      throw new Error(`HTTP error! Status: ${response.status}`)
+    }
+
+    const result = await response.json()
+    console.log('🔍 搜索游戏结果:', result)
+
+    if (result && result.ret === 200 && result.data && result.data.code === 0 && result.data.info) {
+      // 处理搜索结果 - 兼容data为null的情况
+      let games: Game[] = []
+
+      if (result.data.info.data && Array.isArray(result.data.info.data)) {
+        games = result.data.info.data.map((item: Record<string, unknown>) => ({
+          id: Number(item.id) || 0,
+          name: String(item.name || '未命名游戏'),
+          imageUrl: String(item.icon || ''),
+          biaoshi: String(item.biaoshi || ''),
+          code: String(item.code || ''),
+          type: String(item.type || ''),
+        }))
+      }
+
+      searchResults.value = games
+      hasSearchResults.value = true
+
+      console.log('🔍 搜索到游戏数量:', games.length)
+
+      // 不需要显示toast，让UI自然显示无结果状态
+    } else {
+      console.error('搜索游戏失败:', result)
+      searchResults.value = []
+      hasSearchResults.value = false
+      showToast('搜索失败，请稍后重试')
+    }
+  } catch (error) {
+    console.error('搜索游戏请求错误:', error)
+    searchResults.value = []
+    hasSearchResults.value = false
+    showToast('搜索失败，请检查网络连接')
+  } finally {
+    isSearching.value = false
+    // 关闭搜索中的toast
+    closeToast()
+  }
+}
+
+// 处理搜索输入
+const handleSearchInput = () => {
+  const keyword = searchKeyword.value.trim()
+  if (keyword) {
+    // 防抖处理，延迟搜索
+    clearTimeout(searchTimeout)
+    searchTimeout = setTimeout(() => {
+      searchGames(keyword)
+    }, 500)
+  } else {
+    // 清空搜索结果
+    searchResults.value = []
+    hasSearchResults.value = false
+  }
+}
+
+// 清空搜索
+const clearSearch = () => {
+  searchKeyword.value = ''
+  searchResults.value = []
+  hasSearchResults.value = false
+  clearTimeout(searchTimeout)
+}
+
+// 搜索防抖定时器
+let searchTimeout: NodeJS.Timeout
 
 // 获取游戏列表数据（直接获取该分类下的所有游戏）
 const fetchGamesData = async (page: number = 1) => {
@@ -386,8 +510,59 @@ onMounted(() => {
 
     <!-- 内容区域 -->
     <div class="content">
+      <!-- 搜索框 -->
+      <div class="search-section">
+        <div class="search-input-container">
+          <van-icon name="search" class="search-icon" />
+          <input
+            v-model="searchKeyword"
+            type="text"
+            placeholder="搜索游戏名称"
+            class="search-input"
+            @input="handleSearchInput"
+            @keyup.enter="searchGames(searchKeyword)"
+          />
+          <van-icon v-if="searchKeyword" name="clear" class="clear-icon" @click="clearSearch" />
+        </div>
+      </div>
+
+      <!-- 搜索结果区域 -->
+      <div v-if="hasSearchResults" class="search-results-section">
+        <!-- 搜索结果 -->
+        <div v-if="searchResults.length > 0" class="search-results">
+          <div class="search-results-header">
+            <span class="results-title">搜索结果 ({{ searchResults.length }})</span>
+            <button class="clear-search-btn" @click="clearSearch">
+              <van-icon name="cross" size="14" />
+              清空
+            </button>
+          </div>
+
+          <div class="games-grid">
+            <div
+              class="game-item"
+              v-for="game in searchResults"
+              :key="game.id"
+              @click="handleGameClick(game)"
+            >
+              <div class="game-image">
+                <img v-if="game.imageUrl" :src="game.imageUrl" :alt="game.name" />
+              </div>
+              <div class="game-name">{{ game.name }}</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- 搜索无结果 -->
+        <div v-else class="no-search-results">
+          <van-icon name="search" size="48" color="#666" />
+          <div class="no-results-text">未找到相关游戏</div>
+          <div class="no-results-tip">请尝试其他关键词</div>
+        </div>
+      </div>
+
       <!-- 游戏列表加载状态 -->
-      <div v-if="isLoadingSecondaryCategories" class="secondary-loading">
+      <div v-if="isLoadingSecondaryCategories && !hasSearchResults" class="secondary-loading">
         <div class="custom-spinner"></div>
         <div class="loading-text">加载游戏中...</div>
       </div>
@@ -399,7 +574,7 @@ onMounted(() => {
       </div>
 
       <!-- 当前选中二级分类的游戏展示区域 -->
-      <div class="selected-secondary-games">
+      <div v-if="!hasSearchResults" class="selected-secondary-games">
         <div v-for="secondaryCategory in secondaryCategories" :key="secondaryCategory.id">
           <!-- 只显示展开的分类的游戏 -->
           <div v-if="secondaryCategory.expanded" class="games-section">
@@ -525,6 +700,113 @@ onMounted(() => {
 .content {
   padding: 15px;
   margin-top: 50px; /* 为固定定位的HeaderNav留出空间 */
+}
+
+/* 搜索区域 */
+.search-section {
+  margin-bottom: 20px;
+}
+
+.search-input-container {
+  position: relative;
+  display: flex;
+  align-items: center;
+  background-color: #2c2c2c;
+  border-radius: 25px;
+  padding: 0 15px;
+  height: 44px;
+}
+
+.search-icon {
+  color: #999;
+  margin-right: 10px;
+  font-size: 16px;
+}
+
+.search-input {
+  flex: 1;
+  background: transparent;
+  border: none;
+  outline: none;
+  color: #fff;
+  font-size: 14px;
+  height: 100%;
+}
+
+.search-input::placeholder {
+  color: #999;
+}
+
+.clear-icon {
+  color: #999;
+  margin-left: 10px;
+  font-size: 16px;
+  cursor: pointer;
+  padding: 4px;
+}
+
+.clear-icon:hover {
+  color: #ff9500;
+}
+
+/* 搜索结果区域 */
+.search-results-section {
+  margin-bottom: 20px;
+}
+
+.search-results-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 15px;
+  padding: 0 5px;
+}
+
+.results-title {
+  color: #ff9500;
+  font-size: 16px;
+  font-weight: bold;
+}
+
+.clear-search-btn {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  background: rgba(255, 149, 0, 0.1);
+  border: 1px solid rgba(255, 149, 0, 0.3);
+  border-radius: 15px;
+  padding: 4px 8px;
+  color: #ff9500;
+  font-size: 12px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.clear-search-btn:hover {
+  background: rgba(255, 149, 0, 0.2);
+  border-color: rgba(255, 149, 0, 0.5);
+}
+
+.no-search-results {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 60px 20px;
+  text-align: center;
+}
+
+.no-results-text {
+  margin-top: 15px;
+  color: #999;
+  font-size: 16px;
+  font-weight: 500;
+}
+
+.no-results-tip {
+  margin-top: 8px;
+  color: #666;
+  font-size: 14px;
 }
 
 /* 全屏Loading */

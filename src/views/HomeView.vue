@@ -313,6 +313,9 @@ const switchType = (typeId: number) => {
     console.log(
       `缓存状态恢复完成: 页码=${currentPage.value}, 总页数=${totalPages.value}, 数据长度=${videoData.value.length}, 滚动位置=${targetTabState.scrollPosition}`,
     )
+
+    // 🔥 恢复缓存数据后立即关闭全屏loading
+    isFullScreenLoading.value = false
   } else {
     // 重置状态
     currentPage.value = 1
@@ -337,13 +340,21 @@ const switchType = (typeId: number) => {
     } else {
       // 如果有缓存数据，仍然需要获取广告数据以备后续使用
       fetchListAds()
+      // 🔥 首页标签有缓存数据时也要关闭全屏loading
+      isFullScreenLoading.value = false
     }
   } else {
     // 其他标签也需要获取广告数据
     fetchListAds()
-    // 其他标签，如果没有缓存数据，等待滚动触发懒加载
+    // 其他标签，如果没有缓存数据，立即加载第一页数据
     if (!tabStates.value[typeId]) {
       isFirstLoad.value = true
+      // 🔥 立即加载数据，不要等待滚动触发
+      console.log(`非首页标签${typeId}没有缓存，立即加载第一页数据`)
+      fetchRecommendVideosData(1, typeId)
+    } else {
+      // 如果有缓存数据，关闭全屏loading
+      isFullScreenLoading.value = false
     }
 
     // 添加滚动监听（如果还没有添加）
