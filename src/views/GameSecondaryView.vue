@@ -283,8 +283,8 @@ const fetchGamesData = async (page: number = 1) => {
     const formData = new URLSearchParams({
       pid: topCategoryId.value,
       oneclass_id: primaryCategoryId.value,
-      page: page.toString(),
-      limit: '12',
+      p: page.toString(),
+      limit: '18',
     })
 
     // 发起POST请求
