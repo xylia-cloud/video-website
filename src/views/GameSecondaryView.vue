@@ -1033,7 +1033,7 @@ onMounted(() => {
 
 .games-grid {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
+  grid-template-columns: repeat(4, 1fr);
   gap: 10px;
   margin-bottom: 15px;
 }
@@ -1043,26 +1043,15 @@ onMounted(() => {
   flex-direction: column;
   align-items: center;
   gap: 8px;
-  padding: 10px;
-  border-radius: 8px;
-  background: rgba(255, 255, 255, 0.05);
-  border: 1px solid rgba(255, 255, 255, 0.1);
   cursor: pointer;
   transition: all 0.3s ease;
 }
 
-.game-item:hover {
-  background: rgba(255, 255, 255, 0.1);
-  border-color: rgba(255, 149, 0, 0.5);
-  transform: translateY(-2px);
-}
-
 .game-image {
-  width: 60px;
-  height: 60px;
+  width: 100%;
+  aspect-ratio: 1;
   border-radius: 8px;
   overflow: hidden;
-  background: linear-gradient(135deg, #333, #555);
 }
 
 .game-image img {
