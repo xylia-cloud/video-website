@@ -284,7 +284,7 @@ const fetchGamesData = async (page: number = 1) => {
       pid: topCategoryId.value,
       oneclass_id: primaryCategoryId.value,
       p: page.toString(),
-      limit: '18',
+      limit: '100',
     })
 
     // 发起POST请求
@@ -600,12 +600,12 @@ onMounted(() => {
                 </div>
               </div>
 
-              <!-- 精简分页控件 -->
+              <!-- 精简分页控件 - 已隐藏 -->
+              <!--
               <div
                 v-if="secondaryCategory.pagination && secondaryCategory.pagination.totalPages > 1"
                 class="pagination-compact"
               >
-                <!-- 上一页 -->
                 <button
                   class="page-btn-compact"
                   :disabled="secondaryCategory.pagination.currentPage <= 1"
@@ -619,14 +619,12 @@ onMounted(() => {
                   <van-icon name="arrow-left" size="14" />
                 </button>
 
-                <!-- 当前页信息 -->
                 <span class="page-info-compact">
                   {{ secondaryCategory.pagination.currentPage }}/{{
                     secondaryCategory.pagination.totalPages
                   }}
                 </span>
 
-                <!-- 下一页 -->
                 <button
                   class="page-btn-compact"
                   :disabled="
@@ -643,7 +641,6 @@ onMounted(() => {
                   <van-icon name="arrow" size="14" />
                 </button>
 
-                <!-- 跳转输入框 -->
                 <div class="page-jump">
                   <span class="jump-label">跳转</span>
                   <input
@@ -659,9 +656,9 @@ onMounted(() => {
                   <span class="jump-total">页</span>
                 </div>
 
-                <!-- 总数信息 -->
                 <span class="total-info">共{{ secondaryCategory.pagination.totalCount }}项</span>
               </div>
+              -->
             </div>
 
             <!-- 无游戏状态 -->
