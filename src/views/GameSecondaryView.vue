@@ -284,7 +284,7 @@ const fetchGamesData = async (page: number = 1) => {
       pid: topCategoryId.value,
       oneclass_id: primaryCategoryId.value,
       p: page.toString(),
-      limit: '100',
+      limit: '400',
     })
 
     // 发起POST请求
