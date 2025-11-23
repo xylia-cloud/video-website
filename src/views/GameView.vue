@@ -2,7 +2,7 @@
 import { ref, onMounted } from 'vue'
 import { NEW_API_BASE_URL } from '@/utils/config'
 import { getUserInfo, isLoggedIn, fetchNotices, type NoticeGroup } from '@/api/fetch-api'
-import { useRouter } from 'vue-router'
+import { useRouter, useRoute } from 'vue-router'
 import { showToast } from 'vant'
 
 // 顶级游戏分类接口
@@ -195,8 +195,16 @@ const fetchTopCategories = async () => {
 
       topCategories.value = sortedCategories
 
-      // 默认选中第一个分类
-      if (topCategories.value.length > 0) {
+      // 检查是否有从二级页面返回的顶级分类ID
+      const returnTopCategoryId = route.query.returnTopCategoryId as string
+      
+      if (returnTopCategoryId && sortedCategories.find(cat => cat.id === returnTopCategoryId)) {
+        // 如果有返回的顶级分类ID且该分类存在，使用它
+        selectedTopCategory.value = returnTopCategoryId
+        console.log('恢复之前选中的顶级分类:', returnTopCategoryId)
+        fetchPrimaryCategories(returnTopCategoryId)
+      } else if (topCategories.value.length > 0) {
+        // 否则默认选中第一个分类
         selectedTopCategory.value = String(topCategories.value[0].id)
         // 加载第一个顶级分类的一级分类列表
         fetchPrimaryCategories(selectedTopCategory.value)
@@ -523,6 +531,7 @@ const fetchGamesForSubCategory = async (
 }
 
 const router = useRouter()
+const route = useRoute()
 
 // 处理顶级分类点击
 const handleTopCategoryClick = (categoryId: string) => {
@@ -547,7 +556,7 @@ const handleTopCategoryClick = (categoryId: string) => {
 const handlePrimaryCategoryClick = (primaryCategory: SubGameCategory) => {
   console.log('点击一级分类:', primaryCategory)
 
-  // 跳转到二级分类页面，传递一级分类信息
+  // 跳转到二级分类页面，传递一级分类信息和当前选中的顶级分类ID
   router.push({
     name: 'game-secondary',
     params: {
@@ -558,6 +567,8 @@ const handlePrimaryCategoryClick = (primaryCategory: SubGameCategory) => {
       topCategoryName:
         topCategories.value.find((cat) => cat.id === selectedTopCategory.value)?.name || '',
       primaryCategoryName: primaryCategory.name,
+      // 添加返回参数，用于返回时恢复顶级分类选择
+      returnTopCategoryId: selectedTopCategory.value,
     },
   })
 }
@@ -1476,15 +1487,17 @@ onMounted(() => {
   cursor: pointer;
   flex: 0 1 auto;
   min-width: 0;
-  transition: opacity 0.3s ease;
+  opacity: 0.4;
+  transition: all 0.3s ease;
 }
 
 .top-category-horizontal-item:hover {
-  opacity: 0.8;
+  opacity: 0.7;
 }
 
 .top-category-horizontal-item.active {
   opacity: 1;
+  transform: scale(1.05);
 }
 
 .top-category-horizontal-icon {

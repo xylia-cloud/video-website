@@ -4,7 +4,7 @@ import { useRouter } from 'vue-router';
 const router = useRouter();
 
 // 组件属性
-defineProps({
+const props = defineProps({
   title: {
     type: String,
     required: true
@@ -16,15 +16,25 @@ defineProps({
   rightText: {
     type: String,
     default: ''
+  },
+  customBack: {
+    type: Boolean,
+    default: false
   }
 });
 
 // 事件
-const emit = defineEmits(['rightClick']);
+const emit = defineEmits(['rightClick', 'back']);
 
 // 返回上一页
 const goBack = () => {
-  router.back();
+  if (props.customBack) {
+    // 如果启用了自定义返回，触发 back 事件让父组件处理
+    emit('back');
+  } else {
+    // 否则执行默认返回
+    router.back();
+  }
 };
 
 // 右侧按钮点击

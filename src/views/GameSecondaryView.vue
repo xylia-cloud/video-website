@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref, onMounted, onUnmounted } from 'vue'
-import { useRoute } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import { NEW_API_BASE_URL } from '@/utils/config'
 import { showToast, closeToast } from 'vant'
 import HeaderNav from '@/components/HeaderNav.vue'
@@ -8,12 +8,14 @@ import { getUserInfo } from '@/api/fetch-api'
 
 // 路由相关
 const route = useRoute()
+const router = useRouter()
 
 // 从路由参数获取信息
 const topCategoryId = ref(route.params.topCategoryId as string)
 const primaryCategoryId = ref(route.params.primaryCategoryId as string)
 const topCategoryName = ref((route.query.topCategoryName as string) || '')
 const primaryCategoryName = ref((route.query.primaryCategoryName as string) || '')
+const returnTopCategoryId = ref((route.query.returnTopCategoryId as string) || '')
 
 // 二级分类接口
 interface SecondaryCategory {
@@ -569,12 +571,23 @@ onMounted(() => {
 onUnmounted(() => {
   window.removeEventListener('scroll', handleScroll)
 })
+
+// 自定义返回逻辑
+const handleBack = () => {
+  // 返回到游戏页面，并传递顶级分类ID
+  router.push({
+    name: 'game',
+    query: {
+      returnTopCategoryId: returnTopCategoryId.value || topCategoryId.value,
+    },
+  })
+}
 </script>
 
 <template>
   <div class="game-secondary">
     <!-- 头部导航 -->
-    <HeaderNav :title="primaryCategoryName" />
+    <HeaderNav :title="primaryCategoryName" :custom-back="true" @back="handleBack" />
 
     <!-- 内容区域 -->
     <div class="content">
