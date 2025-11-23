@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, onUnmounted } from 'vue'
 import { useRoute } from 'vue-router'
 import { NEW_API_BASE_URL } from '@/utils/config'
 import { showToast, closeToast } from 'vant'
@@ -57,15 +57,17 @@ const secondaryCategoriesPagination = ref({
   currentPage: 1,
   totalCount: 0,
   totalPages: 0,
-  pageSize: 12,
+  pageSize: 20,
 })
-const secondaryCategoriesJumpPage = ref(1)
-
-// 全屏加载状态
-const isGlobalLoading = ref(false)
 
 // 防重复请求标记
 const isSecondaryCategoriesLoading = ref(false)
+
+// 是否还有更多数据
+const hasMoreData = ref(true)
+
+// 是否正在加载更多
+const isLoadingMore = ref(false)
 
 // 搜索相关
 const searchKeyword = ref('')
@@ -262,15 +264,27 @@ const clearSearch = () => {
 let searchTimeout: NodeJS.Timeout
 
 // 获取游戏列表数据（直接获取该分类下的所有游戏）
-const fetchGamesData = async (page: number = 1) => {
+const fetchGamesData = async (page: number = 1, isLoadMore: boolean = false) => {
   if (isSecondaryCategoriesLoading.value) {
     console.log('🔄 游戏数据正在加载中，跳过重复请求')
     return
   }
 
+  // 如果是加载更多，检查是否还有更多数据
+  if (isLoadMore && !hasMoreData.value) {
+    console.log('📋 已加载全部数据')
+    return
+  }
+
   isSecondaryCategoriesLoading.value = true
-  isGlobalLoading.value = true
-  isLoadingSecondaryCategories.value = true
+
+  // 首次加载和加载更多都显示相应的loading状态
+  if (!isLoadMore) {
+    isLoadingSecondaryCategories.value = true
+  } else {
+    isLoadingMore.value = true
+  }
+
   hasSecondaryCategoriesError.value = false
 
   try {
@@ -279,12 +293,12 @@ const fetchGamesData = async (page: number = 1) => {
       service: 'caipiao.gettwoclass',
     })
 
-    // 构建POST请求体参数
+    // 构建POST请求体参数 - limit改为20
     const formData = new URLSearchParams({
       pid: topCategoryId.value,
       oneclass_id: primaryCategoryId.value,
       p: page.toString(),
-      limit: '400',
+      limit: '20',
     })
 
     // 发起POST请求
@@ -322,30 +336,45 @@ const fetchGamesData = async (page: number = 1) => {
         type: String(item.type || ''),
       }))
 
-      // 创建一个虚拟的分类来包含所有游戏
-      const gameCategory = {
-        id: 'all-games',
-        name: '全部游戏',
-        icon: '',
-        primary_id: primaryCategoryId.value,
-        ismy: 0,
-        expanded: true,
-        games: games,
-        loading: false,
-        pagination: {
-          currentPage: page,
-          totalCount: parseInt(result.data.info.total || '0'),
-          totalPages: Math.ceil(parseInt(result.data.info.total || '0') / 12),
-          pageSize: 12,
-        },
-      }
-
-      secondaryCategories.value = [gameCategory]
-
       // 从后端响应中获取分页信息
       const totalCount = parseInt(result.data.info.total || '0')
-      const pageSize = 12
+      const pageSize = 20
       const totalPages = Math.ceil(totalCount / pageSize)
+
+      // 判断是否还有更多数据
+      hasMoreData.value = page < totalPages
+
+      if (isLoadMore && secondaryCategories.value.length > 0) {
+        // 加载更多：累加数据
+        const existingCategory = secondaryCategories.value[0]
+        existingCategory.games = [...(existingCategory.games || []), ...games]
+        existingCategory.pagination = {
+          currentPage: page,
+          totalCount,
+          totalPages,
+          pageSize,
+        }
+      } else {
+        // 首次加载：创建新的分类
+        const gameCategory = {
+          id: 'all-games',
+          name: '全部游戏',
+          icon: '',
+          primary_id: primaryCategoryId.value,
+          ismy: 0,
+          expanded: true,
+          games: games,
+          loading: false,
+          pagination: {
+            currentPage: page,
+            totalCount,
+            totalPages,
+            pageSize,
+          },
+        }
+
+        secondaryCategories.value = [gameCategory]
+      }
 
       // 更新分页信息
       secondaryCategoriesPagination.value = {
@@ -357,16 +386,25 @@ const fetchGamesData = async (page: number = 1) => {
       console.log('处理后的游戏数据:', games)
     } else {
       console.log(`没有获取到分类 ${primaryCategoryId.value} 的游戏数据`)
-      secondaryCategories.value = []
+      if (!isLoadMore) {
+        secondaryCategories.value = []
+      }
     }
   } catch (error) {
     console.error('获取游戏数据失败:', error)
     hasSecondaryCategoriesError.value = true
-    secondaryCategories.value = []
+    if (!isLoadMore) {
+      secondaryCategories.value = []
+    }
   } finally {
     isSecondaryCategoriesLoading.value = false
-    isGlobalLoading.value = false
     isLoadingSecondaryCategories.value = false
+    isLoadingMore.value = false
+
+    // 延迟检查是否需要继续加载（等待DOM更新）
+    setTimeout(() => {
+      checkAndLoadMore()
+    }, 100)
   }
 }
 
@@ -441,44 +479,72 @@ const handleGameClick = async (game: Game) => {
   }
 }
 
-// 处理分页点击
-const handlePageChange = (secondaryCategory: SecondaryCategory, page: number) => {
-  if (page < 1 || page > (secondaryCategory.pagination?.totalPages || 1)) return
-  if (page === secondaryCategory.pagination?.currentPage) return
-
-  fetchGamesData(page)
-}
-
-// 处理跳转页码
-const handleJumpPage = (secondaryCategory: SecondaryCategory) => {
-  const jumpPage = secondaryCategory.jumpPage
-  if (!jumpPage || !secondaryCategory.pagination) return
-
-  const targetPage = Number(jumpPage)
-  if (targetPage >= 1 && targetPage <= secondaryCategory.pagination.totalPages) {
-    handlePageChange(secondaryCategory, targetPage)
+// 滚动加载更多
+const handleScroll = () => {
+  // 如果正在加载或没有更多数据，则不处理
+  if (isLoadingMore.value || !hasMoreData.value || isSecondaryCategoriesLoading.value) {
+    console.log('📋 滚动加载被跳过:', {
+      isLoadingMore: isLoadingMore.value,
+      hasMoreData: hasMoreData.value,
+      isLoading: isSecondaryCategoriesLoading.value,
+    })
+    return
   }
 
-  secondaryCategory.jumpPage = undefined
+  // 如果正在搜索，不触发滚动加载
+  if (hasSearchResults.value) {
+    return
+  }
+
+  // 获取滚动信息
+  const scrollTop = window.pageYOffset || document.documentElement.scrollTop
+  const windowHeight = window.innerHeight
+  const documentHeight = document.documentElement.scrollHeight
+
+  // 距离底部200px时触发加载
+  const distanceToBottom = documentHeight - (scrollTop + windowHeight)
+
+  console.log('📋 滚动信息:', {
+    scrollTop,
+    windowHeight,
+    documentHeight,
+    distanceToBottom,
+  })
+
+  if (distanceToBottom < 200) {
+    console.log('📋 触发滚动加载更多')
+    const nextPage = secondaryCategoriesPagination.value.currentPage + 1
+    fetchGamesData(nextPage, true)
+  }
 }
 
-// 处理游戏列表分页点击
-const handleSecondaryCategoriesPageChange = (page: number) => {
-  if (page < 1 || page > secondaryCategoriesPagination.value.totalPages) return
-  if (page === secondaryCategoriesPagination.value.currentPage) return
+// 检查是否需要加载更多（页面内容不够高）
+const checkAndLoadMore = () => {
+  // 如果正在加载或没有更多数据，则不处理
+  if (isLoadingMore.value || !hasMoreData.value || isSecondaryCategoriesLoading.value) {
+    return
+  }
 
-  fetchGamesData(page)
-}
+  // 如果正在搜索，不触发
+  if (hasSearchResults.value) {
+    return
+  }
 
-// 处理二级分类跳转页面
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
-const handleSecondaryCategoriesJumpPage = () => {
-  const jumpPage = secondaryCategoriesJumpPage.value
-  if (jumpPage && jumpPage >= 1 && jumpPage <= secondaryCategoriesPagination.value.totalPages) {
-    handleSecondaryCategoriesPageChange(jumpPage)
-  } else {
-    // 重置为当前页
-    secondaryCategoriesJumpPage.value = secondaryCategoriesPagination.value.currentPage
+  // 获取页面高度信息
+  const windowHeight = window.innerHeight
+  const documentHeight = document.documentElement.scrollHeight
+
+  console.log('📋 检查页面高度:', {
+    windowHeight,
+    documentHeight,
+    hasScrollbar: documentHeight > windowHeight,
+  })
+
+  // 如果页面高度小于等于窗口高度，说明没有滚动条，自动加载更多
+  if (documentHeight <= windowHeight + 10) {
+    console.log('📋 页面内容不够，自动加载更多')
+    const nextPage = secondaryCategoriesPagination.value.currentPage + 1
+    fetchGamesData(nextPage, true)
   }
 }
 
@@ -494,17 +560,19 @@ onMounted(() => {
   if (primaryCategoryId.value) {
     fetchGamesData(1)
   }
+
+  // 添加滚动事件监听
+  window.addEventListener('scroll', handleScroll)
+})
+
+// 组件卸载时移除滚动事件监听
+onUnmounted(() => {
+  window.removeEventListener('scroll', handleScroll)
 })
 </script>
 
 <template>
   <div class="game-secondary">
-    <!-- 全屏Loading -->
-    <div v-if="isGlobalLoading" class="fullscreen-loading">
-      <div class="custom-spinner"></div>
-      <div class="loading-text">加载中...</div>
-    </div>
-
     <!-- 头部导航 -->
     <HeaderNav :title="primaryCategoryName" />
 
@@ -680,6 +748,17 @@ onMounted(() => {
       >
         <div class="no-selected-text">该分类下暂无游戏</div>
       </div>
+
+      <!-- 加载更多状态 -->
+      <div v-if="!hasSearchResults && secondaryCategories.length > 0" class="load-more-status">
+        <div v-if="isLoadingMore" class="loading-more">
+          <div class="small-spinner"></div>
+          <span>加载中...</span>
+        </div>
+        <div v-else-if="!hasMoreData" class="no-more-data">
+          <span>已加载全部游戏</span>
+        </div>
+      </div>
     </div>
   </div>
 </template>
@@ -806,46 +885,6 @@ onMounted(() => {
   font-size: 14px;
 }
 
-/* 全屏Loading */
-.fullscreen-loading {
-  position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background-color: rgba(17, 17, 17, 0.9);
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  z-index: 9999;
-}
-
-.custom-spinner {
-  width: 40px;
-  height: 40px;
-  border: 3px solid rgba(255, 149, 0, 0.3);
-  border-top: 3px solid #ff9500;
-  border-radius: 50%;
-  animation: spin 1s linear infinite;
-}
-
-@keyframes spin {
-  0% {
-    transform: rotate(0deg);
-  }
-  100% {
-    transform: rotate(360deg);
-  }
-}
-
-.loading-text {
-  margin-top: 15px;
-  color: #ff9500;
-  font-size: 16px;
-  font-weight: 500;
-}
-
 /* 错误状态 */
 .error-state {
   display: flex;
@@ -935,6 +974,30 @@ onMounted(() => {
   justify-content: center;
   padding: 40px 20px;
   gap: 15px;
+}
+
+.secondary-loading .custom-spinner {
+  width: 40px;
+  height: 40px;
+  border: 3px solid rgba(255, 149, 0, 0.3);
+  border-top: 3px solid #ff9500;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+}
+
+.secondary-loading .loading-text {
+  color: #ff9500;
+  font-size: 16px;
+  font-weight: 500;
+}
+
+@keyframes spin {
+  0% {
+    transform: rotate(0deg);
+  }
+  100% {
+    transform: rotate(360deg);
+  }
 }
 
 /* 分页控件 */
@@ -1028,6 +1091,21 @@ onMounted(() => {
   margin: 10px 0;
 }
 
+.games-loading .custom-spinner {
+  width: 40px;
+  height: 40px;
+  border: 3px solid rgba(255, 149, 0, 0.3);
+  border-top: 3px solid #ff9500;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+}
+
+.games-loading .loading-text {
+  color: #ff9500;
+  font-size: 16px;
+  font-weight: 500;
+}
+
 .games-grid {
   display: grid;
   grid-template-columns: repeat(4, 1fr);
@@ -1093,5 +1171,37 @@ onMounted(() => {
 .no-selected-text {
   font-size: 14px;
   color: #999;
+}
+
+/* 加载更多状态 */
+.load-more-status {
+  padding: 20px;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+.loading-more {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: #ff9500;
+  font-size: 14px;
+}
+
+.small-spinner {
+  width: 20px;
+  height: 20px;
+  border: 2px solid rgba(255, 149, 0, 0.3);
+  border-top: 2px solid #ff9500;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+}
+
+.no-more-data {
+  color: #666;
+  font-size: 14px;
+  text-align: center;
+  padding: 10px 0;
 }
 </style>
