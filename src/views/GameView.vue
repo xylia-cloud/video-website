@@ -4,6 +4,7 @@ import { NEW_API_BASE_URL } from '@/utils/config'
 import { getUserInfo, isLoggedIn, fetchNotices, type NoticeGroup } from '@/api/fetch-api'
 import { useRouter, useRoute } from 'vue-router'
 import { showToast } from 'vant'
+import lotteryIcon from '@/assets/img/icon-game-caipiao.png'
 
 // 顶级游戏分类接口
 interface TopGameCategory {
@@ -37,6 +38,7 @@ interface SubGameCategory {
   loading?: boolean // 是否正在加载游戏
   pagination?: PaginationInfo // 分页信息
   jumpPage?: number // 跳转页码输入值
+  biaoshi?: string // 彩票标识
 }
 
 // 游戏数据
@@ -193,12 +195,22 @@ const fetchTopCategories = async () => {
           return paixuA - paixuB
         })
 
+      // 手动插入彩票分类到顶级分类列表的最前面
+      const lotteryCategory: TopGameCategory = {
+        id: '0',
+        name: '彩票',
+        icon: lotteryIcon,
+        status: '1',
+        paixu: '0',
+      }
+      sortedCategories.unshift(lotteryCategory)
+
       topCategories.value = sortedCategories
 
       // 检查是否有从二级页面返回的顶级分类ID
       const returnTopCategoryId = route.query.returnTopCategoryId as string
-      
-      if (returnTopCategoryId && sortedCategories.find(cat => cat.id === returnTopCategoryId)) {
+
+      if (returnTopCategoryId && sortedCategories.find((cat) => cat.id === returnTopCategoryId)) {
         // 如果有返回的顶级分类ID且该分类存在，使用它
         selectedTopCategory.value = returnTopCategoryId
         console.log('恢复之前选中的顶级分类:', returnTopCategoryId)
@@ -282,6 +294,7 @@ const fetchPrimaryCategories = async (topCategoryId: string, page: number = 1) =
         expanded: false, // 默认不展开
         games: [], // 初始化游戏列表
         loading: false, // 初始化加载状态
+        biaoshi: String(item.biaoshi || ''), // 彩票标识
         pagination: {
           // 初始化分页信息
           currentPage: 1,
@@ -556,21 +569,36 @@ const handleTopCategoryClick = (categoryId: string) => {
 const handlePrimaryCategoryClick = (primaryCategory: SubGameCategory) => {
   console.log('点击一级分类:', primaryCategory)
 
-  // 跳转到二级分类页面，传递一级分类信息和当前选中的顶级分类ID
-  router.push({
-    name: 'game-secondary',
-    params: {
-      topCategoryId: selectedTopCategory.value,
-      primaryCategoryId: primaryCategory.id,
-    },
-    query: {
-      topCategoryName:
-        topCategories.value.find((cat) => cat.id === selectedTopCategory.value)?.name || '',
-      primaryCategoryName: primaryCategory.name,
-      // 添加返回参数，用于返回时恢复顶级分类选择
-      returnTopCategoryId: selectedTopCategory.value,
-    },
-  })
+  // 如果是彩票分类（顶级分类ID为'0'），跳转到彩票详情页
+  if (selectedTopCategory.value === '0') {
+    router.push({
+      name: 'lottery-detail',
+      params: {
+        primaryCategoryId: primaryCategory.id,
+      },
+      query: {
+        primaryCategoryName: primaryCategory.name,
+        id: primaryCategory.id, // 传递id参数
+        biaoshi: primaryCategory.biaoshi || '', // 传递biaoshi参数
+      },
+    })
+  } else {
+    // 其他分类跳转到二级分类页面，传递一级分类信息和当前选中的顶级分类ID
+    router.push({
+      name: 'game-secondary',
+      params: {
+        topCategoryId: selectedTopCategory.value,
+        primaryCategoryId: primaryCategory.id,
+      },
+      query: {
+        topCategoryName:
+          topCategories.value.find((cat) => cat.id === selectedTopCategory.value)?.name || '',
+        primaryCategoryName: primaryCategory.name,
+        // 添加返回参数，用于返回时恢复顶级分类选择
+        returnTopCategoryId: selectedTopCategory.value,
+      },
+    })
+  }
 }
 
 // 处理分页点击（保留用于游戏分页功能）

@@ -39,6 +39,7 @@ interface Game {
   biaoshi: string
   code?: string
   type?: string
+  iscollect?: number // 是否已收藏：1-已收藏，0-未收藏
 }
 
 // 分页信息接口
@@ -76,6 +77,159 @@ const searchKeyword = ref('')
 const isSearching = ref(false)
 const searchResults = ref<Game[]>([])
 const hasSearchResults = ref(false)
+
+// 选项卡相关
+const activeTab = ref<'all' | 'favorite'>('all')
+
+// 收藏列表相关
+const favoriteGames = ref<Game[]>([])
+const isLoadingFavorites = ref(false)
+const hasFavoritesError = ref(false)
+
+// 获取收藏游戏列表
+const fetchFavoriteGames = async () => {
+  isLoadingFavorites.value = true
+  hasFavoritesError.value = false
+
+  try {
+    // 检查用户登录状态
+    const userInfo = getUserInfo()
+    if (!userInfo || !userInfo.token) {
+      showToast('请先登录')
+      isLoadingFavorites.value = false
+      return
+    }
+
+    const uid = userInfo.user_id || userInfo.id
+
+    // 构建查询参数
+    const queryParams = new URLSearchParams({
+      service: 'Caipiao.Collect',
+      lang: 'zh',
+      uid: String(uid),
+      token: userInfo.token,
+    })
+
+    // 发起GET请求
+    const response = await fetch(`${NEW_API_BASE_URL}/?${queryParams.toString()}`, {
+      method: 'GET',
+      headers: {
+        Accept: 'application/json',
+      },
+    })
+
+    if (!response.ok) {
+      throw new Error(`HTTP error! Status: ${response.status}`)
+    }
+
+    const result = await response.json()
+    console.log('获取收藏游戏列表:', result)
+
+    if (result && result.ret === 200 && result.data && result.data.code === 0) {
+      // 处理收藏游戏数据
+      const games = result.data.info?.data || result.data.info || []
+
+      if (Array.isArray(games)) {
+        favoriteGames.value = games.map((item: Record<string, unknown>) => ({
+          id: Number(item.id) || 0,
+          name: String(item.name || '未命名游戏'),
+          imageUrl: String(item.icon || ''),
+          biaoshi: String(item.biaoshi || ''),
+          code: String(item.code || ''),
+          type: String(item.type || ''),
+          iscollect: 1, // 收藏列表中的游戏都是已收藏状态
+        }))
+      } else {
+        favoriteGames.value = []
+      }
+    } else {
+      favoriteGames.value = []
+    }
+  } catch (error) {
+    console.error('获取收藏游戏列表失败:', error)
+    hasFavoritesError.value = true
+    favoriteGames.value = []
+  } finally {
+    isLoadingFavorites.value = false
+  }
+}
+
+// 收藏/取消收藏游戏
+const toggleFavoriteGame = async (game: Game, event: Event, isFavorited: boolean = false) => {
+  // 阻止事件冒泡，避免触发游戏点击
+  event.stopPropagation()
+
+  try {
+    // 检查用户登录状态
+    const userInfo = getUserInfo()
+    if (!userInfo || !userInfo.token) {
+      showToast('请先登录')
+      return
+    }
+
+    const uid = userInfo.user_id || userInfo.id
+
+    // 根据当前状态决定操作类型
+    // isFavorited = true（在收藏列表中）: type = 0 (取消收藏)
+    // isFavorited = false（在全部列表中）: type = 1 (添加收藏)
+    const actionType = isFavorited ? '0' : '1'
+
+    // 构建查询参数
+    const queryParams = new URLSearchParams({
+      service: 'Caipiao.Gamecollect',
+      lang: 'zh',
+      type: actionType,
+      uid: String(uid),
+      token: userInfo.token,
+      game_id: String(game.id),
+    })
+
+    console.log('收藏操作:', isFavorited ? '取消收藏' : '添加收藏', 'type:', actionType)
+
+    // 发起POST请求
+    const response = await fetch(`${NEW_API_BASE_URL}/?${queryParams.toString()}`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/x-www-form-urlencoded',
+        Accept: 'application/json',
+      },
+    })
+
+    if (!response.ok) {
+      throw new Error(`HTTP error! Status: ${response.status}`)
+    }
+
+    const result = await response.json()
+    console.log('收藏游戏结果:', result)
+
+    if (result && result.ret === 200 && result.data && result.data.code === 0) {
+      showToast(result.data.msg || '操作成功')
+
+      // 更新游戏的收藏状态
+      game.iscollect = isFavorited ? 0 : 1
+
+      // 如果当前在收藏选项卡，刷新收藏列表
+      if (activeTab.value === 'favorite') {
+        fetchFavoriteGames()
+      }
+    } else {
+      showToast(result?.data?.msg || '操作失败')
+    }
+  } catch (error) {
+    console.error('收藏游戏失败:', error)
+    showToast('操作失败，请稍后重试')
+  }
+}
+
+// 切换选项卡
+const handleTabChange = (tab: 'all' | 'favorite') => {
+  activeTab.value = tab
+
+  if (tab === 'favorite') {
+    // 切换到收藏选项卡时，获取收藏列表
+    fetchFavoriteGames()
+  }
+}
 
 // 进入游戏接口
 const enterGame = async (params: {
@@ -169,17 +323,27 @@ const searchGames = async (keyword: string) => {
   try {
     console.log('🔍 开始搜索游戏，关键词:', keyword)
 
+    // 获取用户信息
+    const userInfo = getUserInfo()
+    const uid =
+      userInfo && (userInfo.user_id || userInfo.id) ? String(userInfo.user_id || userInfo.id) : '0'
+    const token = userInfo?.token || ''
+
     // 构建查询参数 - 使用gettwoclass接口进行搜索
     const queryParams = new URLSearchParams({
       service: 'Caipiao.Gettwoclass',
     })
 
-    // 构建GET请求参数
+    // 构建GET请求参数，添加uid和token
     const searchParams = new URLSearchParams({
       pid: topCategoryId.value,
       oneclass_id: primaryCategoryId.value,
       game_name: keyword.trim(),
+      uid: uid,
+      token: token,
     })
+
+    console.log('搜索游戏参数:', { uid, token, keyword })
 
     // 发起GET请求（根据API示例使用GET方法）
     const response = await fetch(
@@ -211,6 +375,7 @@ const searchGames = async (keyword: string) => {
           biaoshi: String(item.biaoshi || ''),
           code: String(item.code || ''),
           type: String(item.type || ''),
+          iscollect: Number(item.iscollect) || 0, // 收藏状态
         }))
       }
 
@@ -290,18 +455,28 @@ const fetchGamesData = async (page: number = 1, isLoadMore: boolean = false) => 
   hasSecondaryCategoriesError.value = false
 
   try {
+    // 获取用户信息
+    const userInfo = getUserInfo()
+    const uid =
+      userInfo && (userInfo.user_id || userInfo.id) ? String(userInfo.user_id || userInfo.id) : '0'
+    const token = userInfo?.token || ''
+
     // 构建查询参数 - 使用gettwoclass获取游戏列表
     const queryParams = new URLSearchParams({
       service: 'caipiao.gettwoclass',
     })
 
-    // 构建POST请求体参数 - limit改为20
+    // 构建POST请求体参数 - limit改为20，添加uid和token
     const formData = new URLSearchParams({
       pid: topCategoryId.value,
       oneclass_id: primaryCategoryId.value,
       p: page.toString(),
       limit: '20',
+      uid: uid,
+      token: token,
     })
+
+    console.log('获取游戏列表参数:', { uid, token, page })
 
     // 发起POST请求
     const response = await fetch(`${NEW_API_BASE_URL}/?${queryParams.toString()}`, {
@@ -336,6 +511,7 @@ const fetchGamesData = async (page: number = 1, isLoadMore: boolean = false) => 
         biaoshi: String(item.biaoshi || ''),
         code: String(item.code || ''),
         type: String(item.type || ''),
+        iscollect: Number(item.iscollect) || 0, // 收藏状态
       }))
 
       // 从后端响应中获取分页信息
@@ -591,6 +767,26 @@ const handleBack = () => {
 
     <!-- 内容区域 -->
     <div class="content">
+      <!-- 选项卡 -->
+      <div class="tabs-section">
+        <div
+          class="tab-item"
+          :class="{ active: activeTab === 'all' }"
+          @click="handleTabChange('all')"
+        >
+          <span>全部</span>
+          <div v-if="activeTab === 'all'" class="tab-indicator"></div>
+        </div>
+        <div
+          class="tab-item"
+          :class="{ active: activeTab === 'favorite' }"
+          @click="handleTabChange('favorite')"
+        >
+          <span>收藏</span>
+          <div v-if="activeTab === 'favorite'" class="tab-indicator"></div>
+        </div>
+      </div>
+
       <!-- 搜索框 -->
       <div class="search-section">
         <div class="search-input-container">
@@ -620,16 +816,25 @@ const handleBack = () => {
           </div>
 
           <div class="games-grid">
-            <div
-              class="game-item"
-              v-for="game in searchResults"
-              :key="game.id"
-              @click="handleGameClick(game)"
-            >
-              <div class="game-image">
+            <div class="game-item" v-for="game in searchResults" :key="game.id">
+              <div class="game-image" @click="handleGameClick(game)">
                 <img v-if="game.imageUrl" :src="game.imageUrl" :alt="game.name" />
               </div>
-              <div class="game-name">{{ game.name }}</div>
+              <div class="game-info">
+                <div class="game-name" @click="handleGameClick(game)">{{ game.name }}</div>
+                <!-- 收藏按钮 - 根据iscollect显示不同状态 -->
+                <div
+                  class="favorite-btn-bottom"
+                  :class="{ favorited: game.iscollect === 1 }"
+                  @click="toggleFavoriteGame(game, $event, game.iscollect === 1)"
+                >
+                  <van-icon
+                    :name="game.iscollect === 1 ? 'star' : 'star-o'"
+                    size="18"
+                    :color="game.iscollect === 1 ? '#ff9500' : '#999'"
+                  />
+                </div>
+              </div>
             </div>
           </div>
         </div>
@@ -655,7 +860,7 @@ const handleBack = () => {
       </div>
 
       <!-- 当前选中二级分类的游戏展示区域 -->
-      <div v-if="!hasSearchResults" class="selected-secondary-games">
+      <div v-if="!hasSearchResults && activeTab === 'all'" class="selected-secondary-games">
         <div v-for="secondaryCategory in secondaryCategories" :key="secondaryCategory.id">
           <!-- 只显示展开的分类的游戏 -->
           <div v-if="secondaryCategory.expanded" class="games-section">
@@ -668,16 +873,25 @@ const handleBack = () => {
             <!-- 游戏网格 -->
             <div v-else-if="secondaryCategory.games && secondaryCategory.games.length > 0">
               <div class="games-grid">
-                <div
-                  class="game-item"
-                  v-for="game in secondaryCategory.games"
-                  :key="game.id"
-                  @click="handleGameClick(game)"
-                >
-                  <div class="game-image">
+                <div class="game-item" v-for="game in secondaryCategory.games" :key="game.id">
+                  <div class="game-image" @click="handleGameClick(game)">
                     <img v-if="game.imageUrl" :src="game.imageUrl" :alt="game.name" />
                   </div>
-                  <div class="game-name">{{ game.name }}</div>
+                  <div class="game-info">
+                    <div class="game-name" @click="handleGameClick(game)">{{ game.name }}</div>
+                    <!-- 收藏按钮 - 根据iscollect显示不同状态 -->
+                    <div
+                      class="favorite-btn-bottom"
+                      :class="{ favorited: game.iscollect === 1 }"
+                      @click="toggleFavoriteGame(game, $event, game.iscollect === 1)"
+                    >
+                      <van-icon
+                        :name="game.iscollect === 1 ? 'star' : 'star-o'"
+                        size="18"
+                        :color="game.iscollect === 1 ? '#ff9500' : '#999'"
+                      />
+                    </div>
+                  </div>
                 </div>
               </div>
 
@@ -755,7 +969,8 @@ const handleBack = () => {
         v-if="
           !isLoadingSecondaryCategories &&
           !hasSecondaryCategoriesError &&
-          secondaryCategories.length === 0
+          secondaryCategories.length === 0 &&
+          activeTab === 'all'
         "
         class="no-selected-category"
       >
@@ -763,13 +978,57 @@ const handleBack = () => {
       </div>
 
       <!-- 加载更多状态 -->
-      <div v-if="!hasSearchResults && secondaryCategories.length > 0" class="load-more-status">
+      <div
+        v-if="!hasSearchResults && activeTab === 'all' && secondaryCategories.length > 0"
+        class="load-more-status"
+      >
         <div v-if="isLoadingMore" class="loading-more">
           <div class="small-spinner"></div>
           <span>加载中...</span>
         </div>
         <div v-else-if="!hasMoreData" class="no-more-data">
           <span>已加载全部游戏</span>
+        </div>
+      </div>
+
+      <!-- 收藏游戏列表 -->
+      <div v-if="activeTab === 'favorite'" class="favorite-games-section">
+        <!-- 加载状态 -->
+        <div v-if="isLoadingFavorites" class="games-loading">
+          <div class="custom-spinner"></div>
+          <div class="loading-text">加载收藏中...</div>
+        </div>
+
+        <!-- 错误状态 -->
+        <div v-else-if="hasFavoritesError" class="error-state">
+          <van-icon name="warning-o" size="24" color="#ff9500" />
+          <div class="error-text">加载收藏失败</div>
+        </div>
+
+        <!-- 收藏游戏网格 -->
+        <div v-else-if="favoriteGames.length > 0" class="games-grid">
+          <div class="game-item" v-for="game in favoriteGames" :key="game.id">
+            <div class="game-image" @click="handleGameClick(game)">
+              <img v-if="game.imageUrl" :src="game.imageUrl" :alt="game.name" />
+            </div>
+            <div class="game-info">
+              <div class="game-name" @click="handleGameClick(game)">{{ game.name }}</div>
+              <!-- 收藏按钮 - 在收藏列表中，点击是取消收藏 -->
+              <div
+                class="favorite-btn-bottom favorited"
+                @click="toggleFavoriteGame(game, $event, true)"
+              >
+                <van-icon name="star" size="18" color="#ff9500" />
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- 无收藏游戏 -->
+        <div v-else class="no-favorites">
+          <van-icon name="star-o" size="48" color="#666" />
+          <div class="no-favorites-text">暂无收藏游戏</div>
+          <div class="no-favorites-tip">快去收藏喜欢的游戏吧</div>
         </div>
       </div>
     </div>
@@ -789,6 +1048,56 @@ const handleBack = () => {
 .content {
   padding: 15px;
   margin-top: 50px; /* 为固定定位的HeaderNav留出空间 */
+}
+
+/* 选项卡区域 */
+.tabs-section {
+  display: flex;
+  align-items: center;
+  width: 100%;
+  margin-bottom: 20px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.tab-item {
+  position: relative;
+  flex: 1;
+  cursor: pointer;
+  padding: 12px 0;
+  transition: all 0.3s ease;
+  text-align: center;
+}
+
+.tab-item span {
+  font-size: 16px;
+  font-weight: 500;
+  color: #999;
+  transition: all 0.3s ease;
+}
+
+.tab-item.active span {
+  color: #ff9500;
+  font-weight: bold;
+}
+
+.tab-indicator {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 3px;
+  background: linear-gradient(90deg, #ff9500 0%, #ff7700 100%);
+  border-radius: 2px 2px 0 0;
+  animation: slideIn 0.3s ease;
+}
+
+@keyframes slideIn {
+  from {
+    transform: scaleX(0);
+  }
+  to {
+    transform: scaleX(1);
+  }
 }
 
 /* 搜索区域 */
@@ -1099,7 +1408,7 @@ const handleBack = () => {
   padding: 40px 20px;
   color: #999;
   text-align: center;
-  background-color: #2a2a2a;
+  /* background-color: #2a2a2a; */
   border-radius: 8px;
   margin: 10px 0;
 }
@@ -1121,8 +1430,8 @@ const handleBack = () => {
 
 .games-grid {
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
-  gap: 10px;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 12px;
   margin-bottom: 15px;
 }
 
@@ -1140,6 +1449,12 @@ const handleBack = () => {
   aspect-ratio: 1;
   border-radius: 8px;
   overflow: hidden;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.game-image:hover {
+  transform: scale(1.02);
 }
 
 .game-image img {
@@ -1148,12 +1463,51 @@ const handleBack = () => {
   object-fit: cover;
 }
 
+/* 游戏信息区域（名称和收藏按钮） */
+.game-info {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+}
+
 .game-name {
+  flex: 1;
   font-size: 12px;
   color: #fff;
-  text-align: center;
-  line-height: 1.2;
+  text-align: left;
+  line-height: 1.3;
   word-break: break-word;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  -webkit-box-orient: vertical;
+  cursor: pointer;
+}
+
+/* 收藏按钮（在游戏名称右侧） */
+.favorite-btn-bottom {
+  flex-shrink: 0;
+  width: 28px;
+  height: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  border-radius: 50%;
+}
+
+.favorite-btn-bottom:hover {
+  background: rgba(255, 255, 255, 0.1);
+  transform: scale(1.15);
+}
+
+.favorite-btn-bottom.favorited:hover {
+  background: rgba(255, 149, 0, 0.1);
 }
 
 .no-games {
@@ -1216,5 +1570,33 @@ const handleBack = () => {
   font-size: 14px;
   text-align: center;
   padding: 10px 0;
+}
+
+/* 收藏游戏区域 */
+.favorite-games-section {
+  margin-top: 20px;
+}
+
+/* 无收藏游戏状态 */
+.no-favorites {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 80px 20px;
+  text-align: center;
+}
+
+.no-favorites-text {
+  margin-top: 15px;
+  color: #999;
+  font-size: 16px;
+  font-weight: 500;
+}
+
+.no-favorites-tip {
+  margin-top: 8px;
+  color: #666;
+  font-size: 14px;
 }
 </style>
