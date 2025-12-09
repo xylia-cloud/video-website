@@ -19,41 +19,59 @@ const categoryBiaoshi = ref((route.query.biaoshi as string) || '')
 // 彩票数据
 interface LotteryIssue {
   issueNumber: string
-  drawTime: string
   drawnNumbers: number[]
   status: string
 }
 
+interface SqkjItem {
+  opencode: string
+  name: string
+  title: string
+  expect: string
+}
+
 // 彩票当前期号数据
 const currentIssue = ref<LotteryIssue>({
-  issueNumber: '20250612003',
-  drawTime: '20250612003',
-  drawnNumbers: [3, 6, 11, 45, 8, 47],
-  status: '封盘中',
+  issueNumber: '',
+  drawnNumbers: [],
+  status: '',
 })
+
+// 开奖信息
+const sqkjInfo = ref<SqkjItem | null>(null)
 
 // 选号相关
 const selectedNumbers = ref<number[]>([])
 const bettingAmount = ref(0)
-const betAmounts = [1, 5, 10, 50, 100, 200, 500, 1000]
 
 // 用户余额
 const userBalance = ref(1000)
 
-// 标签页相关
-const activeTab = ref<'特码两面' | '特码生肖' | '特码色波'>('特码两面')
-
 // 玩法数据接口
-interface WanfaItem {
+interface WanfaOption {
   id: string
+  wanfa_id: string
   name: string
-  odds: number
+  peilv: string
+  caipiao_id: string
+  wanfaname: string
+}
+
+interface CoinItem {
+  id: string
+  coin: string
+  img: string
 }
 
 // 玩法数据
-const wanfaList = ref<WanfaItem[]>([])
+const wanfaList = ref<WanfaOption[][]>([])
+const coinList = ref<CoinItem[]>([])
 const isLoadingWanfa = ref(false)
 const hasWanfaError = ref(false)
+
+// 玩法分类名称列表
+const wanfaNames = ref<string[]>([])
+const activeWanfaIndex = ref(0)
 
 // 获取玩法接口
 const fetchWanfa = async () => {
@@ -93,23 +111,70 @@ const fetchWanfa = async () => {
 
     if (result && result.ret === 200 && result.data && result.data.code === 0) {
       // 处理玩法数据
-      const wanfaData = result.data.info || []
+      const info = result.data.info || {}
 
-      if (Array.isArray(wanfaData)) {
-        wanfaList.value = wanfaData.map((item: Record<string, unknown>) => ({
+      // 处理硬币数据
+      if (info.coinimg && Array.isArray(info.coinimg)) {
+        coinList.value = info.coinimg.map((item: Record<string, unknown>) => ({
           id: String(item.id || ''),
-          name: String(item.name || '未命名玩法'),
-          odds: Number(item.odds) || 0,
+          coin: String(item.coin || ''),
+          img: String(item.img || ''),
         }))
+      }
+
+      // 处理开奖信息
+      if (info.sqkj && Array.isArray(info.sqkj) && info.sqkj.length > 0) {
+        const sqkjData = info.sqkj[0]
+        sqkjInfo.value = {
+          opencode: String(sqkjData.opencode || ''),
+          name: String(sqkjData.name || ''),
+          title: String(sqkjData.title || ''),
+          expect: String(sqkjData.expect || ''),
+        }
+
+        // 更新期号和开奖号码
+        currentIssue.value.issueNumber = sqkjInfo.value.expect
+        const opencodeArray = sqkjInfo.value.opencode.split(',').map((num) => Number(num.trim()))
+        currentIssue.value.drawnNumbers = opencodeArray
+      }
+
+      // 处理玩法数据
+      if (info.wanfa && Array.isArray(info.wanfa)) {
+        wanfaList.value = info.wanfa.map((group: Record<string, unknown>[]) => {
+          if (Array.isArray(group)) {
+            return group.map((item: Record<string, unknown>) => ({
+              id: String(item.id || ''),
+              wanfa_id: String(item.wanfa_id || ''),
+              name: String(item.name || ''),
+              peilv: String(item.peilv || ''),
+              caipiao_id: String(item.caipiao_id || ''),
+              wanfaname: String(item.wanfaname || ''),
+            }))
+          }
+          return []
+        })
+
+        // 提取玩法分类名称（从第一个玩法组中获取）
+        const nameSet = new Set<string>()
+        wanfaList.value.forEach((group) => {
+          group.forEach((item) => {
+            nameSet.add(item.wanfaname)
+          })
+        })
+        wanfaNames.value = Array.from(nameSet)
+        activeWanfaIndex.value = 0
       } else {
         wanfaList.value = []
+        wanfaNames.value = []
       }
 
       console.log('处理后的玩法数据:', wanfaList.value)
+      console.log('玩法分类:', wanfaNames.value)
     } else {
       console.log('获取玩法数据失败:', result)
       hasWanfaError.value = true
       wanfaList.value = []
+      wanfaNames.value = []
     }
   } catch (error) {
     console.error('获取玩法数据失败:', error)
@@ -184,90 +249,109 @@ onMounted(() => {
 
     <!-- 内容区域 -->
     <div class="content">
-      <!-- 标签页 -->
-      <div class="tabs-section">
+      <!-- 玩法分类标签页 -->
+      <div v-if="wanfaNames.length > 0" class="tabs-section">
         <div
+          v-for="(wanfaName, index) in wanfaNames"
+          :key="wanfaName"
           class="tab-item"
-          :class="{ active: activeTab === '特码两面' }"
-          @click="activeTab = '特码两面'"
+          :class="{ active: activeWanfaIndex === index }"
+          @click="activeWanfaIndex = index"
         >
-          <span>特码两面</span>
-          <div v-if="activeTab === '特码两面'" class="tab-indicator"></div>
-        </div>
-        <div
-          class="tab-item"
-          :class="{ active: activeTab === '特码生肖' }"
-          @click="activeTab = '特码生肖'"
-        >
-          <span>特码生肖</span>
-          <div v-if="activeTab === '特码生肖'" class="tab-indicator"></div>
-        </div>
-        <div
-          class="tab-item"
-          :class="{ active: activeTab === '特码色波' }"
-          @click="activeTab = '特码色波'"
-        >
-          <span>特码色波</span>
-          <div v-if="activeTab === '特码色波'" class="tab-indicator"></div>
+          <span>{{ wanfaName }}</span>
+          <div v-if="activeWanfaIndex === index" class="tab-indicator"></div>
         </div>
       </div>
 
       <!-- 期号和开奖信息 -->
       <div class="lottery-info">
-        <div class="issue-info">
-          <div class="issue-number">{{ currentIssue.issueNumber }}</div>
-          <div class="issue-time">{{ currentIssue.drawTime }}</div>
+        <div class="info-left">
+          <div class="issue-row">
+            <span class="label">期号</span>
+            <span class="issue-number">{{ currentIssue.issueNumber }}</span>
+          </div>
+          <div class="result-row">
+            <span class="label">开奖结果</span>
+            <div class="drawn-numbers">
+              <div class="drawn-number-item" v-for="num in currentIssue.drawnNumbers" :key="num">
+                <span>{{ num }}</span>
+              </div>
+            </div>
+          </div>
         </div>
-        <div class="status-badge">{{ currentIssue.status }}</div>
+        <div v-if="currentIssue.status" class="status-badge">{{ currentIssue.status }}</div>
       </div>
 
-      <!-- 开奖号码 -->
-      <div class="drawn-numbers">
-        <div class="drawn-number-item" v-for="num in currentIssue.drawnNumbers" :key="num">
-          <span>{{ num }}</span>
-        </div>
+      <!-- 功能按钮 -->
+      <div class="function-buttons">
+        <button class="func-btn">
+          <van-icon name="info-o" size="16" />
+          玩法说明
+        </button>
+        <button class="func-btn">
+          <van-icon name="records" size="16" />
+          投注记录
+        </button>
+        <button class="func-btn">
+          <van-icon name="award" size="16" />
+          开奖记录
+        </button>
       </div>
 
-      <!-- 选号面板 -->
-      <div class="number-panel">
-        <div class="number-grid">
+      <!-- 加载状态 -->
+      <div v-if="isLoadingWanfa" class="loading-container">
+        <van-loading type="spinner" color="#ff9500" />
+        <span class="loading-text">加载中...</span>
+      </div>
+
+      <!-- 玩法选项面板 -->
+      <div v-if="wanfaList.length > 0 && activeWanfaIndex < wanfaList.length" class="wanfa-panel">
+        <div class="wanfa-grid">
           <div
-            v-for="num in 25"
-            :key="num"
-            class="number-item"
-            :class="{ selected: selectedNumbers.includes(num) }"
-            @click="toggleNumber(num)"
+            v-for="option in wanfaList[activeWanfaIndex]"
+            :key="option.id"
+            class="wanfa-item"
+            :class="{ selected: selectedNumbers.includes(Number(option.id)) }"
+            @click="toggleNumber(Number(option.id))"
           >
-            <div class="number-label">{{ num }}</div>
-            <div class="number-odds">47</div>
+            <div class="option-name">{{ option.name }}</div>
+            <div class="option-odds">{{ option.peilv }}</div>
           </div>
         </div>
       </div>
 
       <!-- 投注金额选择 -->
-      <div class="betting-amount-section">
+      <div v-if="coinList.length > 0" class="betting-amount-section">
         <div class="amount-buttons">
           <button
-            v-for="amount in betAmounts"
-            :key="amount"
+            v-for="coin in coinList"
+            :key="coin.id"
             class="amount-btn"
-            :class="{ active: bettingAmount === amount }"
-            @click="setBettingAmount(amount)"
+            :class="{ active: bettingAmount === Number(coin.coin) }"
+            @click="setBettingAmount(Number(coin.coin))"
           >
             <van-icon name="diamond" size="14" />
-            {{ amount }}
+            {{ coin.coin }}
           </button>
         </div>
       </div>
 
-      <!-- 底部信息和提交 -->
+      <!-- 底部信息和投注 -->
       <div class="bottom-section">
         <div class="balance-info">
-          <span class="label">0 注</span>
-          <span class="diamond-icon">💎</span>
+          <van-icon name="diamond" size="16" class="diamond-icon" />
           <span class="balance">余额：{{ userBalance }}</span>
         </div>
-        <button class="submit-btn" @click="submitBetting">提交</button>
+        <div class="betting-input-group">
+          <input
+            v-model.number="bettingAmount"
+            type="number"
+            class="betting-input"
+            placeholder="输入金额"
+            min="0"
+          />
+          <button class="submit-btn" @click="submitBetting">投注</button>
+        </div>
       </div>
     </div>
   </div>
@@ -278,23 +362,28 @@ onMounted(() => {
   background-color: #111;
   color: #fff;
   min-height: 100vh;
-  padding-bottom: 20px;
+  padding-bottom: 0;
   width: 100%;
   box-sizing: border-box;
   overflow-x: hidden;
+  display: flex;
+  flex-direction: column;
 }
 
 .content {
-  padding: 0 12px;
+  padding: 60px 12px 220px 12px;
+  flex: 1;
+  overflow-y: auto;
 }
 
 /* 标签页样式 */
 .tabs-section {
   display: flex;
-  gap: 20px;
-  padding: 12px 0;
+  gap: 0;
+  padding: 12px 0 0 0;
   border-bottom: 1px solid #333;
   margin-bottom: 12px;
+  width: 100%;
 }
 
 .tab-item {
@@ -304,6 +393,9 @@ onMounted(() => {
   font-size: 14px;
   color: #999;
   transition: color 0.3s ease;
+  flex: 1;
+  text-align: center;
+  white-space: nowrap;
 }
 
 .tab-item.active {
@@ -323,28 +415,51 @@ onMounted(() => {
 .lottery-info {
   display: flex;
   justify-content: space-between;
-  align-items: center;
+  align-items: flex-start;
   background-color: #2c2c2c;
-  padding: 12px;
-  border-radius: 8px;
-  margin-bottom: 12px;
+  padding: 16px;
+  border-radius: 8px 8px 0 0;
+  margin-bottom: 0;
+  gap: 12px;
 }
 
-.issue-info {
+.info-left {
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: 12px;
+  flex: 1;
+}
+
+.issue-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.issue-row .label {
+  color: #999;
+  font-size: 13px;
+  min-width: 50px;
+  text-align: right;
 }
 
 .issue-number {
-  font-size: 14px;
+  font-size: 16px;
   color: #ff9500;
-  font-weight: 500;
+  font-weight: 600;
 }
 
-.issue-time {
-  font-size: 12px;
+.result-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.result-row .label {
   color: #999;
+  font-size: 13px;
+  min-width: 50px;
+  white-space: nowrap;
 }
 
 .status-badge {
@@ -356,77 +471,165 @@ onMounted(() => {
   font-weight: 500;
 }
 
+/* 功能按钮 */
+.function-buttons {
+  display: flex;
+  gap: 0;
+  margin-bottom: 16px;
+  justify-content: space-between;
+  background-color: #2c2c2c;
+  border-radius: 0 0 8px 8px;
+  padding: 8px 12px;
+  border-top: 1px solid #444;
+}
+
+.func-btn {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 6px 8px;
+  background-color: transparent;
+  border: none;
+  border-radius: 0;
+  color: #ff9500;
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 500;
+  transition: all 0.3s ease;
+  border-right: 1px solid #444;
+}
+
+.func-btn:last-child {
+  border-right: none;
+}
+
+.func-btn:hover {
+  color: #ffb84d;
+  opacity: 0.8;
+}
+
+.func-btn:active {
+  transform: scale(0.98);
+}
+
 /* 开奖号码 */
 .drawn-numbers {
   display: flex;
-  gap: 8px;
-  margin-bottom: 16px;
-  justify-content: center;
+  gap: 6px;
+  justify-content: flex-start;
   flex-wrap: wrap;
+  align-items: center;
+  flex: 1;
 }
 
 .drawn-number-item {
-  width: 40px;
-  height: 40px;
+  width: 28px;
+  height: 28px;
   border-radius: 50%;
-  background-color: #ff9500;
+  background: radial-gradient(circle at 30% 30%, #ffb84d, #ff9500);
   display: flex;
   align-items: center;
   justify-content: center;
   color: #fff;
   font-weight: bold;
   font-size: 14px;
+  box-shadow:
+    0 4px 8px rgba(0, 0, 0, 0.4),
+    inset -2px -2px 4px rgba(0, 0, 0, 0.3);
+  position: relative;
 }
 
-/* 选号面板 */
-.number-panel {
+.drawn-number-item::after {
+  content: '';
+  position: absolute;
+  width: 8px;
+  height: 8px;
+  background: rgba(255, 255, 255, 0.3);
+  border-radius: 50%;
+  top: 4px;
+  left: 4px;
+}
+
+/* 加载状态 */
+.loading-container {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  background-color: rgba(17, 17, 17, 0.95);
+  gap: 12px;
+  z-index: 100;
+}
+
+.loading-text {
+  color: #ff9500;
+  font-size: 14px;
+  font-weight: 500;
+}
+
+/* 玩法选项面板 */
+.wanfa-panel {
   margin-bottom: 16px;
 }
 
-.number-grid {
+.wanfa-grid {
   display: grid;
-  grid-template-columns: repeat(5, 1fr);
+  grid-template-columns: repeat(4, 1fr);
   gap: 8px;
 }
 
-.number-item {
+.wanfa-item {
   border: 1px solid #444;
   border-radius: 8px;
-  padding: 8px;
+  padding: 12px 8px;
   text-align: center;
   cursor: pointer;
   transition: all 0.3s ease;
   background-color: #2c2c2c;
 }
 
-.number-item:hover {
+.wanfa-item:hover {
   border-color: #ff9500;
 }
 
-.number-item.selected {
+.wanfa-item.selected {
   background-color: #ff9500;
   border-color: #ff9500;
   color: #000;
 }
 
-.number-label {
-  font-size: 16px;
+.option-name {
+  font-size: 14px;
   font-weight: bold;
   margin-bottom: 4px;
 }
 
-.number-odds {
+.option-odds {
   font-size: 12px;
   color: #999;
 }
 
-.number-item.selected .number-odds {
+.wanfa-item.selected .option-odds {
   color: #000;
 }
 
 /* 投注金额选择 */
 .betting-amount-section {
-  margin-bottom: 16px;
+  position: fixed;
+  bottom: 80px;
+  left: 0;
+  right: 0;
+  padding: 12px;
+  background-color: #111;
+  border-top: 1px solid #333;
+  z-index: 10;
 }
 
 .amount-buttons {
@@ -462,19 +665,22 @@ onMounted(() => {
 
 /* 底部信息和提交 */
 .bottom-section {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
   display: flex;
   justify-content: space-between;
   align-items: center;
   padding: 12px;
   background-color: #2c2c2c;
-  border-radius: 8px;
-  margin-top: 16px;
+  border-top: 1px solid #333;
+  z-index: 11;
 }
 
 .balance-info {
   display: flex;
   align-items: center;
-  gap: 8px;
   font-size: 12px;
 }
 
@@ -484,6 +690,7 @@ onMounted(() => {
 
 .diamond-icon {
   font-size: 14px;
+  color: #ff9500;
 }
 
 .balance {
@@ -491,24 +698,59 @@ onMounted(() => {
   margin-left: 8px;
 }
 
-.submit-btn {
-  background: linear-gradient(135deg, #7c3aed 0%, #a855f7 100%);
-  color: #fff;
-  border: none;
-  padding: 8px 24px;
-  border-radius: 20px;
-  cursor: pointer;
-  font-weight: 500;
-  font-size: 14px;
+.betting-input-group {
+  display: flex;
+  gap: 0;
+  align-items: center;
+  border: 1px solid #444;
+  border-radius: 6px;
+  overflow: hidden;
   transition: all 0.3s ease;
 }
 
+.betting-input-group:focus-within {
+  border-color: #ff9500;
+  box-shadow: 0 0 8px rgba(255, 149, 0, 0.2);
+}
+
+.betting-input {
+  width: 80px;
+  padding: 8px 12px;
+  border: none;
+  background-color: #1a1a1a;
+  color: #fff;
+  font-size: 14px;
+  outline: none;
+  transition: all 0.3s ease;
+}
+
+.betting-input:focus {
+  background-color: #222;
+}
+
+.betting-input::placeholder {
+  color: #666;
+}
+
+.submit-btn {
+  background: linear-gradient(135deg, #ff9500 0%, #ffb84d 100%);
+  color: #000;
+  border: none;
+  padding: 8px 20px;
+  border-radius: 0;
+  cursor: pointer;
+  font-weight: 600;
+  font-size: 14px;
+  transition: all 0.3s ease;
+  white-space: nowrap;
+}
+
 .submit-btn:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 4px 12px rgba(168, 85, 247, 0.4);
+  opacity: 0.9;
+  box-shadow: inset 0 0 8px rgba(0, 0, 0, 0.2);
 }
 
 .submit-btn:active {
-  transform: translateY(0);
+  opacity: 0.8;
 }
 </style>
