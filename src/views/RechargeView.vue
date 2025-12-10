@@ -191,6 +191,8 @@ const orderInfo = ref({
   payUrl: '',
   qudaoid: 0,
 })
+const paymentCountdown = ref(0)
+const paymentCountdownTimer = ref<ReturnType<typeof setInterval> | null>(null)
 
 // 计算渠道ID到类型的映射
 const channelTypeMap: Record<string, number> = {
@@ -353,6 +355,33 @@ const handlePaymentFailure = () => {
   // 保持在当前页面，用户可以重新选择支付方式
 }
 
+// 🔥 打开支付页面（兼容Safari）
+const openPaymentPage = (payUrl: string) => {
+  if (!payUrl) return
+
+  try {
+    // 检测是否为iOS Safari
+    const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent)
+    const isSafari = /Safari/.test(navigator.userAgent) && !/Chrome/.test(navigator.userAgent)
+
+    if (isIOS && isSafari) {
+      // iOS Safari: 使用location.href
+      window.location.href = payUrl
+    } else {
+      // 其他浏览器: 尝试使用window.open
+      const newWindow = window.open(payUrl, '_blank')
+      if (!newWindow || newWindow.closed || typeof newWindow.closed === 'undefined') {
+        // 如果window.open被阻止，降级使用location.href
+        window.location.href = payUrl
+      }
+    }
+  } catch (error) {
+    console.error('打开支付页面失败:', error)
+    // 降级处理
+    window.location.href = payUrl
+  }
+}
+
 // 选择金额
 const selectAmount = (item: MoneyItem) => {
   selectedMoneyItem.value = item
@@ -478,7 +507,7 @@ const createOrder = async () => {
 
     if (result && result.ret === 200 && result.data && result.data.code === 0) {
       const payUrl = result.data.info?.purl
-      const orderNumber = result.data.info?.order_no || result.data.info?.orderid || '#222222'
+      const orderNumber = result.data.info?.order_no || result.data.info?.orderid || ''
 
       // 🔥 设置订单信息并显示自定义弹窗
       orderInfo.value = {
@@ -487,6 +516,24 @@ const createOrder = async () => {
         qudaoid: qudaoid,
       }
       showOrderSuccessModal.value = true
+
+      // 🔥 自动打开支付页面（3秒后）
+      if (payUrl) {
+        paymentCountdown.value = 3
+        if (paymentCountdownTimer.value) {
+          clearInterval(paymentCountdownTimer.value)
+        }
+        paymentCountdownTimer.value = setInterval(() => {
+          paymentCountdown.value--
+          if (paymentCountdown.value <= 0) {
+            if (paymentCountdownTimer.value) {
+              clearInterval(paymentCountdownTimer.value)
+              paymentCountdownTimer.value = null
+            }
+            openPaymentPage(payUrl)
+          }
+        }, 1000)
+      }
     } else {
       // 订单创建失败
       showToast({
@@ -706,9 +753,15 @@ onMounted(async () => {
 
     <!-- 可滚动内容区域 -->
     <div class="scrollable-content">
+      <!-- 加载充值规则 -->
+      <div v-if="isLoadingRules" class="loading-rules">
+        <van-loading type="spinner" color="#ff9500" />
+        <span>加载充值规则中...</span>
+      </div>
+
       <!-- 第二步：选择支付平台 -->
       <div
-        v-if="chargeRulesDisplay?.type === 'channels'"
+        v-if="!isLoadingRules && chargeRulesDisplay?.type === 'channels'"
         class="selection-section platform-selection"
       >
         <h3 class="section-title">
@@ -735,7 +788,7 @@ onMounted(async () => {
       </div>
 
       <!-- 第三步：选择充值金额 -->
-      <div v-if="showAmountSelection" class="selection-section">
+      <div v-if="!isLoadingRules && showAmountSelection" class="selection-section">
         <h3 class="section-title">
           <span class="step-number">2</span>
           选择充值金额
@@ -848,14 +901,9 @@ onMounted(async () => {
       </div>
 
       <div class="order-details">
-        <div class="order-number">
-          <span class="order-label">{{ orderInfo.orderNumber }}</span>
-        </div>
-
         <div class="payment-status">
-          <span class="status-text">正在支付...</span>
-          <span class="countdown">24PX</span>
-          <span class="status-color">#FFFFFF</span>
+          <span class="status-text">正在跳转支付页面...</span>
+          <span class="countdown" v-if="paymentCountdown > 0">{{ paymentCountdown }}s</span>
         </div>
       </div>
 

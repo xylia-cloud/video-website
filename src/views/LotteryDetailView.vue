@@ -2,7 +2,7 @@
 import { ref, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import HeaderNav from '@/components/HeaderNav.vue'
-import { getUserInfo } from '@/api/fetch-api'
+import { getUserInfo, fetchUserBalance } from '@/api/fetch-api'
 import { showToast } from 'vant'
 import { NEW_API_BASE_URL } from '@/utils/config'
 
@@ -42,10 +42,20 @@ const sqkjInfo = ref<SqkjItem | null>(null)
 
 // 选号相关
 const selectedNumbers = ref<number[]>([])
-const bettingAmount = ref(0)
+const singleBetAmount = ref(0) // 单注金额
+const betMultiplier = ref(1) // 倍数
+const isBetting = ref(false) // 投注中状态
+
+// 投注成功弹窗
+const showBettingSuccessModal = ref(false)
+const bettingSuccessMessage = ref('')
+
+// 错误提示弹窗
+const showErrorModal = ref(false)
+const errorMessage = ref('')
 
 // 用户余额
-const userBalance = ref(1000)
+const userBalance = ref(0)
 
 // 玩法数据接口
 interface WanfaOption {
@@ -63,15 +73,70 @@ interface CoinItem {
   img: string
 }
 
+interface BeishuItem {
+  id: string
+  name: string
+  value: string
+}
+
 // 玩法数据
 const wanfaList = ref<WanfaOption[][]>([])
 const coinList = ref<CoinItem[]>([])
+const beishuList = ref<BeishuItem[]>([])
 const isLoadingWanfa = ref(false)
 const hasWanfaError = ref(false)
 
 // 玩法分类名称列表
 const wanfaNames = ref<string[]>([])
 const activeWanfaIndex = ref(0)
+
+// 获取倍数接口
+const fetchBeishu = async () => {
+  try {
+    // 构建查询参数
+    const queryParams = new URLSearchParams({
+      service: 'Caipiao.Getbeishu',
+      lang: 'zh',
+    })
+
+    console.log('获取倍数数据')
+
+    // 发起GET请求
+    const response = await fetch(`${NEW_API_BASE_URL}/?${queryParams.toString()}`, {
+      method: 'GET',
+      headers: {
+        Accept: 'application/json',
+      },
+    })
+
+    if (!response.ok) {
+      throw new Error(`HTTP error! Status: ${response.status}`)
+    }
+
+    const result = await response.json()
+    console.log('获取倍数数据:', result)
+
+    if (result && result.ret === 200 && result.data && result.data.code === 0) {
+      // 处理倍数数据
+      const info = result.data.info || []
+      if (Array.isArray(info)) {
+        beishuList.value = info.map((item: Record<string, unknown>) => ({
+          id: String(item.id || ''),
+          name: String(item.name || ''),
+          value: String(item.value || ''),
+        }))
+      }
+      console.log('处理后的倍数数据:', beishuList.value)
+    } else {
+      console.log('获取倍数数据失败:', result)
+      beishuList.value = []
+    }
+  } catch (error) {
+    console.error('获取倍数数据失败:', error)
+    beishuList.value = []
+    showToast('获取倍数数据失败')
+  }
+}
 
 // 获取玩法接口
 const fetchWanfa = async () => {
@@ -196,28 +261,142 @@ const toggleNumber = (num: number) => {
   }
 }
 
-// 设置投注金额
-const setBettingAmount = (amount: number) => {
-  bettingAmount.value = amount
+// 设置单注金额
+const setSingleBetAmount = (amount: number) => {
+  singleBetAmount.value = amount
+}
+
+// 设置倍数
+const setBetMultiplier = (multiplier: number) => {
+  betMultiplier.value = multiplier
 }
 
 // 提交投注
-const submitBetting = () => {
+const submitBetting = async () => {
   if (selectedNumbers.value.length === 0) {
     showToast('请选择号码')
     return
   }
-  if (bettingAmount.value === 0) {
+  if (singleBetAmount.value === 0) {
     showToast('请选择投注金额')
     return
   }
-  showToast(`已提交投注：${selectedNumbers.value.join(',')}，金额：${bettingAmount.value}`)
+
+  // 验证单注金额为整数
+  if (!Number.isInteger(singleBetAmount.value)) {
+    showToast('投注金额必须为整数')
+    return
+  }
+
+  try {
+    // 设置投注中状态
+    isBetting.value = true
+
+    // 获取用户信息
+    const userInfo = getUserInfo()
+    if (!userInfo) {
+      showToast('获取用户信息失败')
+      return
+    }
+
+    // 获取当前玩法的wanfa_id
+    const currentWanfaId = wanfaList.value[activeWanfaIndex.value]?.[0]?.wanfa_id || ''
+
+    // 计算总注数和总金额
+    const zhushu = selectedNumbers.value.length // 注数
+    const totalMoney = singleBetAmount.value * zhushu * betMultiplier.value // 总金额 = 单注金额 * 注数 * 倍数
+
+    // 构建查询参数
+    const queryParams = new URLSearchParams({
+      service: 'Caipiao.Touzhu',
+      lang: 'zh',
+      uid: userInfo.user_id?.toString() || '',
+      token: userInfo.token || '',
+      zhuboid: '', // 先留空
+      biaoshi: categoryBiaoshi.value,
+      title: primaryCategoryName.value,
+      wanfid: currentWanfaId, // 玩法ID（如46、47、48）
+      wanfaxiid: selectedNumbers.value.join(','), // 选中的选项ID（如202、203等）
+      zhushu: zhushu.toString(), // 注数
+      beishu: betMultiplier.value.toString(), // 倍数
+      money: totalMoney.toString(), // 总金额 = 单注金额 * 注数 * 倍数
+      value: '', // 先留空
+      source: 'mobile',
+    })
+
+    console.log('投注参数:', Object.fromEntries(queryParams))
+
+    // 发起投注请求
+    const response = await fetch(`${NEW_API_BASE_URL}/?${queryParams.toString()}`, {
+      method: 'GET',
+      headers: {
+        Accept: 'application/json',
+      },
+    })
+
+    if (!response.ok) {
+      throw new Error(`HTTP error! Status: ${response.status}`)
+    }
+
+    const result = await response.json()
+    console.log('投注结果:', result)
+
+    if (result && result.ret === 200 && result.data) {
+      if (result.data.code === 0) {
+        // 投注成功
+        bettingSuccessMessage.value = result.data.msg || '下单成功,恭喜发财'
+        showBettingSuccessModal.value = true
+
+        // 投注成功后更新余额
+        try {
+          const balanceResult = await fetchUserBalance()
+          if (balanceResult.code === 1 && balanceResult.data) {
+            userBalance.value = balanceResult.data.coin
+          }
+        } catch (error) {
+          console.error('更新余额失败:', error)
+        }
+      } else {
+        // 其他错误（包括余额不足等）
+        errorMessage.value = result.data.msg || '投注失败，请重试'
+        showErrorModal.value = true
+      }
+    } else {
+      showToast(result?.data?.msg || result?.msg || '投注失败，请重试')
+    }
+  } catch (error) {
+    console.error('投注错误:', error)
+    showToast('网络错误，请重试')
+  } finally {
+    // 关闭投注中状态
+    isBetting.value = false
+  }
 }
 
 // 自定义返回逻辑
 const handleBack = () => {
   router.push({
     name: 'game',
+  })
+}
+
+// 跳转到投注记录页面
+const goToTouzhuRecord = () => {
+  router.push({
+    name: 'lotteryTouzhuRecord',
+    query: {
+      biaoshi: categoryBiaoshi.value,
+    },
+  })
+}
+
+// 跳转到开奖记录页面
+const goToHistory = () => {
+  router.push({
+    name: 'lotteryHistory',
+    query: {
+      biaoshi: categoryBiaoshi.value,
+    },
   })
 }
 
@@ -229,16 +408,33 @@ onMounted(() => {
     categoryBiaoshi: categoryBiaoshi.value,
   })
 
-  // 获取用户信息
-  const userInfo = getUserInfo()
-  if (userInfo) {
-    userBalance.value = userInfo.coin || 1000
+  // 获取用户余额
+  const loadBalance = async () => {
+    try {
+      const result = await fetchUserBalance()
+      if (result.code === 1 && result.data) {
+        userBalance.value = result.data.coin
+      }
+    } catch (error) {
+      console.error('获取余额失败:', error)
+      // 降级处理：从本地存储获取
+      const userInfo = getUserInfo()
+      if (userInfo) {
+        userBalance.value = userInfo.coin || 0
+      }
+    }
   }
 
   // 获取玩法数据
   if (categoryId.value && categoryBiaoshi.value) {
     fetchWanfa()
   }
+
+  // 获取倍数数据
+  fetchBeishu()
+
+  // 加载余额
+  loadBalance()
 })
 </script>
 
@@ -284,15 +480,11 @@ onMounted(() => {
 
       <!-- 功能按钮 -->
       <div class="function-buttons">
-        <button class="func-btn">
-          <van-icon name="info-o" size="16" />
-          玩法说明
-        </button>
-        <button class="func-btn">
+        <button class="func-btn" @click="goToTouzhuRecord">
           <van-icon name="records" size="16" />
           投注记录
         </button>
-        <button class="func-btn">
+        <button class="func-btn" @click="goToHistory">
           <van-icon name="award" size="16" />
           开奖记录
         </button>
@@ -327,11 +519,27 @@ onMounted(() => {
             v-for="coin in coinList"
             :key="coin.id"
             class="amount-btn"
-            :class="{ active: bettingAmount === Number(coin.coin) }"
-            @click="setBettingAmount(Number(coin.coin))"
+            :class="{ active: singleBetAmount === Number(coin.coin) }"
+            @click="setSingleBetAmount(Number(coin.coin))"
           >
             <van-icon name="diamond" size="14" />
             {{ coin.coin }}
+          </button>
+        </div>
+      </div>
+
+      <!-- 倍数选择 -->
+      <div class="multiplier-section">
+        <span class="multiplier-label">倍数：</span>
+        <div class="multiplier-buttons">
+          <button
+            v-for="beishu in beishuList"
+            :key="beishu.id"
+            class="multiplier-btn"
+            :class="{ active: betMultiplier === Number(beishu.value) }"
+            @click="setBetMultiplier(Number(beishu.value))"
+          >
+            {{ beishu.name }}倍
           </button>
         </div>
       </div>
@@ -344,14 +552,77 @@ onMounted(() => {
         </div>
         <div class="betting-input-group">
           <input
-            v-model.number="bettingAmount"
+            v-model.number="singleBetAmount"
             type="number"
             class="betting-input"
             placeholder="输入金额"
             min="0"
+            :disabled="isBetting"
           />
-          <button class="submit-btn" @click="submitBetting">投注</button>
+          <button class="submit-btn" @click="submitBetting" :disabled="isBetting">
+            <van-loading v-if="isBetting" type="spinner" size="16" color="#fff" />
+            <span v-else>投注</span>
+          </button>
         </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 投注中LOADING效果 -->
+  <div v-if="isBetting" class="betting-loading-overlay">
+    <div class="betting-loading-content">
+      <van-loading type="spinner" size="48" color="#ff9500" />
+      <p>投注中...</p>
+    </div>
+  </div>
+
+  <!-- 投注成功弹窗 -->
+  <div v-if="showBettingSuccessModal" class="betting-success-modal-overlay">
+    <div class="betting-success-modal">
+      <div class="modal-header">
+        <h2>投注成功</h2>
+      </div>
+      <div class="modal-body">
+        <p>{{ bettingSuccessMessage }}</p>
+      </div>
+      <div class="modal-footer">
+        <button
+          class="modal-btn"
+          @click="
+            () => {
+              showBettingSuccessModal = false
+              selectedNumbers = []
+              singleBetAmount = 0
+              betMultiplier = 1
+            }
+          "
+        >
+          确定
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 错误提示弹窗 -->
+  <div v-if="showErrorModal" class="betting-success-modal-overlay">
+    <div class="betting-success-modal">
+      <div class="modal-header">
+        <h2>提示</h2>
+      </div>
+      <div class="modal-body">
+        <p>{{ errorMessage }}</p>
+      </div>
+      <div class="modal-footer">
+        <button
+          class="modal-btn"
+          @click="
+            () => {
+              showErrorModal = false
+            }
+          "
+        >
+          确定
+        </button>
       </div>
     </div>
   </div>
@@ -371,19 +642,25 @@ onMounted(() => {
 }
 
 .content {
-  padding: 60px 12px 220px 12px;
+  padding: 108px 12px 280px 12px;
   flex: 1;
   overflow-y: auto;
 }
 
 /* 标签页样式 */
 .tabs-section {
+  position: fixed;
+  top: 44px;
+  left: 0;
+  right: 0;
   display: flex;
   gap: 0;
   padding: 12px 0 0 0;
   border-bottom: 1px solid #333;
-  margin-bottom: 12px;
+  margin-bottom: 0;
   width: 100%;
+  background-color: #111;
+  z-index: 20;
 }
 
 .tab-item {
@@ -623,12 +900,13 @@ onMounted(() => {
 /* 投注金额选择 */
 .betting-amount-section {
   position: fixed;
-  bottom: 80px;
+  bottom: 123px;
   left: 0;
   right: 0;
   padding: 12px;
   background-color: #111;
   border-top: 1px solid #333;
+  border-bottom: none;
   z-index: 10;
 }
 
@@ -658,6 +936,59 @@ onMounted(() => {
 }
 
 .amount-btn.active {
+  background-color: #ff9500;
+  border-color: #ff9500;
+  color: #000;
+}
+
+/* 倍数选择 */
+.multiplier-section {
+  position: fixed;
+  bottom: 65px;
+  left: 0;
+  right: 0;
+  padding: 12px;
+  background-color: #1a1a1a;
+  border-top: 1px solid #333;
+  border-bottom: none;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  z-index: 10;
+}
+
+.multiplier-label {
+  color: #999;
+  font-size: 14px;
+  white-space: nowrap;
+}
+
+.multiplier-buttons {
+  display: flex;
+  gap: 8px;
+  flex: 1;
+  overflow-x: auto;
+}
+
+.multiplier-btn {
+  flex-shrink: 0;
+  padding: 6px 12px;
+  background-color: #222;
+  border: 1px solid #333;
+  color: #999;
+  border-radius: 6px;
+  font-size: 12px;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  white-space: nowrap;
+}
+
+.multiplier-btn:hover {
+  border-color: #ff9500;
+  color: #ff9500;
+}
+
+.multiplier-btn.active {
   background-color: #ff9500;
   border-color: #ff9500;
   color: #000;
@@ -751,6 +1082,121 @@ onMounted(() => {
 }
 
 .submit-btn:active {
+  opacity: 0.8;
+}
+
+.submit-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.betting-input:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+/* 投注中LOADING效果 */
+.betting-loading-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(0, 0, 0, 0.7);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+}
+
+.betting-loading-content {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+}
+
+.betting-loading-content p {
+  color: #fff;
+  font-size: 16px;
+  margin: 0;
+}
+
+/* 投注成功弹窗 */
+.betting-success-modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(0, 0, 0, 0.7);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1001;
+}
+
+.betting-success-modal {
+  background-color: #1a1a1a;
+  border-radius: 12px;
+  width: 80%;
+  max-width: 300px;
+  overflow: hidden;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
+}
+
+.modal-header {
+  background-color: #222;
+  padding: 16px;
+  border-bottom: 1px solid #333;
+  text-align: center;
+}
+
+.modal-header h2 {
+  margin: 0;
+  color: #fff;
+  font-size: 18px;
+  font-weight: 600;
+}
+
+.modal-body {
+  padding: 24px 16px;
+  text-align: center;
+}
+
+.modal-body p {
+  margin: 0;
+  color: #fff;
+  font-size: 14px;
+  line-height: 1.6;
+}
+
+.modal-footer {
+  padding: 0;
+  border-top: 1px solid #333;
+  display: flex;
+  justify-content: center;
+}
+
+.modal-btn {
+  background: none;
+  color: #ff9500;
+  border: none;
+  padding: 12px 16px;
+  border-radius: 0;
+  cursor: pointer;
+  font-weight: 600;
+  font-size: 14px;
+  transition: all 0.3s ease;
+  min-width: 100%;
+  flex: 1;
+}
+
+.modal-btn:hover {
+  opacity: 0.8;
+}
+
+.modal-btn:active {
   opacity: 0.8;
 }
 </style>

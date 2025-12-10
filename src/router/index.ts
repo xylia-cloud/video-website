@@ -3,6 +3,8 @@ import HomeView from '../views/HomeView.vue'
 import GameView from '../views/GameView.vue'
 import GameSecondaryView from '../views/GameSecondaryView.vue'
 import LotteryDetailView from '../views/LotteryDetailView.vue'
+import LotteryTouzhuRecordView from '../views/LotteryTouzhuRecordView.vue'
+import LotteryHistoryView from '../views/LotteryHistoryView.vue'
 import LiveView from '../views/LiveView.vue'
 import ProfileView from '../views/ProfileView.vue'
 import TagsView from '../views/TagsView.vue'
@@ -85,6 +87,16 @@ const router = createRouter({
       name: 'lottery-detail',
       component: LotteryDetailView,
       props: true,
+    },
+    {
+      path: '/lottery-touzhu-record',
+      name: 'lotteryTouzhuRecord',
+      component: LotteryTouzhuRecordView,
+    },
+    {
+      path: '/lottery-history',
+      name: 'lotteryHistory',
+      component: LotteryHistoryView,
     },
     {
       path: '/game-record',

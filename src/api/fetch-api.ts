@@ -2964,3 +2964,73 @@ export const fetchPromotionRecord = async (params: { p?: number } = {}) => {
     }
   })
 }
+
+/**
+ * 获取用户余额
+ * @returns 用户余额信息
+ */
+export const fetchUserBalance = async () => {
+  try {
+    // 获取用户信息
+    const userInfo = getUserInfo()
+    if (!userInfo) {
+      throw new Error('用户信息不存在')
+    }
+
+    const userId = userInfo.user_id || userInfo.id
+    const token = userInfo.token
+
+    if (!userId || !token) {
+      throw new Error('用户信息不完整')
+    }
+
+    console.log('正在获取用户余额...')
+
+    // 构建请求参数
+    const queryParams = new URLSearchParams({
+      service: 'User.GetBalance',
+      lang: 'zh',
+      uid: String(userId),
+      token: token,
+    })
+
+    const separator = NEW_API_BASE_URL.includes('?') ? '&' : '?'
+    const requestUrl = `${NEW_API_BASE_URL}${separator}${queryParams.toString()}`
+
+    const response = await fetch(requestUrl, {
+      method: 'GET',
+      headers: {
+        Accept: 'application/json',
+      },
+    })
+
+    if (!response.ok) {
+      throw new Error(`HTTP error! Status: ${response.status}`)
+    }
+
+    const result = await response.json()
+    console.log('获取用户余额返回:', result)
+
+    if (result && result.ret === 200 && result.data && result.data.code === 0) {
+      // 返回余额信息
+      const balanceInfo = result.data.info?.[0]
+      return {
+        code: 1,
+        data: {
+          coin: parseFloat(balanceInfo?.coin || '0'),
+          score: parseInt(balanceInfo?.score || '0'),
+        },
+        msg: result.data.msg || '获取成功',
+      }
+    } else {
+      return {
+        code: 0,
+        data: null,
+        msg: result?.data?.msg || result?.msg || '获取失败',
+      }
+    }
+  } catch (error) {
+    console.error('获取用户余额失败:', error)
+    throw error
+  }
+}
