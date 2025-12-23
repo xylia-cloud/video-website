@@ -1643,6 +1643,28 @@ const performTouristLogin = async () => {
         />
       </div>
 
+      <!-- 最热视频列表（仅首页标签显示标题） -->
+      <div v-if="isFirstTabActive">
+        <!-- 最热标题 -->
+        <div class="section-title">最热</div>
+        <div v-if="isLoading" class="loading-state">
+          <van-loading type="spinner" color="#ff9500" />
+          <div class="loading-text">加载中...</div>
+        </div>
+        <div v-else-if="hasError" class="error-state">
+          <van-icon name="warning-o" size="24" color="#ff9500" />
+          <div class="error-text">加载失败，请稍后再试</div>
+          <div v-if="errorMessage" class="error-detail">{{ errorMessage }}</div>
+        </div>
+        <VideoList v-else :videos="videoData" />
+
+        <!-- 热门视频换一批按钮 -->
+        <div v-if="videoData.length > 0 && !isLoading" class="refresh-btn" @click="refreshVideos">
+          <van-icon name="replay" />
+          <span>换一批</span>
+        </div>
+      </div>
+
       <!-- 最新视频列表（仅首页标签显示） -->
       <div v-if="isFirstTabActive">
         <!-- 最新标题 -->
@@ -1664,28 +1686,6 @@ const performTouristLogin = async () => {
           class="refresh-btn"
           @click="refreshLatestVideos"
         >
-          <van-icon name="replay" />
-          <span>换一批</span>
-        </div>
-      </div>
-
-      <!-- 最热视频列表（仅首页标签显示标题） -->
-      <div v-if="isFirstTabActive">
-        <!-- 最热标题 -->
-        <div class="section-title">最热</div>
-        <div v-if="isLoading && videoData.length === 0" class="loading-state">
-          <van-loading type="spinner" color="#ff9500" />
-          <div class="loading-text">加载中...</div>
-        </div>
-        <div v-else-if="hasError" class="error-state">
-          <van-icon name="warning-o" size="24" color="#ff9500" />
-          <div class="error-text">加载失败，请稍后再试</div>
-          <div v-if="errorMessage" class="error-detail">{{ errorMessage }}</div>
-        </div>
-        <VideoList v-else :videos="videoData" />
-
-        <!-- 热门视频换一批按钮 -->
-        <div v-if="videoData.length > 0" class="refresh-btn" @click="refreshVideos">
           <van-icon name="replay" />
           <span>换一批</span>
         </div>

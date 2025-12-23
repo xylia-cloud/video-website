@@ -1,12 +1,18 @@
 <script setup lang="ts">
-import { ref, onMounted, computed } from 'vue'
+import { ref, onMounted, onUnmounted, computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import HeaderNav from '@/components/HeaderNav.vue'
 import { getUserInfo, fetchUserBalance } from '@/api/fetch-api'
 import { showToast } from 'vant'
 import { NEW_API_BASE_URL } from '@/utils/config'
 
-// 路由相关
+defineOptions({
+  inheritAttrs: false,
+})
+
+// ==========================================
+// 1. 基础配置与路由
+// ==========================================
 const route = useRoute()
 const router = useRouter()
 
@@ -20,10 +26,13 @@ const returnPrimaryCategoryId = ref((route.query.returnPrimaryCategoryId as stri
 const returnTopCategoryName = ref((route.query.returnTopCategoryName as string) || '')
 const returnPrimaryCategoryName = ref((route.query.returnPrimaryCategoryName as string) || '')
 
-// 彩票数据
+// ==========================================
+// 2. 类型定义
+// ==========================================
 interface LotteryIssue {
   issueNumber: string
   drawnNumbers: number[]
+  drawnResult: string
   status: string
 }
 
@@ -34,46 +43,11 @@ interface SqkjItem {
   expect: string
 }
 
-// 彩票当前期号数据
-const currentIssue = ref<LotteryIssue>({
-  issueNumber: '',
-  drawnNumbers: [],
-  status: '',
-})
-
-// 开奖信息
-const sqkjInfo = ref<SqkjItem | null>(null)
-
-// 倒计时数据
 interface CountdownData {
   lefttime: number
   nowexpect: string
 }
 
-const countdownData = ref<CountdownData | null>(null)
-const countdownInterval = ref<ReturnType<typeof setInterval> | null>(null)
-
-// 选号相关
-const selectedNumbers = ref<number[]>([])
-const singleBetAmount = ref(0) // 单注金额
-const betMultiplier = ref(1) // 倍数
-const isBetting = ref(false) // 投注中状态
-
-// 投注成功弹窗
-const showBettingSuccessModal = ref(false)
-const bettingSuccessMessage = ref('')
-
-// 错误提示弹窗
-const showErrorModal = ref(false)
-const errorMessage = ref('')
-
-// 登录过期弹窗
-const showLoginExpiredModal = ref(false)
-
-// 用户余额
-const userBalance = ref(0)
-
-// 玩法数据接口
 interface WanfaOption {
   id: string
   wanfa_id: string
@@ -95,167 +69,266 @@ interface BeishuItem {
   value: string
 }
 
-// 玩法数据
+// ==========================================
+// 3. 状态变量
+// ==========================================
+// 彩票当前期号数据
+const currentIssue = ref<LotteryIssue>({
+  issueNumber: '',
+  drawnNumbers: [],
+  drawnResult: '',
+  status: '',
+})
+
+const sqkjInfo = ref<SqkjItem | null>(null)
+const countdownData = ref<CountdownData | null>(null)
+
+// --- 定时器管理 (关键修复) ---
+const timerInterval = ref<ReturnType<typeof setInterval> | null>(null) // 倒计时句柄
+const pollingTimeout = ref<ReturnType<typeof setTimeout> | null>(null) // 轮询等待句柄
+
+// 选号与投注
+const selectedNumbers = ref<number[]>([])
+const singleBetAmount = ref(0)
+const betMultiplier = ref(1)
+const isBetting = ref(false)
+
+// 弹窗控制
+const showBettingSuccessModal = ref(false)
+const bettingSuccessMessage = ref('')
+const showErrorModal = ref(false)
+const errorMessage = ref('')
+const showLoginExpiredModal = ref(false)
+const showWinningModal = ref(false)
+const isWinning = ref(false)
+
+// 用户与玩法数据
+const userBalance = ref(0)
 const wanfaList = ref<WanfaOption[][]>([])
 const coinList = ref<CoinItem[]>([])
 const beishuList = ref<BeishuItem[]>([])
 const isLoadingWanfa = ref(false)
 const hasWanfaError = ref(false)
-
-// 玩法分类名称列表
 const wanfaNames = ref<string[]>([])
 const activeWanfaIndex = ref(0)
 
-// 倒计时是否结束（剩余时间 <= 1秒）
+// 计算属性：倒计时是否结束
 const isCountdownEnded = computed(() => {
   return countdownData.value ? countdownData.value.lefttime <= 1 : false
 })
 
-// 获取倒计时接口
-const fetchCountdown = async () => {
-  if (!categoryBiaoshi.value) {
-    console.log('缺少必要参数：biaoshi')
+// ==========================================
+// 4. 核心逻辑：定时器与倒计时 (解决死循环)
+// ==========================================
+
+/**
+ * 彻底清除所有定时器
+ * 在切换状态前必须调用，确保“单线程”运行
+ */
+const clearAllTimers = () => {
+  if (timerInterval.value) {
+    clearInterval(timerInterval.value)
+    timerInterval.value = null
+  }
+  if (pollingTimeout.value) {
+    clearTimeout(pollingTimeout.value)
+    pollingTimeout.value = null
+  }
+}
+
+/**
+ * 启动倒计时模式
+ */
+const startCountdown = () => {
+  // 1. 安全清理
+  clearAllTimers()
+
+  // 2. 检查时间有效性
+  if (!countdownData.value || countdownData.value.lefttime <= 0) {
+    console.log('>>> 时间无效或已归零，转入轮询')
+    handleRoundEnd()
     return
   }
 
+  console.log(`>>> 启动倒计时: ${countdownData.value.lefttime}秒`)
+
+  // 3. 开启倒计时
+  timerInterval.value = setInterval(() => {
+    if (countdownData.value && countdownData.value.lefttime > 0) {
+      countdownData.value.lefttime--
+    } else {
+      // 倒计时结束
+      console.log('>>> 倒计时结束')
+      clearAllTimers() // 立即停止
+      handleRoundEnd() // 进入下一阶段
+    }
+  }, 1000)
+}
+
+/**
+ * 倒计时结束后的处理（轮询等待模式）
+ * 负责：等待3秒 -> 刷新数据
+ */
+const handleRoundEnd = () => {
+  // 确保没有其他定时器干扰
+  clearAllTimers()
+
+  console.log('>>> 等待服务器结算(3s)...')
+
+  // 设置唯一的轮询定时器
+  pollingTimeout.value = setTimeout(() => {
+    refreshAllData()
+  }, 3000)
+}
+
+/**
+ * 刷新所有数据
+ */
+const refreshAllData = async () => {
   try {
-    // 构建查询参数
+    // 1. 获取最新时间 (这是最重要的)
+    // fetchCountdown 内部会决定是继续轮询还是开始倒计时
+    await fetchCountdown()
+
+    // 2. 刷新玩法(赔率可能变)和中奖状态
+    fetchWanfa()
+    checkWinning()
+  } catch (error) {
+    console.error('>>> 刷新数据异常，重试中:', error)
+    // 即使报错，也要继续尝试，否则页面会卡死
+    handleRoundEnd()
+  }
+}
+
+// ==========================================
+// 5. API 请求函数
+// ==========================================
+
+// 获取倒计时接口
+const fetchCountdown = async () => {
+  if (!categoryBiaoshi.value) return
+
+  try {
     const queryParams = new URLSearchParams({
       service: 'Caipiao.Gettimes2',
       lang: 'zh',
       biaoshi: categoryBiaoshi.value,
     })
 
-    console.log('获取倒计时数据')
-
-    // 发起GET请求
     const response = await fetch(`${NEW_API_BASE_URL}/?${queryParams.toString()}`, {
       method: 'GET',
-      headers: {
-        Accept: 'application/json',
-      },
+      headers: { Accept: 'application/json' },
     })
 
-    if (!response.ok) {
-      throw new Error(`HTTP error! Status: ${response.status}`)
+    if (!response.ok) throw new Error(`HTTP error! Status: ${response.status}`)
+    const result = await response.json()
+
+    if (result?.ret === 200 && result?.data?.code === 0 && result?.data?.info) {
+      const info = result.data.info
+      const newLeftTime = Number(info.lefttime)
+
+      // 更新数据
+      countdownData.value = {
+        lefttime: newLeftTime,
+        nowexpect: String(info.nowexpect || ''),
+      }
+
+      console.log(`>>> 接口返回时间: ${newLeftTime}秒`)
+
+      // === 核心决策 ===
+      if (newLeftTime > 0) {
+        // A. 拿到有效时间 -> 启动倒计时
+        startCountdown()
+      } else {
+        // B. 时间仍为0 (新一期未出) -> 继续等待
+        console.log('>>> 新一期未开出，继续轮询')
+        handleRoundEnd()
+      }
+    } else {
+      // 接口返回结构不对，视为失败，重试
+      throw new Error('API Data Error')
     }
+  } catch (error) {
+    console.error('获取倒计时接口失败:', error)
+    throw error // 抛出错误让 refreshAllData 捕获并触发重试
+  }
+}
+
+// 查询中奖记录
+const checkWinning = async () => {
+  try {
+    const userInfo = getUserInfo()
+    if (!userInfo || !userInfo.user_id) return
+
+    // 先重置中奖状态
+    isWinning.value = false
+
+    const queryParams = new URLSearchParams({
+      service: 'Caipiao.Check',
+      lang: 'zh',
+      uid: userInfo.user_id.toString(),
+      token: userInfo.token || '',
+      biaoshi: categoryBiaoshi.value,
+    })
+
+    const response = await fetch(`${NEW_API_BASE_URL}/?${queryParams.toString()}`, {
+      method: 'GET',
+      headers: { Accept: 'application/json' },
+    })
 
     const result = await response.json()
-    console.log('获取倒计时数据:', result)
 
     if (result && result.ret === 200 && result.data && result.data.code === 0) {
       const info = result.data.info
-      if (info && typeof info.lefttime === 'number') {
-        countdownData.value = {
-          lefttime: info.lefttime,
-          nowexpect: String(info.nowexpect || ''),
+
+      if (info && info.zhong && Array.isArray(info.zhong)) {
+        const myUserId = String(userInfo.user_id).trim()
+
+        console.log(`>>> 开始核对中奖名单 (我的ID: ${myUserId}) <<<`)
+
+        // 查找匹配项
+        const foundWinner = info.zhong.find((item: any) => {
+          const recordUid = String(item.uid).trim() // 提取记录中的 UID
+          const recordId = item.id // 提取记录的订单ID
+
+          // 打印比对过程
+          const isMatch = recordUid === myUserId
+          // console.log(`比对: 记录订单[${recordId}] 的归属用户ID[${recordUid}] vs 我的ID[${myUserId}] => ${isMatch ? '匹配' : '不匹配'}`)
+
+          return isMatch
+        })
+
+        if (foundWinner) {
+          // 这里特意打印 item.uid 给你看
+          console.log(`✅ 恭喜中奖！匹配成功的记录:`, foundWinner)
+          console.log(`   -> 记录归属者(uid): ${foundWinner.uid}`)
+          console.log(`   -> 我的ID(myUserId): ${myUserId}`)
+
+          isWinning.value = true
+          showWinningModal.value = true
+
+          // 刷新余额
+          fetchUserBalance().then((res) => {
+            if (res.code === 1 && res.data) userBalance.value = res.data.coin
+          })
+        } else {
+          console.log('❎ 未中奖: 名单中没有当前用户')
         }
-        console.log('倒计时数据:', countdownData.value)
-        startCountdown()
       }
-    } else {
-      console.log('获取倒计时数据失败:', result)
     }
   } catch (error) {
-    console.error('获取倒计时数据失败:', error)
-  }
-}
-
-// 启动倒计时
-const startCountdown = () => {
-  // 清除之前的倒计时
-  if (countdownInterval.value) {
-    clearInterval(countdownInterval.value)
-  }
-
-  // 每秒更新一次倒计时
-  countdownInterval.value = setInterval(() => {
-    if (countdownData.value && countdownData.value.lefttime > 0) {
-      countdownData.value.lefttime--
-    } else {
-      // 倒计时结束，清除定时器并重新获取
-      if (countdownInterval.value) {
-        clearInterval(countdownInterval.value)
-        countdownInterval.value = null
-      }
-      fetchCountdown()
-    }
-  }, 1000)
-}
-
-// 格式化倒计时显示
-const formatCountdown = (seconds: number): string => {
-  const hours = Math.floor(seconds / 3600)
-  const minutes = Math.floor((seconds % 3600) / 60)
-  const secs = seconds % 60
-
-  if (hours > 0) {
-    return `${hours}:${String(minutes).padStart(2, '0')}:${String(secs).padStart(2, '0')}`
-  } else {
-    return `${minutes}:${String(secs).padStart(2, '0')}`
-  }
-}
-
-// 获取倍数接口
-const fetchBeishu = async () => {
-  try {
-    // 构建查询参数
-    const queryParams = new URLSearchParams({
-      service: 'Caipiao.Getbeishu',
-      lang: 'zh',
-    })
-
-    console.log('获取倍数数据')
-
-    // 发起GET请求
-    const response = await fetch(`${NEW_API_BASE_URL}/?${queryParams.toString()}`, {
-      method: 'GET',
-      headers: {
-        Accept: 'application/json',
-      },
-    })
-
-    if (!response.ok) {
-      throw new Error(`HTTP error! Status: ${response.status}`)
-    }
-
-    const result = await response.json()
-    console.log('获取倍数数据:', result)
-
-    if (result && result.ret === 200 && result.data && result.data.code === 0) {
-      // 处理倍数数据
-      const info = result.data.info || []
-      if (Array.isArray(info)) {
-        beishuList.value = info.map((item: Record<string, unknown>) => ({
-          id: String(item.id || ''),
-          name: String(item.name || ''),
-          value: String(item.value || ''),
-        }))
-      }
-      console.log('处理后的倍数数据:', beishuList.value)
-    } else {
-      console.log('获取倍数数据失败:', result)
-      beishuList.value = []
-    }
-  } catch (error) {
-    console.error('获取倍数数据失败:', error)
-    beishuList.value = []
-    showToast('获取倍数数据失败')
+    console.error('查询中奖记录失败:', error)
   }
 }
 
 // 获取玩法接口
 const fetchWanfa = async () => {
-  if (!categoryId.value || !categoryBiaoshi.value) {
-    console.log('缺少必要参数：id或biaoshi')
-    return
-  }
+  if (!categoryId.value || !categoryBiaoshi.value) return
 
   isLoadingWanfa.value = true
   hasWanfaError.value = false
 
   try {
-    // 构建查询参数
     const queryParams = new URLSearchParams({
       service: 'Caipiao.Getwanfa',
       lang: 'zh',
@@ -263,232 +336,203 @@ const fetchWanfa = async () => {
       biaoshi: categoryBiaoshi.value,
     })
 
-    console.log('获取玩法参数:', { id: categoryId.value, biaoshi: categoryBiaoshi.value })
-
-    // 发起GET请求
     const response = await fetch(`${NEW_API_BASE_URL}/?${queryParams.toString()}`, {
       method: 'GET',
-      headers: {
-        Accept: 'application/json',
-      },
+      headers: { Accept: 'application/json' },
     })
 
-    if (!response.ok) {
-      throw new Error(`HTTP error! Status: ${response.status}`)
-    }
-
     const result = await response.json()
-    console.log('获取玩法数据:', result)
 
-    if (result && result.ret === 200 && result.data && result.data.code === 0) {
-      // 处理玩法数据
+    if (result?.ret === 200 && result?.data?.code === 0) {
       const info = result.data.info || {}
 
-      // 处理硬币数据
+      // 硬币数据
       if (info.coinimg && Array.isArray(info.coinimg)) {
-        coinList.value = info.coinimg.map((item: Record<string, unknown>) => ({
+        coinList.value = info.coinimg.map((item: any) => ({
           id: String(item.id || ''),
           coin: String(item.coin || ''),
           img: String(item.img || ''),
         }))
       }
 
-      // 处理开奖信息
+      // === 开奖信息解析 ===
       if (info.sqkj && Array.isArray(info.sqkj) && info.sqkj.length > 0) {
         const sqkjData = info.sqkj[0]
+
         sqkjInfo.value = {
           opencode: String(sqkjData.opencode || ''),
           name: String(sqkjData.name || ''),
           title: String(sqkjData.title || ''),
-          expect: String(sqkjData.expect || ''),
+          expect: String(sqkjData.expect || sqkjData.uexpect || ''),
         }
-
-        // 更新期号和开奖号码
         currentIssue.value.issueNumber = sqkjInfo.value.expect
-        const opencodeArray = sqkjInfo.value.opencode.split(',').map((num) => Number(num.trim()))
-        currentIssue.value.drawnNumbers = opencodeArray
+
+        const rawStr = sqkjInfo.value.opencode // 例如 "04,04,02"
+
+        // 【核心修复】正则提取所有连续数字
+        // match(/\d+/g) 会直接把字符串里的所有数字块提取出来，变成数组
+        // "04,04,02" -> ["04", "04", "02"]
+        // "04 04 02" -> ["04", "04", "02"]
+        const numbers = rawStr.match(/\d+/g)
+
+        if (numbers && numbers.length > 0) {
+          // 转换为数字数组
+          currentIssue.value.drawnNumbers = numbers.map((n) => Number(n))
+          currentIssue.value.drawnResult = ''
+          console.log('>>> 成功解析号码:', currentIssue.value.drawnNumbers)
+        } else {
+          // 如果没有数字，说明是文本结果（如"总单"）
+          currentIssue.value.drawnNumbers = []
+          currentIssue.value.drawnResult = rawStr
+        }
       }
 
-      // 处理玩法数据
+      // 玩法列表处理
       if (info.wanfa && Array.isArray(info.wanfa)) {
-        wanfaList.value = info.wanfa.map((group: Record<string, unknown>[]) => {
-          if (Array.isArray(group)) {
-            return group.map((item: Record<string, unknown>) => ({
-              id: String(item.id || ''),
-              wanfa_id: String(item.wanfa_id || ''),
-              name: String(item.name || ''),
-              peilv: String(item.peilv || ''),
-              caipiao_id: String(item.caipiao_id || ''),
-              wanfaname: String(item.wanfaname || ''),
-            }))
-          }
-          return []
+        wanfaList.value = info.wanfa.map((group: any[]) => {
+          return Array.isArray(group)
+            ? group.map((item: any) => ({
+                id: String(item.id),
+                wanfa_id: String(item.wanfa_id),
+                name: String(item.name),
+                peilv: String(item.peilv),
+                caipiao_id: String(item.caipiao_id),
+                wanfaname: String(item.wanfaname),
+              }))
+            : []
         })
-
-        // 提取玩法分类名称（从第一个玩法组中获取）
         const nameSet = new Set<string>()
-        wanfaList.value.forEach((group) => {
-          group.forEach((item) => {
-            nameSet.add(item.wanfaname)
-          })
-        })
+        wanfaList.value.forEach((group) => group.forEach((item) => nameSet.add(item.wanfaname)))
         wanfaNames.value = Array.from(nameSet)
-        activeWanfaIndex.value = 0
-      } else {
-        wanfaList.value = []
-        wanfaNames.value = []
+        if (activeWanfaIndex.value >= wanfaNames.value.length) activeWanfaIndex.value = 0
       }
-
-      console.log('处理后的玩法数据:', wanfaList.value)
-      console.log('玩法分类:', wanfaNames.value)
     } else {
-      console.log('获取玩法数据失败:', result)
       hasWanfaError.value = true
-      wanfaList.value = []
-      wanfaNames.value = []
     }
   } catch (error) {
     console.error('获取玩法数据失败:', error)
     hasWanfaError.value = true
-    wanfaList.value = []
-    showToast('获取玩法数据失败')
   } finally {
     isLoadingWanfa.value = false
   }
 }
 
-// 选择号码
-const toggleNumber = (num: number) => {
-  const index = selectedNumbers.value.indexOf(num)
-  if (index > -1) {
-    selectedNumbers.value.splice(index, 1)
-  } else {
-    selectedNumbers.value.push(num)
+// 获取倍数接口
+const fetchBeishu = async () => {
+  try {
+    const queryParams = new URLSearchParams({ service: 'Caipiao.Getbeishu', lang: 'zh' })
+    const response = await fetch(`${NEW_API_BASE_URL}/?${queryParams.toString()}`)
+    const result = await response.json()
+    if (result?.ret === 200 && result?.data?.code === 0 && Array.isArray(result.data.info)) {
+      beishuList.value = result.data.info.map((item: any) => ({
+        id: String(item.id),
+        name: String(item.name),
+        value: String(item.value),
+      }))
+    }
+  } catch (error) {
+    console.error('获取倍数失败', error)
   }
 }
 
-// 设置单注金额
-const setSingleBetAmount = (amount: number) => {
-  singleBetAmount.value = amount
+// ==========================================
+// 6. 交互功能
+// ==========================================
+
+// 选号
+const toggleNumber = (num: number) => {
+  const index = selectedNumbers.value.indexOf(num)
+  if (index > -1) selectedNumbers.value.splice(index, 1)
+  else selectedNumbers.value.push(num)
 }
 
-// 设置倍数
-const setBetMultiplier = (multiplier: number) => {
-  betMultiplier.value = multiplier
-}
+// 金额倍数
+const setSingleBetAmount = (amount: number) => (singleBetAmount.value = amount)
+const setBetMultiplier = (multiplier: number) => (betMultiplier.value = multiplier)
 
 // 提交投注
 const submitBetting = async () => {
-  if (selectedNumbers.value.length === 0) {
-    showToast('请选择号码')
-    return
-  }
-  if (singleBetAmount.value === 0) {
-    showToast('请选择投注金额')
-    return
-  }
+  if (selectedNumbers.value.length === 0) return showToast('请选择号码')
+  if (singleBetAmount.value === 0) return showToast('请选择投注金额')
+  if (!Number.isInteger(singleBetAmount.value)) return showToast('投注金额必须为整数')
 
-  // 验证单注金额为整数
-  if (!Number.isInteger(singleBetAmount.value)) {
-    showToast('投注金额必须为整数')
-    return
-  }
-
+  isBetting.value = true
   try {
-    // 设置投注中状态
-    isBetting.value = true
-
-    // 获取用户信息
     const userInfo = getUserInfo()
-    if (!userInfo) {
-      showToast('获取用户信息失败')
-      return
-    }
+    if (!userInfo) return showToast('获取用户信息失败')
 
-    // 获取当前玩法的wanfa_id
-    const currentWanfaId = wanfaList.value[activeWanfaIndex.value]?.[0]?.wanfa_id || ''
+    // 获取当前页面显示的所有选项列表
+    const currentOptions = wanfaList.value[activeWanfaIndex.value] || []
 
-    // 计算总注数和总金额
-    const zhushu = selectedNumbers.value.length // 注数
-    const totalMoney = singleBetAmount.value * zhushu * betMultiplier.value // 总金额 = 单注金额 * 注数 * 倍数
+    // 获取当前玩法的通用 wanfa_id
+    const currentWanfaId = currentOptions[0]?.wanfa_id || ''
 
-    // 构建查询参数
+    // 【核心修改】通过选中的ID (selectedNumbers) 反查对应的 Name
+    const selectedNames = currentOptions
+      .filter((option) => selectedNumbers.value.includes(Number(option.id))) // 找到选中的选项对象
+      .map((option) => option.name) // 提取 name 属性
+      .join(',') // 拼接成字符串，例如 "大,单"
+
+    const zhushu = selectedNumbers.value.length
+    const totalMoney = singleBetAmount.value * zhushu * betMultiplier.value
+
+    // 选中的 ID 字符串
+    const selectedIdsStr = selectedNumbers.value.join(',')
+
     const queryParams = new URLSearchParams({
       service: 'Caipiao.Touzhu',
       lang: 'zh',
       uid: userInfo.user_id?.toString() || '',
       token: userInfo.token || '',
-      zhuboid: '', // 先留空
+      zhuboid: '',
       biaoshi: categoryBiaoshi.value,
       title: primaryCategoryName.value,
-      wanfid: currentWanfaId, // 玩法ID（如46、47、48）
-      wanfaxiid: selectedNumbers.value.join(','), // 选中的选项ID（如202、203等）
-      zhushu: zhushu.toString(), // 注数
-      beishu: betMultiplier.value.toString(), // 倍数
-      money: totalMoney.toString(), // 总金额 = 单注金额 * 注数 * 倍数
-      value: '', // 先留空
+      wanfid: currentWanfaId,
+
+      // wanfaxiid 通常传 ID
+      wanfaxiid: selectedIdsStr,
+
+      zhushu: zhushu.toString(),
+      beishu: betMultiplier.value.toString(),
+      money: totalMoney.toString(),
+
+      // 【修改处】这里传中文名称 (name)
+      value: selectedNames,
+
       source: 'mobile',
     })
 
-    console.log('投注参数:', Object.fromEntries(queryParams))
+    console.log('提交参数:', Object.fromEntries(queryParams))
 
-    // 发起投注请求
     const response = await fetch(`${NEW_API_BASE_URL}/?${queryParams.toString()}`, {
       method: 'GET',
-      headers: {
-        Accept: 'application/json',
-      },
+      headers: { Accept: 'application/json' },
     })
-
-    if (!response.ok) {
-      throw new Error(`HTTP error! Status: ${response.status}`)
-    }
-
     const result = await response.json()
-    console.log('投注结果:', result)
 
-    if (result && result.ret === 200 && result.data) {
-      if (result.data.code === 0) {
-        // 投注成功
-        bettingSuccessMessage.value = result.data.msg || '下单成功,恭喜发财'
-        showBettingSuccessModal.value = true
+    if (result?.ret === 200 && result?.data?.code === 0) {
+      bettingSuccessMessage.value = result.data.msg || '下单成功,恭喜发财'
+      showBettingSuccessModal.value = true
+      selectedNumbers.value = [] // 清空选项
 
-        // 投注成功后更新余额
-        try {
-          const balanceResult = await fetchUserBalance()
-          if (balanceResult.code === 1 && balanceResult.data) {
-            userBalance.value = balanceResult.data.coin
-          }
-        } catch (error) {
-          console.error('更新余额失败:', error)
-        }
-      } else {
-        // 其他错误（包括余额不足等）
-        errorMessage.value = result.data.msg || '投注失败，请重试'
-        showErrorModal.value = true
-      }
+      // 刷新余额
+      fetchUserBalance().then((res) => {
+        if (res.code === 1 && res.data) userBalance.value = res.data.coin
+      })
     } else {
-      showToast(result?.data?.msg || result?.msg || '投注失败，请重试')
+      errorMessage.value = result?.data?.msg || '投注失败，请重试'
+      showErrorModal.value = true
     }
   } catch (error) {
-    console.error('投注错误:', error)
+    console.error(error)
     showToast('网络错误，请重试')
   } finally {
-    // 关闭投注中状态
     isBetting.value = false
   }
 }
 
-// 自定义返回逻辑
+// 导航
 const handleBack = () => {
-  console.log('返回参数:', {
-    returnTopCategoryId: returnTopCategoryId.value,
-    returnPrimaryCategoryId: returnPrimaryCategoryId.value,
-    returnTopCategoryName: returnTopCategoryName.value,
-    returnPrimaryCategoryName: returnPrimaryCategoryName.value,
-  })
-
-  // 返回到二级分类页面
   router.push({
     name: 'game-secondary',
     params: {
@@ -502,78 +546,50 @@ const handleBack = () => {
     },
   })
 }
+const goToTouzhuRecord = () =>
+  router.push({ name: 'lotteryTouzhuRecord', query: { biaoshi: categoryBiaoshi.value } })
+const goToHistory = () =>
+  router.push({ name: 'lotteryHistory', query: { biaoshi: categoryBiaoshi.value } })
+const goToLogin = () => router.push({ name: 'login' })
 
-// 跳转到投注记录页面
-const goToTouzhuRecord = () => {
-  router.push({
-    name: 'lotteryTouzhuRecord',
-    query: {
-      biaoshi: categoryBiaoshi.value,
-    },
-  })
+// 格式化时间
+const formatCountdown = (seconds: number): string => {
+  const hours = Math.floor(seconds / 3600)
+  const minutes = Math.floor((seconds % 3600) / 60)
+  const secs = seconds % 60
+  return hours > 0
+    ? `${hours}:${String(minutes).padStart(2, '0')}:${String(secs).padStart(2, '0')}`
+    : `${minutes}:${String(secs).padStart(2, '0')}`
 }
 
-// 跳转到开奖记录页面
-const goToHistory = () => {
-  router.push({
-    name: 'lotteryHistory',
-    query: {
-      biaoshi: categoryBiaoshi.value,
-    },
-  })
-}
-
-// 跳转到登录页面
-const goToLogin = () => {
-  router.push({
-    name: 'login',
-  })
-}
-
+// ==========================================
+// 7. 生命周期
+// ==========================================
 onMounted(() => {
-  console.log('彩票详情页:', {
-    primaryCategoryId: primaryCategoryId.value,
-    primaryCategoryName: primaryCategoryName.value,
-    categoryId: categoryId.value,
-    categoryBiaoshi: categoryBiaoshi.value,
-  })
+  // 加载余额
+  fetchUserBalance()
+    .then((res) => {
+      if (res.code === 1 && res.data) userBalance.value = res.data.coin
+      else if (res.code === 700) showLoginExpiredModal.value = true
+    })
+    .catch(() => {
+      const u = getUserInfo()
+      if (u) userBalance.value = u.coin || 0
+    })
 
-  // 获取用户余额
-  const loadBalance = async () => {
-    try {
-      const result = await fetchUserBalance()
-      if (result.code === 1 && result.data) {
-        userBalance.value = result.data.coin
-      } else if (result.code === 700) {
-        // 登录状态失效
-        console.log('登录状态失效:', result.msg)
-        showLoginExpiredModal.value = true
-      }
-    } catch (error) {
-      console.error('获取余额失败:', error)
-      // 降级处理：从本地存储获取
-      const userInfo = getUserInfo()
-      if (userInfo) {
-        userBalance.value = userInfo.coin || 0
-      }
-    }
-  }
-
-  // 获取玩法数据
-  if (categoryId.value && categoryBiaoshi.value) {
-    fetchWanfa()
-  }
-
-  // 获取倍数数据
+  // 加载基础数据
+  if (categoryId.value && categoryBiaoshi.value) fetchWanfa()
   fetchBeishu()
 
-  // 获取倒计时数据
+  // 启动倒计时主流程
   if (categoryBiaoshi.value) {
-    fetchCountdown()
+    fetchCountdown() // 入口：这里会自动判断是开始倒计时还是进入等待
   }
+})
 
-  // 加载余额
-  loadBalance()
+// 离开页面时务必销毁所有定时器，防止后台持续请求
+onUnmounted(() => {
+  clearAllTimers()
 })
 </script>
 
@@ -607,9 +623,16 @@ onMounted(() => {
           </div>
           <div class="result-row">
             <span class="label">开奖结果</span>
-            <div class="drawn-numbers">
-              <div class="drawn-number-item" v-for="num in currentIssue.drawnNumbers" :key="num">
-                <span>{{ num }}</span>
+            <div v-if="currentIssue.drawnResult" class="drawn-result-text">
+              {{ currentIssue.drawnResult }}
+            </div>
+            <div v-else class="drawn-numbers">
+              <div
+                class="drawn-number-item"
+                v-for="(num, index) in currentIssue.drawnNumbers"
+                :key="index"
+              >
+                <span>{{ String(num).padStart(2, '0') }}</span>
               </div>
             </div>
           </div>
@@ -617,8 +640,11 @@ onMounted(() => {
         <div class="info-right">
           <div v-if="currentIssue.status" class="status-badge">{{ currentIssue.status }}</div>
           <div v-if="countdownData" class="countdown-section">
-            <div class="countdown-label">开奖倒计时</div>
-            <div class="countdown-timer">{{ formatCountdown(countdownData.lefttime) }}</div>
+            <div v-if="countdownData.lefttime > 0" class="countdown-label">开奖倒计时</div>
+
+            <div class="countdown-timer">
+              {{ countdownData.lefttime > 0 ? formatCountdown(countdownData.lefttime) : '开奖中' }}
+            </div>
           </div>
         </div>
       </div>
@@ -787,6 +813,31 @@ onMounted(() => {
       </div>
       <div class="modal-footer">
         <button class="modal-btn" @click="goToLogin">去登录</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 中奖弹窗 -->
+  <div v-if="showWinningModal" class="betting-success-modal-overlay">
+    <div class="betting-success-modal">
+      <div class="modal-header">
+        <h2>{{ isWinning ? '恭喜中奖' : '未中奖' }}</h2>
+      </div>
+      <div class="modal-body">
+        <p v-if="isWinning" class="winning-text">恭喜！您已中奖，请查看投注记录！</p>
+        <p v-else class="losing-text">很遗憾，本期未中奖，继续加油！</p>
+      </div>
+      <div class="modal-footer">
+        <button
+          class="modal-btn"
+          @click="
+            () => {
+              showWinningModal = false
+            }
+          "
+        >
+          确定
+        </button>
       </div>
     </div>
   </div>
@@ -1024,6 +1075,17 @@ onMounted(() => {
   border-radius: 50%;
   top: 4px;
   left: 4px;
+}
+
+.drawn-result-text {
+  font-size: 16px;
+  font-weight: bold;
+  color: #ff9500;
+  padding: 8px 12px;
+  background-color: rgba(255, 149, 0, 0.1);
+  border-radius: 6px;
+  border: 1px solid rgba(255, 149, 0, 0.3);
+  display: inline-block;
 }
 
 /* 加载状态 */
@@ -1395,5 +1457,14 @@ onMounted(() => {
 
 .modal-btn:active {
   opacity: 0.8;
+}
+
+.winning-text {
+  color: #ff9500;
+  font-weight: 600;
+}
+
+.losing-text {
+  color: #999;
 }
 </style>

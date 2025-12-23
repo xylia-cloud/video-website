@@ -23,6 +23,8 @@ interface TouzhuRecord {
   amount: string // 投注金额
   is_show: string // 状态 (0=待开奖, 1=已中奖, 2=未中奖)
   opentime: string // 开奖时间
+  tzcode: string // 投注号码/选择
+  opencode: string // 开奖码
 }
 
 // 页面状态
@@ -92,6 +94,8 @@ const fetchTouzhuRecords = async (page: number = 1) => {
           amount: String(item.amount || '0'),
           is_show: String(item.is_show || '0'),
           opentime: String(item.opentime || ''),
+          tzcode: String(item.tzcode || ''),
+          opencode: String(item.opencode || ''),
         }))
 
         if (page === 1) {
@@ -254,16 +258,30 @@ onBeforeUnmount(() => {
           <!-- 卡片内容 -->
           <div class="card-content">
             <div class="content-row">
-              <span class="label">玩法</span>
-              <span class="value">{{ record.playtitle }}</span>
+              <div class="content-col">
+                <span class="label">玩法</span>
+                <span class="value">{{ record.playtitle }}</span>
+              </div>
+              <div class="content-col">
+                <span class="label">倍数</span>
+                <span class="value">{{ record.beishu }}倍</span>
+              </div>
             </div>
             <div class="content-row">
-              <span class="label">倍数</span>
-              <span class="value">{{ record.beishu }}倍</span>
+              <div class="content-col">
+                <span class="label">投注号码</span>
+                <span class="value">{{ record.tzcode }}</span>
+              </div>
+              <div class="content-col">
+                <span class="label">投注金额</span>
+                <span class="value amount">{{ record.amount }}</span>
+              </div>
             </div>
-            <div class="content-row">
-              <span class="label">投注金额</span>
-              <span class="value amount">¥{{ record.amount }}</span>
+            <div v-if="record.opencode" class="content-row">
+              <div class="content-col full-width">
+                <span class="label">开奖码</span>
+                <span class="value">{{ record.opencode }}</span>
+              </div>
             </div>
           </div>
 
@@ -454,39 +472,47 @@ onBeforeUnmount(() => {
 
 /* 卡片内容 */
 .card-content {
-  padding: 14px 16px;
+  padding: 10px 16px;
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 8px;
 }
 
 .content-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  font-size: 12px;
+}
+
+.content-row:last-child {
+  grid-template-columns: 1fr;
+}
+
+.content-col {
   display: flex;
-  justify-content: space-between;
-  align-items: center;
-  font-size: 13px;
+  flex-direction: column;
+  gap: 4px;
   padding: 6px 0;
 }
 
-.content-row:not(:last-child) {
-  border-bottom: 1px solid rgba(255, 255, 255, 0.03);
-  padding-bottom: 10px;
+.content-col.full-width {
+  grid-column: 1 / -1;
 }
 
 .label {
   color: #999;
-  flex-shrink: 0;
   font-weight: 500;
-  min-width: 60px;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
 }
 
 .value {
   color: #e0e0e0;
-  text-align: right;
-  flex: 1;
-  margin-left: 12px;
-  word-break: break-word;
   font-weight: 500;
+  font-size: 13px;
+  word-break: break-word;
 }
 
 .value.amount {

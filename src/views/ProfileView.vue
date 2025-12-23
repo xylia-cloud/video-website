@@ -55,23 +55,41 @@ const noticeText = ref('')
 
 // 处理头像URL
 const avatarUrl = computed(() => {
-  if (!userInfo.value) {
+  try {
+    console.log('获取头像URL，当前用户信息:', userInfo.value)
+
+    // 如果用户信息不存在，返回默认头像
+    if (!userInfo.value) {
+      console.log('用户信息不存在，返回默认头像')
+      return new URL('@/assets/img/img-avatar-default.png', import.meta.url).href
+    }
+
+    // 游客用户使用avatar字段，正式用户使用user_portrait字段
+    const portrait = userInfo.value.avatar || userInfo.value.user_portrait
+    console.log('获取到头像路径:', portrait)
+
+    // 如果没有头像，返回默认头像
+    if (!portrait) {
+      console.log('未找到用户头像，返回默认头像')
+      return new URL('@/assets/img/img-avatar-default.png', import.meta.url).href
+    }
+
+    // 处理不同的头像路径格式
+    let finalUrl: string
+    if (portrait.startsWith('http')) {
+      finalUrl = portrait
+    } else if (portrait.startsWith('/')) {
+      finalUrl = `${BASE_URL}${portrait}`
+    } else {
+      finalUrl = `${BASE_URL}/${portrait}`
+    }
+
+    console.log('生成的头像URL:', finalUrl)
+    return finalUrl
+  } catch (error) {
+    console.error('处理头像URL时出错:', error)
+    // 出错时返回默认头像
     return new URL('@/assets/img/img-avatar-default.png', import.meta.url).href
-  }
-
-  // 游客用户使用avatar字段，正式用户使用user_portrait字段
-  const portrait = userInfo.value.avatar || userInfo.value.user_portrait
-
-  if (!portrait) {
-    return new URL('@/assets/img/img-avatar-default.png', import.meta.url).href
-  }
-
-  if (portrait.startsWith('http')) {
-    return portrait
-  } else if (portrait.startsWith('/')) {
-    return `${BASE_URL}${portrait}`
-  } else {
-    return `${BASE_URL}/${portrait}`
   }
 })
 
@@ -90,22 +108,40 @@ const processAdImageUrl = (imgPath: string): string => {
 
 // 用户ID或昵称显示
 const displayName = computed(() => {
-  if (!userInfo.value) return ''
+  try {
+    if (!userInfo.value) {
+      console.log('用户信息不存在，返回空名称')
+      return '未登录用户'
+    }
 
-  // 🔥 统一使用 user_nick_name 字段（游客和正式用户已统一）
-  return userInfo.value.user_nick_name || userInfo.value.user_name || ''
+    console.log('获取用户显示名称，可用字段:', {
+      user_nick_name: userInfo.value.user_nick_name,
+      user_name: userInfo.value.user_name,
+      user_login: userInfo.value.user_login,
+      id: userInfo.value.id,
+    })
+
+    // 统一使用 user_nick_name 字段（游客和正式用户已统一）
+    const name =
+      userInfo.value.user_nick_name ||
+      userInfo.value.user_name ||
+      userInfo.value.user_login ||
+      userInfo.value.id ||
+      '未知用户'
+    console.log('最终显示名称:', name)
+    return name
+  } catch (error) {
+    console.error('获取用户显示名称时出错:', error)
+    return '用户'
+  }
 })
 
 // 用户账号显示
 const userAccount = computed(() => {
   if (!userInfo.value) return ''
 
-  // 游客用户显示ID，正式用户显示用户名
-  if (userInfo.value.isyouke === '1') {
-    return `游客ID: ${userInfo.value.id}`
-  }
-
-  return userInfo.value.user_name || ''
+  // 显示用户ID
+  return userInfo.value.user_id || userInfo.value.id || ''
 })
 
 // 用户名（不是昵称）- 用于账户凭证显示
@@ -316,14 +352,25 @@ onMounted(async () => {
   if (localUserInfo) {
     // 本地有用户信息，直接使用（游客或正式用户）
     console.log('✅ 使用本地缓存的用户信息 - 类型:', isGuest ? '游客' : '正式用户')
-    userInfo.value = localUserInfo
-    // 🔥 统一使用 user_name 字段（游客和正式用户已统一）
+    console.log('本地用户信息详情:', JSON.stringify(localUserInfo, null, 2))
+
+    // 确保用户信息是响应式的
+    userInfo.value = { ...localUserInfo }
+
+    // 统一使用 user_name 字段（游客和正式用户已统一）
     userId.value = localUserInfo.user_name || localUserInfo.user_id || localUserInfo.id || ''
+    console.log('设置用户ID:', userId.value)
 
     // 初始化积分和VIP数据
     userVideoNums.value = localUserInfo.video_nums || 0
     isVip.value = localUserInfo.is_vip || '0'
     vipEndtime.value = localUserInfo.endtime || ''
+
+    console.log('初始化用户数据:', {
+      userVideoNums: userVideoNums.value,
+      isVip: isVip.value,
+      vipEndtime: vipEndtime.value,
+    })
 
     // 只有真正的游客用户才显示提示弹窗
     if (isGuest) {
@@ -655,7 +702,7 @@ const confirmApplyAgent = async () => {
           <div class="username">
             {{ displayName }}
           </div>
-          <div class="user-id">{{ userAccount }}</div>
+          <div class="user-id">用户ID：{{ userAccount }}</div>
         </div>
       </div>
       <div class="user-arrow">
