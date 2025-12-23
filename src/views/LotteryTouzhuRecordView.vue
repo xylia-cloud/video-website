@@ -410,12 +410,6 @@ onBeforeUnmount(() => {
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
 }
 
-.record-card:hover {
-  border-color: #ff9500;
-  box-shadow: 0 6px 16px rgba(255, 149, 0, 0.15);
-  transform: translateY(-2px);
-}
-
 /* 卡片头部 */
 .card-header {
   display: flex;

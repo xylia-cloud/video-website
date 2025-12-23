@@ -3011,16 +3011,32 @@ export const fetchUserBalance = async () => {
     const result = await response.json()
     console.log('获取用户余额返回:', result)
 
-    if (result && result.ret === 200 && result.data && result.data.code === 0) {
-      // 返回余额信息
-      const balanceInfo = result.data.info?.[0]
-      return {
-        code: 1,
-        data: {
-          coin: parseFloat(balanceInfo?.coin || '0'),
-          score: parseInt(balanceInfo?.score || '0'),
-        },
-        msg: result.data.msg || '获取成功',
+    if (result && result.ret === 200 && result.data) {
+      if (result.data.code === 0) {
+        // 返回余额信息
+        const balanceInfo = result.data.info?.[0]
+        return {
+          code: 1,
+          data: {
+            coin: parseFloat(balanceInfo?.coin || '0'),
+            score: parseInt(balanceInfo?.score || '0'),
+          },
+          msg: result.data.msg || '获取成功',
+        }
+      } else if (result.data.code === 700) {
+        // 登录状态失效
+        return {
+          code: 700,
+          data: null,
+          msg: result.data.msg || '登陆状态失效',
+        }
+      } else {
+        // 其他错误
+        return {
+          code: 0,
+          data: null,
+          msg: result.data.msg || '获取失败',
+        }
       }
     } else {
       return {

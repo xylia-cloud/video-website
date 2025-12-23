@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import HeaderNav from '@/components/HeaderNav.vue'
 import { getUserInfo, fetchUserBalance } from '@/api/fetch-api'
@@ -15,6 +15,10 @@ const primaryCategoryId = ref(route.params.primaryCategoryId as string)
 const primaryCategoryName = ref((route.query.primaryCategoryName as string) || '')
 const categoryId = ref((route.query.id as string) || '')
 const categoryBiaoshi = ref((route.query.biaoshi as string) || '')
+const returnTopCategoryId = ref((route.query.returnTopCategoryId as string) || '')
+const returnPrimaryCategoryId = ref((route.query.returnPrimaryCategoryId as string) || '')
+const returnTopCategoryName = ref((route.query.returnTopCategoryName as string) || '')
+const returnPrimaryCategoryName = ref((route.query.returnPrimaryCategoryName as string) || '')
 
 // 彩票数据
 interface LotteryIssue {
@@ -40,6 +44,15 @@ const currentIssue = ref<LotteryIssue>({
 // 开奖信息
 const sqkjInfo = ref<SqkjItem | null>(null)
 
+// 倒计时数据
+interface CountdownData {
+  lefttime: number
+  nowexpect: string
+}
+
+const countdownData = ref<CountdownData | null>(null)
+const countdownInterval = ref<ReturnType<typeof setInterval> | null>(null)
+
 // 选号相关
 const selectedNumbers = ref<number[]>([])
 const singleBetAmount = ref(0) // 单注金额
@@ -53,6 +66,9 @@ const bettingSuccessMessage = ref('')
 // 错误提示弹窗
 const showErrorModal = ref(false)
 const errorMessage = ref('')
+
+// 登录过期弹窗
+const showLoginExpiredModal = ref(false)
 
 // 用户余额
 const userBalance = ref(0)
@@ -89,6 +105,96 @@ const hasWanfaError = ref(false)
 // 玩法分类名称列表
 const wanfaNames = ref<string[]>([])
 const activeWanfaIndex = ref(0)
+
+// 倒计时是否结束（剩余时间 <= 1秒）
+const isCountdownEnded = computed(() => {
+  return countdownData.value ? countdownData.value.lefttime <= 1 : false
+})
+
+// 获取倒计时接口
+const fetchCountdown = async () => {
+  if (!categoryBiaoshi.value) {
+    console.log('缺少必要参数：biaoshi')
+    return
+  }
+
+  try {
+    // 构建查询参数
+    const queryParams = new URLSearchParams({
+      service: 'Caipiao.Gettimes2',
+      lang: 'zh',
+      biaoshi: categoryBiaoshi.value,
+    })
+
+    console.log('获取倒计时数据')
+
+    // 发起GET请求
+    const response = await fetch(`${NEW_API_BASE_URL}/?${queryParams.toString()}`, {
+      method: 'GET',
+      headers: {
+        Accept: 'application/json',
+      },
+    })
+
+    if (!response.ok) {
+      throw new Error(`HTTP error! Status: ${response.status}`)
+    }
+
+    const result = await response.json()
+    console.log('获取倒计时数据:', result)
+
+    if (result && result.ret === 200 && result.data && result.data.code === 0) {
+      const info = result.data.info
+      if (info && typeof info.lefttime === 'number') {
+        countdownData.value = {
+          lefttime: info.lefttime,
+          nowexpect: String(info.nowexpect || ''),
+        }
+        console.log('倒计时数据:', countdownData.value)
+        startCountdown()
+      }
+    } else {
+      console.log('获取倒计时数据失败:', result)
+    }
+  } catch (error) {
+    console.error('获取倒计时数据失败:', error)
+  }
+}
+
+// 启动倒计时
+const startCountdown = () => {
+  // 清除之前的倒计时
+  if (countdownInterval.value) {
+    clearInterval(countdownInterval.value)
+  }
+
+  // 每秒更新一次倒计时
+  countdownInterval.value = setInterval(() => {
+    if (countdownData.value && countdownData.value.lefttime > 0) {
+      countdownData.value.lefttime--
+    } else {
+      // 倒计时结束，清除定时器并重新获取
+      if (countdownInterval.value) {
+        clearInterval(countdownInterval.value)
+        countdownInterval.value = null
+      }
+      fetchCountdown()
+    }
+  }, 1000)
+}
+
+// 格式化倒计时显示
+const formatCountdown = (seconds: number): string => {
+  const hours = Math.floor(seconds / 3600)
+  const minutes = Math.floor((seconds % 3600) / 60)
+  const secs = seconds % 60
+
+  if (hours > 0) {
+    return `${hours}:${String(minutes).padStart(2, '0')}:${String(secs).padStart(2, '0')}`
+  } else {
+    return `${minutes}:${String(secs).padStart(2, '0')}`
+  }
+}
 
 // 获取倍数接口
 const fetchBeishu = async () => {
@@ -375,8 +481,25 @@ const submitBetting = async () => {
 
 // 自定义返回逻辑
 const handleBack = () => {
+  console.log('返回参数:', {
+    returnTopCategoryId: returnTopCategoryId.value,
+    returnPrimaryCategoryId: returnPrimaryCategoryId.value,
+    returnTopCategoryName: returnTopCategoryName.value,
+    returnPrimaryCategoryName: returnPrimaryCategoryName.value,
+  })
+
+  // 返回到二级分类页面
   router.push({
-    name: 'game',
+    name: 'game-secondary',
+    params: {
+      topCategoryId: returnTopCategoryId.value,
+      primaryCategoryId: returnPrimaryCategoryId.value,
+    },
+    query: {
+      topCategoryName: returnTopCategoryName.value,
+      primaryCategoryName: returnPrimaryCategoryName.value,
+      returnTopCategoryId: returnTopCategoryId.value,
+    },
   })
 }
 
@@ -400,6 +523,13 @@ const goToHistory = () => {
   })
 }
 
+// 跳转到登录页面
+const goToLogin = () => {
+  router.push({
+    name: 'login',
+  })
+}
+
 onMounted(() => {
   console.log('彩票详情页:', {
     primaryCategoryId: primaryCategoryId.value,
@@ -414,6 +544,10 @@ onMounted(() => {
       const result = await fetchUserBalance()
       if (result.code === 1 && result.data) {
         userBalance.value = result.data.coin
+      } else if (result.code === 700) {
+        // 登录状态失效
+        console.log('登录状态失效:', result.msg)
+        showLoginExpiredModal.value = true
       }
     } catch (error) {
       console.error('获取余额失败:', error)
@@ -432,6 +566,11 @@ onMounted(() => {
 
   // 获取倍数数据
   fetchBeishu()
+
+  // 获取倒计时数据
+  if (categoryBiaoshi.value) {
+    fetchCountdown()
+  }
 
   // 加载余额
   loadBalance()
@@ -475,7 +614,13 @@ onMounted(() => {
             </div>
           </div>
         </div>
-        <div v-if="currentIssue.status" class="status-badge">{{ currentIssue.status }}</div>
+        <div class="info-right">
+          <div v-if="currentIssue.status" class="status-badge">{{ currentIssue.status }}</div>
+          <div v-if="countdownData" class="countdown-section">
+            <div class="countdown-label">开奖倒计时</div>
+            <div class="countdown-timer">{{ formatCountdown(countdownData.lefttime) }}</div>
+          </div>
+        </div>
       </div>
 
       <!-- 功能按钮 -->
@@ -557,11 +702,15 @@ onMounted(() => {
             class="betting-input"
             placeholder="输入金额"
             min="0"
-            :disabled="isBetting"
+            :disabled="isBetting || isCountdownEnded"
           />
-          <button class="submit-btn" @click="submitBetting" :disabled="isBetting">
+          <button
+            class="submit-btn"
+            @click="submitBetting"
+            :disabled="isBetting || isCountdownEnded"
+          >
             <van-loading v-if="isBetting" type="spinner" size="16" color="#fff" />
-            <span v-else>投注</span>
+            <span v-else>{{ isCountdownEnded ? '禁止下注' : '投注' }}</span>
           </button>
         </div>
       </div>
@@ -623,6 +772,21 @@ onMounted(() => {
         >
           确定
         </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 登录过期弹窗 -->
+  <div v-if="showLoginExpiredModal" class="betting-success-modal-overlay">
+    <div class="betting-success-modal">
+      <div class="modal-header">
+        <h2>登录过期</h2>
+      </div>
+      <div class="modal-body">
+        <p>您的登陆状态失效，请重新登陆！</p>
+      </div>
+      <div class="modal-footer">
+        <button class="modal-btn" @click="goToLogin">去登录</button>
       </div>
     </div>
   </div>
@@ -707,6 +871,13 @@ onMounted(() => {
   flex: 1;
 }
 
+.info-right {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  align-items: flex-end;
+}
+
 .issue-row {
   display: flex;
   align-items: center;
@@ -746,6 +917,32 @@ onMounted(() => {
   border-radius: 4px;
   font-size: 12px;
   font-weight: 500;
+}
+
+.countdown-section {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  background: linear-gradient(135deg, rgba(255, 149, 0, 0.1), rgba(255, 184, 77, 0.1));
+  padding: 6px 10px;
+  border-radius: 6px;
+  border: 1px solid rgba(255, 149, 0, 0.3);
+  min-width: 90px;
+}
+
+.countdown-label {
+  font-size: 10px;
+  color: #999;
+  text-align: center;
+}
+
+.countdown-timer {
+  font-size: 14px;
+  font-weight: bold;
+  color: #ff9500;
+  font-family: 'Courier New', monospace;
+  letter-spacing: 1px;
 }
 
 /* 功能按钮 */

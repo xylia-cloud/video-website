@@ -597,6 +597,26 @@ const handleSecondaryCategoryClick = (secondaryCategory: SecondaryCategory) => {
 const handleGameClick = async (game: Game) => {
   console.log('点击游戏:', game)
 
+  // 如果是彩票分类（topCategoryId为'3'），跳转到彩票详情页
+  if (topCategoryId.value === '3') {
+    router.push({
+      name: 'lottery-detail',
+      params: {
+        primaryCategoryId: game.id.toString(),
+      },
+      query: {
+        primaryCategoryName: game.name, // 传递彩票的名称
+        id: game.id.toString(), // 传递id参数
+        biaoshi: game.biaoshi || '', // 传递biaoshi参数
+        returnTopCategoryId: topCategoryId.value, // 返回时用的顶级分类ID
+        returnPrimaryCategoryId: primaryCategoryId.value, // 返回时用的一级分类ID
+        returnTopCategoryName: topCategoryName.value, // 返回时用的顶级分类名称
+        returnPrimaryCategoryName: primaryCategoryName.value, // 返回时用的一级分类名称
+      },
+    })
+    return
+  }
+
   try {
     // 检查用户登录状态
     const userInfo = getUserInfo()
@@ -872,12 +892,12 @@ const handleBack = () => {
 
             <!-- 游戏网格 -->
             <div v-else-if="secondaryCategory.games && secondaryCategory.games.length > 0">
-              <div class="games-grid">
+              <div class="games-grid" :class="{ 'lottery-grid': topCategoryId === '3' }">
                 <div class="game-item" v-for="game in secondaryCategory.games" :key="game.id">
                   <div class="game-image" @click="handleGameClick(game)">
                     <img v-if="game.imageUrl" :src="game.imageUrl" :alt="game.name" />
                   </div>
-                  <div class="game-info">
+                  <div v-if="topCategoryId !== '3'" class="game-info">
                     <div class="game-name" @click="handleGameClick(game)">{{ game.name }}</div>
                     <!-- 收藏按钮 - 根据iscollect显示不同状态 -->
                     <div
@@ -1435,6 +1455,11 @@ const handleBack = () => {
   margin-bottom: 15px;
 }
 
+.games-grid.lottery-grid {
+  grid-template-columns: 1fr;
+  gap: 12px;
+}
+
 .game-item {
   display: flex;
   flex-direction: column;
@@ -1444,6 +1469,10 @@ const handleBack = () => {
   transition: all 0.3s ease;
 }
 
+.games-grid.lottery-grid .game-item {
+  gap: 0;
+}
+
 .game-image {
   width: 100%;
   aspect-ratio: 1;
@@ -1451,6 +1480,12 @@ const handleBack = () => {
   overflow: hidden;
   cursor: pointer;
   transition: all 0.3s ease;
+}
+
+.games-grid.lottery-grid .game-image {
+  aspect-ratio: auto;
+  border-radius: 0;
+  height: auto;
 }
 
 .game-image:hover {

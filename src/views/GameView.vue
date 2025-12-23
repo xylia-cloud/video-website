@@ -4,7 +4,6 @@ import { NEW_API_BASE_URL } from '@/utils/config'
 import { getUserInfo, isLoggedIn, fetchNotices, type NoticeGroup } from '@/api/fetch-api'
 import { useRouter, useRoute } from 'vue-router'
 import { showToast } from 'vant'
-import lotteryIcon from '@/assets/img/icon-game-caipiao.png'
 
 // 顶级游戏分类接口
 interface TopGameCategory {
@@ -194,16 +193,6 @@ const fetchTopCategories = async () => {
           const paixuB = b.paixu ? parseInt(b.paixu) : 999
           return paixuA - paixuB
         })
-
-      // 手动插入彩票分类到顶级分类列表的最前面
-      const lotteryCategory: TopGameCategory = {
-        id: '0',
-        name: '彩票',
-        icon: lotteryIcon,
-        status: '1',
-        paixu: '0',
-      }
-      sortedCategories.unshift(lotteryCategory)
 
       topCategories.value = sortedCategories
 
