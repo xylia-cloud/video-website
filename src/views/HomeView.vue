@@ -1,6 +1,10 @@
 <script setup lang="ts">
 // 导入视频列表组件
 import VideoList from '@/components/VideoList.vue'
+import PrimaryMenu from '@/components/PrimaryMenu.vue'
+import SecondaryMenu from '@/components/SecondaryMenu.vue'
+import BannerCarousel from '@/components/BannerCarousel.vue'
+import SearchBar from '@/components/SearchBar.vue'
 import { ref, onMounted, onBeforeUnmount, computed, onActivated } from 'vue'
 import { getRecommendVideos } from '@/api/video'
 import {
@@ -11,6 +15,7 @@ import {
   touristLogin,
   getUserInfo,
   isLoggedIn,
+  getFullImageUrl,
 } from '@/api/fetch-api'
 import type { TypeItem } from '@/api/fetch-api'
 import { BASE_URL, VIDEO_CATEGORIES, DEFAULT_PAGE_SIZE } from '@/utils/config'
@@ -188,32 +193,15 @@ const onBannerChange = (index: number) => {
 
 // 处理视频数据的函数
 const processVideoData = (item: ApiVideoItem): VideoItem => {
-  // 处理封面图片URL
-  let coverUrl = ''
-  if (item.vod_pic) {
-    // 如果路径是相对路径，添加BASE_URL
-    if (item.vod_pic.startsWith('/')) {
-      coverUrl = `${BASE_URL}${item.vod_pic}`
-    } else if (item.vod_pic.startsWith('http')) {
-      coverUrl = item.vod_pic
-    } else {
-      coverUrl = item.coverUrl || ''
-    }
-  } else {
-    coverUrl = item.coverUrl || ''
-  }
-
-  // 判断是否付费内容
   const pointsPlay = item.vod_points_play !== undefined ? Number(item.vod_points_play) : 0
   const isVip = pointsPlay > 0
-  const isFree = !isVip
 
   return {
     id: item.id || item.vod_id || 0,
-    coverUrl: coverUrl,
+    coverUrl: getFullImageUrl(item.vod_pic || item.vod_pic_thumb), // 💡 统一处理
     title: item.vod_name || item.title || '',
-    isVip: isVip,
-    isFree: isFree,
+    isVip,
+    isFree: !isVip,
     duration: item.vod_duration || '',
     class: item.vod_class || '',
     time: item.vod_pubdate || item.vod_time || item.vod_time_add || '',
@@ -781,20 +769,12 @@ const fetchBannerAds = async () => {
       result.data.length > 0
     ) {
       // 将API返回的广告数据转换为本地数据结构
-      const apiAds = result.data.map((item: any) => {
-        const adItem = {
-          id: item.id || 0,
-          imageUrl: processAdImageUrl(item.ad_img || ''),
-          title: item.ad_name || '广告',
-          link: item.ad_url || '',
-        }
-
-        console.log('处理后的广告项:', adItem)
-        return adItem
-      })
-
-      // 更新轮播图广告数据
-      console.log('更新轮播图广告数据:', apiAds)
+      const apiAds = result.data.map((item: any) => ({
+        id: item.id || 0,
+        imageUrl: getFullImageUrl(item.ad_img, 'ad'), // 💡 统一处理
+        title: item.ad_name || '广告',
+        link: item.ad_url || '',
+      }))
       bannerAds.value = apiAds
     } else {
       console.log('没有获取到轮播图广告数据，不显示轮播图')
@@ -917,17 +897,12 @@ const fetchTagsData = async () => {
       Array.isArray(result.data) &&
       result.data.length > 0
     ) {
-      // 处理API返回的标签数据
-      const apiTags = result.data.map((item: any, index: number) => {
-        return {
-          tag_id: item.tag_id || index + 1, // 如果没有tag_id，使用索引+1作为ID
-          tag_name: item.tag_name || '',
-          tag_img: item.tag_img ? processImageUrl(item.tag_img) : '', // 如果没有图片，设置为空，让CSS处理背景
-          hasImage: !!item.tag_img, // 标记是否有图片
-        }
-      })
-
-      // 更新标签数据
+      const apiTags = result.data.map((item: any, index: number) => ({
+        tag_id: item.tag_id || index + 1,
+        tag_name: item.tag_name || '',
+        tag_img: getFullImageUrl(item.tag_img, 'tag'), // 💡 统一处理
+        hasImage: !!item.tag_img,
+      }))
       tagsList.value = apiTags
 
       // 只显示前3个标签
@@ -1520,92 +1495,37 @@ const performTouristLogin = async () => {
     </div>
 
     <!-- 顶部搜索栏 -->
-    <div class="search-bar">
-      <div class="search-input">
-        <van-icon name="search" color="#999" />
-        <input
-          type="text"
-          placeholder="影片名称"
-          class="search-field"
-          v-model="searchKeyword"
-          @keyup.enter="handleSearch"
-        />
-        <van-icon
-          v-if="searchKeyword"
-          name="clear"
-          color="#999"
-          class="clear-icon"
-          @click="searchKeyword = ''"
-        />
-      </div>
-      <div class="app-download" @click="openAppDownload">
-        <img src="@/assets/img/icon-yjym.svg" alt="永久域名" />
-        永久域名
-      </div>
-    </div>
+    <SearchBar :keyword="searchKeyword" @search="handleSearch" />
 
     <!-- 导航栏 -->
     <div class="nav-container">
       <!-- 一级分类 -->
-      <div class="nav-tabs">
-        <div
-          v-for="type in typesList"
-          :key="type.type_id"
-          :class="[
-            'tab-item',
-            activeTypeId === type.type_id ||
-            (type.child && type.child.some((child) => child.type_id === activeTypeId))
-              ? 'active'
-              : '',
-            type.child && type.child.length > 0 ? 'has-children' : '',
-          ]"
-          @click="handlePrimaryTypeClick(type)"
-          :data-type-id="type.type_id"
-        >
-          {{ type.type_name }}
-          <van-icon
-            v-if="type.child && type.child.length > 0"
-            :name="expandedTypeId === type.type_id ? 'arrow-up' : 'arrow-down'"
-            size="12"
-            class="expand-icon"
-          />
-        </div>
-      </div>
+      <PrimaryMenu
+        :typesList="typesList"
+        :activeTypeId="activeTypeId"
+        :expandedTypeId="expandedTypeId"
+        @primary-type-click="handlePrimaryTypeClick"
+      />
 
       <!-- 二级分类 -->
-      <div
-        v-if="expandedTypeId && typesList.find((t) => t.type_id === expandedTypeId)?.child"
-        class="sub-nav-tabs"
-      >
-        <div
-          v-for="subType in typesList.find((t) => t.type_id === expandedTypeId)?.child"
-          :key="subType.type_id"
-          :class="['sub-tab-item', activeSubTypeId === subType.type_id ? 'active' : '']"
-          @click="handleSubTypeClick(subType)"
-        >
-          {{ subType.type_name }}
-        </div>
-      </div>
+      <SecondaryMenu
+        :typesList="typesList"
+        :expandedTypeId="expandedTypeId"
+        :activeSubTypeId="activeSubTypeId"
+        @sub-type-click="handleSubTypeClick"
+      />
     </div>
 
     <!-- 主要内容 -->
     <div class="content">
       <!-- 大型轮播广告 -->
-      <div class="banner" v-if="bannerAds.length > 0">
-        <van-swipe
-          :autoplay="3000"
-          lazy-render
-          indicator-color="#ff9500"
-          :loop="true"
-          @change="onBannerChange"
-        >
-          <van-swipe-item v-for="(ad, index) in bannerAds" :key="ad.id" @click="handleAdClick(ad)">
-            <div v-show="currentBannerIndex === index">
-              <img :src="ad.imageUrl" :alt="ad.title" @error="handleImageError($event, ad)" />
-            </div>
-          </van-swipe-item>
-        </van-swipe>
-      </div>
+      <BannerCarousel
+        :bannerAds="bannerAds"
+        :currentBannerIndex="currentBannerIndex"
+        @banner-change="onBannerChange"
+        @ad-click="handleAdClick"
+        @image-error="handleImageError"
+      />
 
       <!-- 分类标签 -->
       <div class="category-tags" v-if="false" style="display: none">
@@ -1656,6 +1576,7 @@ const performTouristLogin = async () => {
           <div class="error-text">加载失败，请稍后再试</div>
           <div v-if="errorMessage" class="error-detail">{{ errorMessage }}</div>
         </div>
+
         <VideoList v-else :videos="videoData" />
 
         <!-- 热门视频换一批按钮 -->
@@ -1761,144 +1682,10 @@ const performTouristLogin = async () => {
   /* 防止横向滚动 */
 }
 
-/* 顶部搜索栏 */
-.search-bar {
-  display: flex;
-  align-items: center;
-  padding: 10px 15px;
-  background-color: #111;
-}
-
-.search-input {
-  flex: 1;
-  display: flex;
-  align-items: center;
-  background-color: #333;
-  border-radius: 20px;
-  padding: 8px 15px;
-  margin-right: 10px;
-}
-
-.search-field {
-  flex: 1;
-  background-color: transparent;
-  border: none;
-  outline: none;
-  color: #fff;
-  margin-left: 5px;
-  font-size: 14px;
-}
-
-.search-field::placeholder {
-  color: #999;
-}
-
-.clear-icon {
-  cursor: pointer;
-}
-
-.app-download {
-  color: #ff9500;
-  font-size: 10px;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-}
-
-.app-download img {
-  width: 24px;
-}
-
 /* 导航容器 */
 .nav-container {
   background-color: #111;
   border-bottom: 1px solid #222;
-}
-
-/* 一级导航标签 */
-.nav-tabs {
-  display: grid;
-  grid-template-columns: repeat(4, 1fr);
-  gap: 8px;
-  padding: 10px 15px;
-}
-
-.tab-item {
-  padding: 8px 12px;
-  font-size: 13px;
-  color: #ccc;
-  text-align: center;
-  cursor: pointer;
-  background-color: #333;
-  border-radius: 8px;
-  border: 1px solid transparent;
-  transition: all 0.3s ease;
-  white-space: nowrap;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 4px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.tab-item.active {
-  color: #fff !important;
-  font-weight: bold !important;
-  background-color: #ff9500 !important;
-  border-color: #ff9500 !important;
-}
-
-.tab-item:hover {
-  background-color: #444;
-  border-color: #666;
-  color: #fff;
-}
-
-.tab-item.has-children {
-  position: relative;
-}
-
-.expand-icon {
-  margin-left: 2px;
-}
-
-/* 二级导航标签 */
-.sub-nav-tabs {
-  display: grid;
-  grid-template-columns: repeat(4, 1fr);
-  gap: 6px;
-  padding: 8px 15px 12px;
-  background-color: #1a1a1a;
-  border-top: 1px solid #333;
-}
-
-.sub-tab-item {
-  padding: 6px 10px;
-  font-size: 12px;
-  color: #999;
-  text-align: center;
-  cursor: pointer;
-  background-color: #2a2a2a;
-  border-radius: 6px;
-  border: 1px solid transparent;
-  transition: all 0.3s ease;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.sub-tab-item.active {
-  color: #fff !important;
-  font-weight: bold !important;
-  background-color: #ff9500 !important;
-  border-color: #ff9500 !important;
-}
-
-.sub-tab-item:hover {
-  background-color: #3a3a3a;
-  border-color: #555;
-  color: #fff;
 }
 
 /* 内容区域 */
@@ -1908,42 +1695,6 @@ const performTouristLogin = async () => {
   box-sizing: border-box;
   overflow-x: hidden;
   /* 防止横向滚动 */
-}
-
-.banner {
-  width: 100%;
-  border-radius: 8px;
-  overflow: hidden;
-  margin-bottom: 15px;
-}
-
-.banner img {
-  width: 100%;
-  height: auto;
-  object-fit: cover;
-  display: block;
-}
-
-.banner .van-swipe {
-  width: 100%;
-  border-radius: 8px;
-  overflow: hidden;
-}
-
-.banner .van-swipe-item {
-  cursor: pointer;
-}
-
-.banner .banner-title {
-  position: absolute;
-  bottom: 0;
-  left: 0;
-  right: 0;
-  background: linear-gradient(to top, rgba(0, 0, 0, 0.7), rgba(0, 0, 0, 0));
-  padding: 15px 10px 8px;
-  color: #fff;
-  font-size: 14px;
-  text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.8);
 }
 
 /* 分类标签 */
