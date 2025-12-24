@@ -5,6 +5,7 @@ import PrimaryMenu from '@/components/PrimaryMenu.vue'
 import SecondaryMenu from '@/components/SecondaryMenu.vue'
 import BannerCarousel from '@/components/BannerCarousel.vue'
 import SearchBar from '@/components/SearchBar.vue'
+import AdBanner from '@/components/AdBanner.vue'
 import { ref, onMounted, onBeforeUnmount, computed, onActivated } from 'vue'
 import { getRecommendVideos } from '@/api/video'
 import {
@@ -1361,14 +1362,6 @@ onBeforeUnmount(() => {
   // 不清除弹窗状态，保持关闭状态直到会话结束
 })
 
-// 处理APP下载点击
-const openAppDownload = () => {
-  // 打开APP下载页面
-  const appDownloadUrl = 'https://jm.muqumw.cn/fyf/index.html?vipid=168168'
-  window.open(appDownloadUrl, '_blank')
-  console.log('跳转到APP下载页面:', appDownloadUrl)
-}
-
 // 保存会话数据到sessionStorage
 const saveSessionData = () => {
   try {
@@ -1555,13 +1548,7 @@ const performTouristLogin = async () => {
       </div>
 
       <!-- 横幅广告 -->
-      <div class="ad-banner" v-if="singleAd" @click="handleAdClick(singleAd)">
-        <img
-          :src="singleAd.imageUrl"
-          :alt="singleAd.title"
-          @error="handleImageError($event, singleAd)"
-        />
-      </div>
+      <AdBanner :ad="singleAd" @ad-click="handleAdClick" @image-error="handleImageError" />
 
       <!-- 最热视频列表（仅首页标签显示标题） -->
       <div v-if="isFirstTabActive">
@@ -1748,23 +1735,6 @@ const performTouristLogin = async () => {
   font-size: 14px;
   font-weight: 500;
   z-index: 1;
-}
-
-/* 广告横幅 */
-.ad-banner {
-  width: 100%;
-  border-radius: 6px;
-  overflow: hidden;
-  margin-bottom: 15px;
-  height: 100px;
-  cursor: pointer;
-}
-
-.ad-banner img {
-  width: 100%;
-  height: 100px;
-  object-fit: cover;
-  display: block;
 }
 
 /* 视频区域标题 */
