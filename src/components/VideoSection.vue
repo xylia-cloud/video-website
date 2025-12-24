@@ -4,17 +4,25 @@
     <div v-if="isFirstTabActive">
       <!-- 最热标题 -->
       <div class="section-title">最热</div>
-      <div v-if="isLoading" class="loading-state">
+      <div v-if="isLoading && videoData.length === 0" class="loading-state">
         <van-loading type="spinner" color="#ff9500" />
         <div class="loading-text">加载中...</div>
       </div>
-      <div v-else-if="hasError" class="error-state">
+      <div v-else-if="hasError && videoData.length === 0" class="error-state">
         <van-icon name="warning-o" size="24" color="#ff9500" />
         <div class="error-text">加载失败，请稍后再试</div>
         <div v-if="errorMessage" class="error-detail">{{ errorMessage }}</div>
       </div>
 
-      <VideoList v-else :videos="videoData" />
+      <div v-else>
+        <VideoList :videos="videoData" />
+
+        <!-- 刷新中的加载状态 -->
+        <div v-if="isLoading && videoData.length > 0" class="refresh-loading">
+          <van-loading type="spinner" size="20" color="#ff9500" />
+          <span>正在换一批...</span>
+        </div>
+      </div>
 
       <!-- 热门视频换一批按钮 -->
       <div v-if="videoData.length > 0 && !isLoading" class="refresh-btn" @click="refreshVideos">
@@ -27,20 +35,32 @@
     <div v-if="isFirstTabActive">
       <!-- 最新标题 -->
       <div class="section-title">最新</div>
-      <div v-if="isLoadingLatest || latestVideoData.length === 0" class="loading-state">
+      <div
+        v-if="(isLoadingLatest || latestVideoData.length === 0) && !isRefreshingLatest"
+        class="loading-state"
+      >
         <van-loading type="spinner" color="#ff9500" />
         <div class="loading-text">{{ isLoadingLatest ? '加载最新视频中...' : '加载中...' }}</div>
       </div>
-      <div v-else-if="hasLatestError" class="error-state">
+      <div v-else-if="hasLatestError && latestVideoData.length === 0" class="error-state">
         <van-icon name="warning-o" size="24" color="#ff9500" />
         <div class="error-text">加载失败，请稍后再试</div>
         <div v-if="latestErrorMessage" class="error-detail">{{ latestErrorMessage }}</div>
       </div>
-      <VideoList v-else :videos="latestVideoData" />
+
+      <div v-else>
+        <VideoList :videos="latestVideoData" />
+
+        <!-- 最新视频刷新中的加载状态 -->
+        <div v-if="isRefreshingLatest && latestVideoData.length > 0" class="refresh-loading">
+          <van-loading type="spinner" size="20" color="#ff9500" />
+          <span>正在换一批...</span>
+        </div>
+      </div>
 
       <!-- 最新视频换一批按钮 -->
       <div
-        v-if="latestVideoData.length > 0 && !isLoadingLatest"
+        v-if="latestVideoData.length > 0 && !isLoadingLatest && !isRefreshingLatest"
         class="refresh-btn"
         @click="refreshLatestVideos"
       >
@@ -92,6 +112,7 @@ interface Props {
   hasLatestError: boolean
   latestErrorMessage?: string
   latestVideoData: VideoItem[]
+  isRefreshingLatest?: boolean
 }
 
 interface Emits {
@@ -178,6 +199,23 @@ const refreshLatestVideos = () => {
 }
 
 .refresh-btn span {
+  margin-left: 5px;
+}
+
+.refresh-loading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 15px auto;
+  padding: 10px 20px;
+  background-color: #333;
+  border-radius: 20px;
+  color: #ff9500;
+  font-size: 14px;
+  gap: 8px;
+}
+
+.refresh-loading span {
   margin-left: 5px;
 }
 </style>

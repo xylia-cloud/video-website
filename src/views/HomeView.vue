@@ -6,6 +6,7 @@ import BannerCarousel from '@/components/BannerCarousel.vue'
 import SearchBar from '@/components/SearchBar.vue'
 import AdBanner from '@/components/AdBanner.vue'
 import VideoSection from '@/components/VideoSection.vue'
+import LoadingStates from '@/components/LoadingStates.vue'
 import { ref, onMounted, onBeforeUnmount, computed, onActivated } from 'vue'
 import { getRecommendVideos } from '@/api/video'
 import {
@@ -654,8 +655,7 @@ const refreshLatestVideos = () => {
     latestCurrentPage.value < latestTotalPages.value ? latestCurrentPage.value + 1 : 1
   console.log(`🔥 最新视频换一批，加载第 ${nextPage} 页数据`)
 
-  // 先清空数据，显示加载状态
-  latestVideoData.value = []
+  // 不清空数据，保持原有视频列表显示直到新数据加载完成
 
   // 然后加载新数据
   fetchLatestVideosData(nextPage)
@@ -1481,11 +1481,15 @@ const performTouristLogin = async () => {
 
 <template>
   <div class="home">
-    <!-- 全屏Loading -->
-    <div v-if="isFullScreenLoading" class="fullscreen-loading">
-      <van-loading type="spinner" size="40px" color="#ff9500" />
-      <div class="loading-text">加载中...</div>
-    </div>
+    <!-- 加载状态组件 -->
+    <LoadingStates
+      :isFullScreenLoading="isFullScreenLoading"
+      :isLoadingMore="isLoadingMore"
+      :isFirstTabActive="isFirstTabActive"
+      :videoDataLength="videoData.length"
+      :hasMoreVideos="hasMoreVideos"
+      :isLoading="isLoading"
+    />
 
     <!-- 顶部搜索栏 -->
     <SearchBar :keyword="searchKeyword" @search="handleSearch" />
@@ -1561,30 +1565,10 @@ const performTouristLogin = async () => {
         :hasLatestError="hasLatestError"
         :latestErrorMessage="latestErrorMessage"
         :latestVideoData="latestVideoData"
+        :isRefreshingLatest="isLoadingLatest"
         @refresh-videos="refreshVideos"
         @refresh-latest-videos="refreshLatestVideos"
       />
-
-      <!-- 加载更多状态（仅非第一个标签显示） -->
-      <div v-if="isLoadingMore && !isFirstTabActive" class="loading-more">
-        <van-loading type="spinner" size="20" color="#ff9500" />
-        <van-icon name="down" size="16" color="#999" />
-        <span>正在加载更多...</span>
-      </div>
-
-      <!-- 已全部加载（仅非第一个标签显示） -->
-      <div
-        v-if="
-          videoData.length > 0 &&
-          !hasMoreVideos &&
-          !isLoading &&
-          !isLoadingMore &&
-          !isFirstTabActive
-        "
-        class="all-loaded"
-      >
-        已经到底了~
-      </div>
     </div>
 
     <!-- 底部导航 -->
@@ -1755,74 +1739,5 @@ const performTouristLogin = async () => {
   justify-content: center;
   background-color: #2c2c2c;
   border-radius: 6px;
-}
-
-/* 加载状态 */
-.loading-state,
-.error-state {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  padding: 30px 0;
-}
-
-.loading-text,
-.error-text {
-  margin-top: 10px;
-  color: #999;
-  font-size: 14px;
-}
-
-.error-detail {
-  font-size: 12px;
-  color: #ff6b6b;
-  margin-top: 8px;
-  text-align: center;
-  max-width: 90%;
-  word-break: break-word;
-}
-
-.loading-more {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 15px 0;
-  margin-bottom: 15px;
-  color: #999;
-  font-size: 14px;
-  gap: 8px;
-}
-
-.all-loaded {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 10px 0;
-  margin-bottom: 15px;
-  color: #999;
-  font-size: 14px;
-}
-
-/* 全屏Loading样式 */
-.fullscreen-loading {
-  position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background-color: rgba(17, 17, 17, 0.9);
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  z-index: 9999;
-}
-
-.fullscreen-loading .loading-text {
-  margin-top: 15px;
-  color: #ff9500;
-  font-size: 16px;
-  font-weight: 500;
 }
 </style>
