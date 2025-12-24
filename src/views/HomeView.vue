@@ -1,11 +1,11 @@
 <script setup lang="ts">
-// 导入视频列表组件
-import VideoList from '@/components/VideoList.vue'
+// 导入组件
 import PrimaryMenu from '@/components/PrimaryMenu.vue'
 import SecondaryMenu from '@/components/SecondaryMenu.vue'
 import BannerCarousel from '@/components/BannerCarousel.vue'
 import SearchBar from '@/components/SearchBar.vue'
 import AdBanner from '@/components/AdBanner.vue'
+import VideoSection from '@/components/VideoSection.vue'
 import { ref, onMounted, onBeforeUnmount, computed, onActivated } from 'vue'
 import { getRecommendVideos } from '@/api/video'
 import {
@@ -1550,68 +1550,20 @@ const performTouristLogin = async () => {
       <!-- 横幅广告 -->
       <AdBanner :ad="singleAd" @ad-click="handleAdClick" @image-error="handleImageError" />
 
-      <!-- 最热视频列表（仅首页标签显示标题） -->
-      <div v-if="isFirstTabActive">
-        <!-- 最热标题 -->
-        <div class="section-title">最热</div>
-        <div v-if="isLoading" class="loading-state">
-          <van-loading type="spinner" color="#ff9500" />
-          <div class="loading-text">加载中...</div>
-        </div>
-        <div v-else-if="hasError" class="error-state">
-          <van-icon name="warning-o" size="24" color="#ff9500" />
-          <div class="error-text">加载失败，请稍后再试</div>
-          <div v-if="errorMessage" class="error-detail">{{ errorMessage }}</div>
-        </div>
-
-        <VideoList v-else :videos="videoData" />
-
-        <!-- 热门视频换一批按钮 -->
-        <div v-if="videoData.length > 0 && !isLoading" class="refresh-btn" @click="refreshVideos">
-          <van-icon name="replay" />
-          <span>换一批</span>
-        </div>
-      </div>
-
-      <!-- 最新视频列表（仅首页标签显示） -->
-      <div v-if="isFirstTabActive">
-        <!-- 最新标题 -->
-        <div class="section-title">最新</div>
-        <div v-if="isLoadingLatest || latestVideoData.length === 0" class="loading-state">
-          <van-loading type="spinner" color="#ff9500" />
-          <div class="loading-text">{{ isLoadingLatest ? '加载最新视频中...' : '加载中...' }}</div>
-        </div>
-        <div v-else-if="hasLatestError" class="error-state">
-          <van-icon name="warning-o" size="24" color="#ff9500" />
-          <div class="error-text">加载失败，请稍后再试</div>
-          <div v-if="latestErrorMessage" class="error-detail">{{ latestErrorMessage }}</div>
-        </div>
-        <VideoList v-else :videos="latestVideoData" />
-
-        <!-- 最新视频换一批按钮 -->
-        <div
-          v-if="latestVideoData.length > 0 && !isLoadingLatest"
-          class="refresh-btn"
-          @click="refreshLatestVideos"
-        >
-          <van-icon name="replay" />
-          <span>换一批</span>
-        </div>
-      </div>
-
-      <!-- 非首页标签的视频列表 -->
-      <div v-else>
-        <div v-if="isLoading && videoData.length === 0" class="loading-state">
-          <van-loading type="spinner" color="#ff9500" />
-          <div class="loading-text">加载中...</div>
-        </div>
-        <div v-else-if="hasError" class="error-state">
-          <van-icon name="warning-o" size="24" color="#ff9500" />
-          <div class="error-text">加载失败，请稍后再试</div>
-          <div v-if="errorMessage" class="error-detail">{{ errorMessage }}</div>
-        </div>
-        <VideoList v-else :videos="videoData" />
-      </div>
+      <!-- 视频区域 -->
+      <VideoSection
+        :isFirstTabActive="isFirstTabActive"
+        :isLoading="isLoading"
+        :hasError="hasError"
+        :errorMessage="errorMessage"
+        :videoData="videoData"
+        :isLoadingLatest="isLoadingLatest"
+        :hasLatestError="hasLatestError"
+        :latestErrorMessage="latestErrorMessage"
+        :latestVideoData="latestVideoData"
+        @refresh-videos="refreshVideos"
+        @refresh-latest-videos="refreshLatestVideos"
+      />
 
       <!-- 加载更多状态（仅非第一个标签显示） -->
       <div v-if="isLoadingMore && !isFirstTabActive" class="loading-more">
@@ -1745,31 +1697,6 @@ const performTouristLogin = async () => {
   margin-bottom: 15px;
 }
 
-.section-title {
-  font-size: 18px;
-  font-weight: bold;
-}
-
-.more-link {
-  color: #999;
-  font-size: 14px;
-}
-
-/* 换一批按钮 */
-.refresh-btn {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: #ff9500;
-  font-size: 14px;
-  padding: 10px 0;
-  margin-bottom: 15px;
-}
-
-.refresh-btn span {
-  margin-left: 5px;
-}
-
 /* 底部导航 */
 .bottom-nav {
   position: fixed;
@@ -1828,32 +1755,6 @@ const performTouristLogin = async () => {
   justify-content: center;
   background-color: #2c2c2c;
   border-radius: 6px;
-}
-
-/* 视频列表标题 */
-.section-title {
-  padding: 20px 15px 15px 15px;
-  font-size: 18px;
-  font-weight: bold;
-  color: #fff;
-  position: relative;
-}
-
-.section-title::before {
-  content: '';
-  position: absolute;
-  left: 15px;
-  top: 50%;
-  transform: translateY(-50%);
-  width: 4px;
-  height: 18px;
-  background: linear-gradient(45deg, #ff9500, #ffb366);
-  border-radius: 2px;
-  margin-right: 10px;
-}
-
-.section-title {
-  padding-left: 30px;
 }
 
 /* 加载状态 */
