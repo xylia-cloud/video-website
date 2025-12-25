@@ -167,6 +167,9 @@ const selectedPaymentMethod = ref('')
 
 // 充值金额
 const rechargeAmount = ref('')
+// 手动输入金额
+const customAmount = ref('')
+const isCustomAmount = ref(false)
 
 // 当前充值规则数据
 const chargeRules = ref<ChargeRulesResponse | null>(null)
@@ -274,6 +277,8 @@ const fetchRules = async (channelId: string) => {
     selectedMoneyItem.value = null
     selectedSubChannel.value = null
     rechargeAmount.value = ''
+    isCustomAmount.value = false
+    customAmount.value = ''
     // 🔥 清空转账账号，避免显示上一个支付方式的信息
     transferAccount.value = ''
 
@@ -340,6 +345,8 @@ const selectPaymentMethod = async (methodId: string) => {
   selectedSubChannel.value = null
   selectedMoneyItem.value = null
   rechargeAmount.value = ''
+  isCustomAmount.value = false
+  customAmount.value = ''
 
   // 获取该渠道的充值规则
   await fetchRules(methodId)
@@ -380,6 +387,8 @@ const selectPlatform = (platform: PaymentSubChannel | Record<string, unknown>) =
   // 重置金额选择
   selectedMoneyItem.value = null
   rechargeAmount.value = ''
+  isCustomAmount.value = false
+  customAmount.value = ''
 }
 
 // 🔥 处理支付成功
@@ -433,7 +442,52 @@ const openPaymentPage = (payUrl: string) => {
 const selectAmount = (item: MoneyItem) => {
   selectedMoneyItem.value = item
   rechargeAmount.value = item.money
+  isCustomAmount.value = false
+  customAmount.value = ''
 }
+
+// 处理手动输入金额
+const handleCustomAmountInput = (value: string) => {
+  // 只允许数字和小数点
+  const numericValue = value.replace(/[^\d.]/g, '')
+  // 限制小数点后两位
+  const parts = numericValue.split('.')
+  if (parts.length > 2) {
+    customAmount.value = parts[0] + '.' + parts.slice(1).join('')
+  } else if (parts.length === 2 && parts[1].length > 2) {
+    customAmount.value = parts[0] + '.' + parts[1].substring(0, 2)
+  } else {
+    customAmount.value = numericValue
+  }
+
+  if (customAmount.value && parseFloat(customAmount.value) > 0) {
+    isCustomAmount.value = true
+    selectedMoneyItem.value = null
+    rechargeAmount.value = customAmount.value
+  } else {
+    isCustomAmount.value = false
+    rechargeAmount.value = ''
+  }
+}
+
+// 计算手动输入金额对应的钻石数
+const calculateCustomCoin = computed(() => {
+  if (!customAmount.value || !availableAmounts.value.length) return 0
+  
+  const amount = parseFloat(customAmount.value)
+  if (amount <= 0) return 0
+
+  // 从可用金额列表中计算比例（使用第一个金额项作为参考）
+  const firstItem = availableAmounts.value[0]
+  if (firstItem && firstItem.money && firstItem.coin) {
+    const moneyRate = parseFloat(firstItem.money)
+    const coinRate = parseFloat(firstItem.coin)
+    if (moneyRate > 0) {
+      return Math.floor((amount / moneyRate) * coinRate)
+    }
+  }
+  return 0
+})
 
 // 复制转账账号
 const copyTransferAccount = async () => {
@@ -472,12 +526,37 @@ const createOrder = async () => {
     return // 防止重复点击
   }
 
-  if (!selectedMoneyItem.value) {
+  if (!selectedMoneyItem.value && !isCustomAmount.value) {
     showToast({
-      message: '请选择充值金额',
+      message: '请选择充值金额或输入自定义金额',
       duration: 2000,
     })
     return
+  }
+
+  // 如果是手动输入金额，需要创建一个临时的金额项
+  if (isCustomAmount.value && !selectedMoneyItem.value) {
+    const customMoney = parseFloat(customAmount.value)
+    if (customMoney <= 0) {
+      showToast({
+        message: '请输入有效的充值金额',
+        duration: 2000,
+      })
+      return
+    }
+    // 创建临时金额项用于订单创建
+    selectedMoneyItem.value = {
+      id: 'custom',
+      name: `自定义${customMoney}元`,
+      coin: calculateCustomCoin.value.toString(),
+      coin_ios: calculateCustomCoin.value.toString(),
+      money: customMoney.toString(),
+      product_id: '',
+      give: '0',
+      list_order: '0',
+      addtime: '',
+      coin_paypal: calculateCustomCoin.value.toString(),
+    }
   }
 
   // 🔥 智能验证支付方式：对于有子渠道的支付方式，检查是否选择了子渠道
@@ -839,16 +918,34 @@ onMounted(async () => {
       <!-- 第三步：选择充值金额 -->
       <div v-if="!isLoadingRules && showAmountSelection" class="selection-section">
         <h3 class="section-title">
-          <span class="step-number">2</span>
+          <span class="step-number">{{ chargeRulesDisplay?.type === 'channels' ? 3 : 2 }}</span>
           选择充值金额
         </h3>
+
+        <!-- 手动输入金额 -->
+        <div class="custom-amount-section">
+          <div class="custom-amount-input-wrapper">
+            <input
+              v-model="customAmount"
+              type="text"
+              inputmode="decimal"
+              placeholder="请输入金额"
+              class="custom-amount-input"
+              @input="(e) => handleCustomAmountInput((e.target as HTMLInputElement).value)"
+            />
+            <span class="custom-amount-unit">元</span>
+          </div>
+          <div v-if="isCustomAmount && calculateCustomCoin > 0" class="custom-coin-display">
+            可获得 {{ calculateCustomCoin }} 钻石
+          </div>
+        </div>
 
         <div class="selection-grid amount-grid">
           <div
             v-for="item in availableAmounts"
             :key="item.id"
             class="selection-item amount-item"
-            :class="{ active: selectedMoneyItem?.id === item.id }"
+            :class="{ active: selectedMoneyItem?.id === item.id && !isCustomAmount }"
             @click="selectAmount(item)"
           >
             <div class="item-content">
@@ -856,7 +953,7 @@ onMounted(async () => {
               <div class="coin-value">{{ item.coin }}钻石</div>
               <div v-if="item.give && item.give !== '0'" class="bonus-tag">送{{ item.give }}</div>
             </div>
-            <div v-if="selectedMoneyItem?.id === item.id" class="check-icon">
+            <div v-if="selectedMoneyItem?.id === item.id && !isCustomAmount" class="check-icon">
               <van-icon name="success" size="10" color="#fff" />
             </div>
           </div>
@@ -908,7 +1005,7 @@ onMounted(async () => {
       <div class="confirm-section-fixed">
         <button
           class="confirm-button"
-          :disabled="!selectedMoneyItem || isCreatingOrder"
+          :disabled="(!selectedMoneyItem && !isCustomAmount) || isCreatingOrder"
           @click="confirmRecharge"
         >
           <van-loading v-if="isCreatingOrder" type="spinner" size="16" color="#fff" />
@@ -1039,7 +1136,7 @@ onMounted(async () => {
 
 /* 钻石余额区域 */
 .diamond-balance {
-  padding: 12px 20px;
+  padding: 6px 20px 12px 20px;
 }
 
 .balance-content {
@@ -1073,7 +1170,7 @@ onMounted(async () => {
 
 /* 选择区域通用样式 */
 .selection-section {
-  padding: 20px;
+  padding: 10px 20px;
 }
 
 .section-title {
@@ -1124,7 +1221,7 @@ onMounted(async () => {
 .selection-grid.platform-grid,
 .selection-grid.amount-grid {
   grid-template-columns: repeat(3, 1fr) !important;
-  gap: 12px;
+  gap: 8px;
 }
 
 .selection-item {
@@ -1277,21 +1374,26 @@ onMounted(async () => {
 }
 
 /* 金额选择项特殊样式 */
+.amount-item {
+  padding: 8px 4px;
+  min-height: auto;
+}
+
 .amount-item .item-content {
   flex-direction: column;
   text-align: center;
-  gap: 4px;
+  gap: 2px;
 }
 
 .amount-value {
-  font-size: 16px;
+  font-size: 13px;
   font-weight: bold;
   color: #fff;
-  margin-bottom: 4px;
+  margin-bottom: 2px;
 }
 
 .coin-value {
-  font-size: 12px;
+  font-size: 11px;
   color: #ccc;
 }
 
@@ -1301,14 +1403,63 @@ onMounted(async () => {
 
 .bonus-tag {
   position: absolute;
-  top: -6px;
-  right: -6px;
+  top: -4px;
+  right: -4px;
   background-color: #ff4444;
   color: #fff;
-  font-size: 10px;
-  padding: 2px 6px;
-  border-radius: 10px;
+  font-size: 9px;
+  padding: 1px 4px;
+  border-radius: 8px;
   font-weight: bold;
+}
+
+/* 手动输入金额区域 */
+.custom-amount-section {
+  margin-top: 12px;
+  margin-bottom: 16px;
+}
+
+.custom-amount-input-wrapper {
+  display: flex;
+  align-items: center;
+  background-color: #222;
+  border: 1px solid #333;
+  border-radius: 8px;
+  padding: 0 12px;
+  transition: all 0.3s ease;
+}
+
+.custom-amount-input-wrapper:focus-within {
+  border-color: #ff9500;
+  background-color: #2a2a2a;
+}
+
+.custom-amount-input {
+  flex: 1;
+  background: transparent;
+  border: none;
+  outline: none;
+  color: #fff;
+  font-size: 15px;
+  padding: 12px 0;
+  font-weight: 500;
+}
+
+.custom-amount-input::placeholder {
+  color: #666;
+}
+
+.custom-amount-unit {
+  color: #999;
+  font-size: 14px;
+  margin-left: 8px;
+}
+
+.custom-coin-display {
+  margin-top: 8px;
+  font-size: 12px;
+  color: #ff9500;
+  text-align: center;
 }
 
 /* 转账信息 */
@@ -1649,11 +1800,24 @@ onMounted(async () => {
     padding: 14px;
     font-size: 15px;
   }
+
+  .custom-amount-input {
+    font-size: 14px;
+    padding: 10px 0;
+  }
+
+  .amount-value {
+    font-size: 12px;
+  }
+
+  .coin-value {
+    font-size: 10px;
+  }
 }
 
 /* 平台选择区域样式 */
 .platform-selection {
-  margin-bottom: 20px;
+  margin-bottom: 0px;
 }
 
 .platform-tip {
@@ -1668,6 +1832,29 @@ onMounted(async () => {
   grid-template-columns: repeat(3, 1fr);
   gap: 10px;
   margin-top: 15px;
+  max-height: 260px;
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding-right: 4px;
+}
+
+/* 自定义滚动条样式 */
+.platform-grid::-webkit-scrollbar {
+  width: 6px;
+}
+
+.platform-grid::-webkit-scrollbar-track {
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 3px;
+}
+
+.platform-grid::-webkit-scrollbar-thumb {
+  background: rgba(255, 149, 0, 0.5);
+  border-radius: 3px;
+}
+
+.platform-grid::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 149, 0, 0.7);
 }
 
 .platform-card {
@@ -1675,7 +1862,7 @@ onMounted(async () => {
   background: #222;
   border: 1px solid #333;
   border-radius: 12px;
-  padding: 12px 8px;
+  padding: 8px 6px;
   cursor: pointer;
   transition: all 0.3s ease;
 }
@@ -1693,13 +1880,21 @@ onMounted(async () => {
   display: flex;
   align-items: center;
   justify-content: center;
-  min-height: 36px;
+  min-height: auto;
+  height: auto;
 }
 
 .platform-name {
   color: #fff;
-  font-size: 14px;
+  font-size: 13px;
   text-align: center;
+  line-height: 1.4;
+  word-break: break-word;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  width: 100%;
 }
 
 /* 重复的check-icon样式已在上面定义，这里移除重复 */
