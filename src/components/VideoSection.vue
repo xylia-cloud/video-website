@@ -75,18 +75,36 @@
         <van-loading type="spinner" color="#ff9500" />
         <div class="loading-text">加载中...</div>
       </div>
-      <div v-else-if="hasError" class="error-state">
+      <div v-else-if="hasError && videoData.length === 0" class="error-state">
         <van-icon name="warning-o" size="24" color="#ff9500" />
         <div class="error-text">加载失败，请稍后再试</div>
         <div v-if="errorMessage" class="error-detail">{{ errorMessage }}</div>
       </div>
-      <VideoList v-else :videos="videoData" />
+
+      <div v-else>
+        <VideoList :videos="videoData" />
+
+        <!-- 加载中的状态 -->
+        <div v-if="isLoading && videoData.length > 0" class="refresh-loading">
+          <van-loading type="spinner" size="20" color="#ff9500" />
+          <span>正在加载...</span>
+        </div>
+      </div>
+
+      <!-- 非首页标签分页控件 -->
+      <VideoPagination
+        v-if="videoData.length > 0 && totalPages > 1"
+        :current-page="currentPage"
+        :total-pages="totalPages"
+        @page-change="handlePageChange"
+      />
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
 import VideoList from '@/components/VideoList.vue'
+import VideoPagination from '@/components/VideoPagination.vue'
 
 interface VideoItem {
   id?: number
@@ -113,15 +131,22 @@ interface Props {
   latestErrorMessage?: string
   latestVideoData: VideoItem[]
   isRefreshingLatest?: boolean
+  currentPage: number
+  totalPages: number
 }
 
 interface Emits {
+  (e: 'page-change', page: number): void
   (e: 'refresh-videos'): void
   (e: 'refresh-latest-videos'): void
 }
 
-defineProps<Props>()
+const props = defineProps<Props>()
 const emit = defineEmits<Emits>()
+
+const handlePageChange = (page: number) => {
+  emit('page-change', page)
+}
 
 const refreshVideos = () => {
   emit('refresh-videos')

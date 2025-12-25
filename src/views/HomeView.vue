@@ -154,11 +154,7 @@ const isTagsLoading = ref<boolean>(false)
 const currentPage = ref(1)
 const totalPages = ref(1)
 
-// 记录当前滚动位置
-const currentScrollPosition = ref(0)
-
-// 无限滚动相关变量
-const isLoadingMore = ref(false)
+// 翻页相关变量
 const hasMoreVideos = ref(true)
 const isFirstLoad = ref(true) // 标记是否为第一次加载
 
@@ -229,6 +225,19 @@ const fetchTypesData = async () => {
 
 // 处理一级分类点击
 const handlePrimaryTypeClick = (type: TypeItem) => {
+  // 获取第一个标签ID（热门）
+  const firstTypeId = typesList.value.length > 0 ? typesList.value[0].type_id : 1
+  const isFirstTab = type.type_id === firstTypeId
+
+  // 如果点击的是热门标签，直接切换并收起二级分类
+  if (isFirstTab) {
+    expandedTypeId.value = null
+    activeSubTypeId.value = null
+    switchType(type.type_id)
+    saveSessionData()
+    return
+  }
+
   // 如果有子分类，则展开/收起子分类
   if (type.child && type.child.length > 0) {
     if (expandedTypeId.value === type.type_id) {
@@ -269,9 +278,6 @@ const switchType = (typeId: number) => {
   // 保存当前标签的状态
   saveCurrentTabState()
 
-  // 移除之前的滚动监听（无论是哪个标签）
-  removeScrollListener()
-
   activeTypeId.value = typeId
 
   // 保存当前选中的标签ID到localStorage
@@ -306,6 +312,12 @@ const switchType = (typeId: number) => {
 
     // 🔥 恢复缓存数据后立即关闭全屏loading
     isFullScreenLoading.value = false
+
+    // 如果是热门标签，还需要加载最新视频数据
+    const firstTypeIdForCache = typesList.value.length > 0 ? typesList.value[0].type_id : 1
+    if (typeId === firstTypeIdForCache) {
+      fetchLatestVideosData()
+    }
   } else {
     // 重置状态
     currentPage.value = 1
@@ -315,21 +327,25 @@ const switchType = (typeId: number) => {
     videoData.value = []
   }
 
-  // 检查是否为第一个标签（热门），如果不是则启用懒加载
+  // 检查是否为第一个标签（热门）
   const firstTypeId = typesList.value.length > 0 ? typesList.value[0].type_id : 1
   const isFirstTab = typeId === firstTypeId
 
   if (isFirstTab) {
-    // 第一个标签立即加载，如果没有缓存数据
+    // 第一个标签（热门）立即加载，如果没有缓存数据
     if (!tabStates.value[typeId]) {
-      // 先获取广告数据，然后再获取视频数据
+      // 先获取广告数据，然后再获取视频数据和最新视频数据
       fetchListAds().then(() => {
         // 🔥 最热视频必须使用 tid=1，否则API只返回10条数据
         fetchRecommendVideosData(1, VIDEO_CATEGORIES.ALL)
+        // 加载最新视频数据
+        fetchLatestVideosData()
       })
     } else {
       // 如果有缓存数据，仍然需要获取广告数据以备后续使用
       fetchListAds()
+      // 加载最新视频数据
+      fetchLatestVideosData()
       // 🔥 首页标签有缓存数据时也要关闭全屏loading
       isFullScreenLoading.value = false
     }
@@ -339,21 +355,13 @@ const switchType = (typeId: number) => {
     // 其他标签，如果没有缓存数据，立即加载第一页数据
     if (!tabStates.value[typeId]) {
       isFirstLoad.value = true
-      // 🔥 立即加载数据，不要等待滚动触发
+      // 立即加载数据
       console.log(`非首页标签${typeId}没有缓存，立即加载第一页数据`)
       fetchRecommendVideosData(1, typeId)
     } else {
       // 如果有缓存数据，关闭全屏loading
       isFullScreenLoading.value = false
     }
-
-    // 添加滚动监听（如果还没有添加）
-    addScrollListener()
-
-    // 立即触发一次检查，如果用户已经在底部附近则开始加载
-    setTimeout(() => {
-      checkScrollForLazyLoad()
-    }, 100)
   }
 }
 
@@ -479,14 +487,8 @@ const fetchLatestVideosData = async (page: number = 1) => {
 }
 
 // 获取推荐视频数据
-const fetchRecommendVideosData = async (page = 1, tid = VIDEO_CATEGORIES.ALL, loadMore = false) => {
-  // 如果是加载更多，设置加载更多状态
-  if (loadMore) {
-    isLoadingMore.value = true
-  } else {
-    isLoading.value = true
-  }
-
+const fetchRecommendVideosData = async (page = 1, tid = VIDEO_CATEGORIES.ALL) => {
+  isLoading.value = true
   hasError.value = false
   errorMessage.value = ''
 
@@ -542,14 +544,8 @@ const fetchRecommendVideosData = async (page = 1, tid = VIDEO_CATEGORIES.ALL, lo
     // 处理数据并插入广告
     const finalData = processDataWithAds(processedData, page)
 
-    // 判断是加载更多还是第一页
-    if (loadMore && page > 1) {
-      // 加载更多，将新数据追加到现有数据后面
-      videoData.value = [...videoData.value, ...finalData]
-    } else {
-      // 第一页，直接替换数据
-      videoData.value = finalData
-    }
+    // 翻页模式：直接替换数据
+    videoData.value = finalData
 
     // 标记已完成第一次加载
     if (isFirstLoad.value) {
@@ -579,7 +575,6 @@ const fetchRecommendVideosData = async (page = 1, tid = VIDEO_CATEGORIES.ALL, lo
     }
   } finally {
     isLoading.value = false
-    isLoadingMore.value = false
     // 确保在任何情况下都关闭全屏loading
     isFullScreenLoading.value = false
   }
@@ -646,6 +641,100 @@ const handleSearch = () => {
   }
 }
 
+// 热门视频换一批
+const refreshVideos = () => {
+  // 检查是否为第一个标签
+  const firstTypeId = typesList.value.length > 0 ? typesList.value[0].type_id : 1
+  const isFirstTab = activeTypeId.value === firstTypeId
+
+  if (!isFirstTab) {
+    // 非热门标签不使用换一批，应该使用分页
+    return
+  }
+
+  const nextPage = currentPage.value < totalPages.value ? currentPage.value + 1 : 1
+  console.log(`加载第 ${nextPage} 页数据，标签ID: ${activeTypeId.value}`)
+
+  // 设置临时加载状态
+  isLoading.value = true
+
+  // 构建请求参数
+  const params = {
+    mid: 1,
+    limit: DEFAULT_PAGE_SIZE,
+    page: nextPage,
+    tid: 1, // 首页标签必须使用 tid=1
+  }
+
+  // 发起请求获取新数据
+  ;(useFetch ? fetchRecommendVideos(params) : getRecommendVideos(params))
+    .then((result: ApiResponse) => {
+      // 更新页码信息
+      if (result.page) {
+        currentPage.value = result.page
+      }
+      if (result.pagecount) {
+        totalPages.value = result.pagecount
+      }
+
+      // 处理API返回的数据
+      let apiData: ApiVideoItem[] = []
+
+      // 适应不同的数据结构
+      if (result.data && result.data.list) {
+        apiData = result.data.list
+      } else if (result.data) {
+        apiData = Array.isArray(result.data) ? result.data : []
+      } else if (result.list) {
+        apiData = result.list
+      }
+
+      // 映射字段
+      const processedData = apiData.map(processVideoData)
+      console.log('🔄 [换一批] API返回原始数据长度:', apiData.length)
+      console.log('🔄 [换一批] 视频映射后数据长度:', processedData.length)
+      console.log('🔄 [换一批] DEFAULT_PAGE_SIZE:', DEFAULT_PAGE_SIZE)
+
+      // 🔥 目标：17条视频 + 3条广告 = 20条
+      // 移除最后3条视频（20-3=17），为广告腾出位置
+      if (processedData.length >= 20) {
+        processedData.splice(17) // 只保留前17条视频
+        console.log('🔄 [换一批] 保留前17条视频，移除后的数据长度:', processedData.length)
+      }
+
+      // 直接使用之前保存的广告位置插入广告
+      const adsToUse = listAds.value.slice(0, 3)
+
+      // 确保广告数据可用
+      if (adsToUse.length > 0) {
+        for (let i = 0; i < Math.min(adPositions.value.length, adsToUse.length); i++) {
+          const position = adPositions.value[i]
+          // 确保位置在有效范围内
+          if (processedData.length >= position) {
+            console.log(`🔄 [换一批] 在位置${position}插入第${i + 1}个广告:`, adsToUse[i])
+            processedData.splice(position, 0, adsToUse[i])
+          }
+        }
+      }
+
+      // 更新视频数据
+      videoData.value = processedData
+
+      // 更新缓存
+      updateTabCache(activeTypeId.value)
+
+      console.log('🔄 [换一批] 最终数据长度:', videoData.value.length)
+    })
+    .catch((error) => {
+      console.error('换一批加载数据失败:', error)
+      hasError.value = true
+      errorMessage.value = error.message || '加载失败，请稍后再试'
+    })
+    .finally(() => {
+      isLoading.value = false
+    })
+}
+
 // 最新视频换一批
 const refreshLatestVideos = () => {
   // 防止重复点击
@@ -661,59 +750,74 @@ const refreshLatestVideos = () => {
   fetchLatestVideosData(nextPage)
 }
 
-// 刷新视频数据 - 加载下一页（仅用于换一批按钮）
-const refreshVideos = () => {
-  // 检查是否为第一个标签
+// 处理分页变化 - 跳转到指定页码（仅用于二级分类）
+const handlePageChange = (page: number) => {
+  // 检查页码是否有效
+  if (page < 1 || page > totalPages.value || page === currentPage.value) {
+    return
+  }
+
+  // 检查是否为第一个标签（热门），如果是则不应该使用分页
   const firstTypeId = typesList.value.length > 0 ? typesList.value[0].type_id : 1
   const isFirstTab = activeTypeId.value === firstTypeId
 
   if (isFirstTab) {
-    // 第一个标签使用换一批逻辑
-    const nextPage = currentPage.value < totalPages.value ? currentPage.value + 1 : 1
-    console.log(`加载第 ${nextPage} 页数据`)
+    console.warn('热门标签不应该使用分页，应该使用换一批功能')
+    return
+  }
 
-    // 设置临时加载状态
-    isLoading.value = true
+  console.log(`跳转到第 ${page} 页，标签ID: ${activeTypeId.value}`)
 
-    // 构建请求参数
-    const params = {
-      mid: 1,
-      limit: DEFAULT_PAGE_SIZE,
-      page: nextPage,
-      tid: activeTypeId.value,
-    }
+  // 滚动到顶部
+  window.scrollTo(0, 0)
 
-    // 发起请求获取新数据
-    ;(useFetch ? fetchRecommendVideos(params) : getRecommendVideos(params))
-      .then((result: ApiResponse) => {
-        // 更新页码信息
-        if (result.page) {
-          currentPage.value = result.page
-        }
+  // 设置加载状态
+  isLoading.value = true
 
-        // 处理API返回的数据
-        let apiData: ApiVideoItem[] = []
+  // 构建请求参数
+  const params = {
+    mid: 1,
+    limit: DEFAULT_PAGE_SIZE,
+    page: page,
+    tid: isFirstTab ? 1 : activeTypeId.value, // 首页标签必须使用 tid=1
+  }
 
-        // 适应不同的数据结构
-        if (result.data && result.data.list) {
-          apiData = result.data.list
-        } else if (result.data) {
-          apiData = Array.isArray(result.data) ? result.data : []
-        } else if (result.list) {
-          apiData = result.list
-        }
+  // 发起请求获取新数据
+  ;(useFetch ? fetchRecommendVideos(params) : getRecommendVideos(params))
+    .then((result: ApiResponse) => {
+      // 更新页码信息
+      if (result.page) {
+        currentPage.value = result.page
+      }
+      if (result.pagecount) {
+        totalPages.value = result.pagecount
+      }
 
-        // 映射字段
-        const processedData = apiData.map(processVideoData)
-        console.log('🔄 [换一批] API返回原始数据长度:', apiData.length)
-        console.log('🔄 [换一批] 视频映射后数据长度:', processedData.length)
-        console.log('🔄 [换一批] DEFAULT_PAGE_SIZE:', DEFAULT_PAGE_SIZE)
+      // 处理API返回的数据
+      let apiData: ApiVideoItem[] = []
 
+      // 适应不同的数据结构
+      if (result.data && result.data.list) {
+        apiData = result.data.list
+      } else if (result.data) {
+        apiData = Array.isArray(result.data) ? result.data : []
+      } else if (result.list) {
+        apiData = result.list
+      }
+
+      // 映射字段
+      const processedData = apiData.map(processVideoData)
+      console.log('📄 [分页] API返回原始数据长度:', apiData.length)
+      console.log('📄 [分页] 视频映射后数据长度:', processedData.length)
+      console.log('📄 [分页] DEFAULT_PAGE_SIZE:', DEFAULT_PAGE_SIZE)
+
+      // 只有首页标签需要插入广告
+      if (isFirstTab && page === 1) {
         // 🔥 目标：17条视频 + 3条广告 = 20条
         // 移除最后3条视频（20-3=17），为广告腾出位置
         if (processedData.length >= 20) {
           processedData.splice(17) // 只保留前17条视频
-          console.log('🔄 [换一批] 保留前17条视频，移除后的数据长度:', processedData.length)
+          console.log('📄 [分页] 保留前17条视频，移除后的数据长度:', processedData.length)
         }
 
         // 直接使用之前保存的广告位置插入广告
@@ -725,29 +829,29 @@ const refreshVideos = () => {
             const position = adPositions.value[i]
             // 确保位置在有效范围内
             if (processedData.length >= position) {
-              console.log(`🔄 [换一批] 在位置${position}插入第${i + 1}个广告:`, adsToUse[i])
+              console.log(`📄 [分页] 在位置${position}插入第${i + 1}个广告:`, adsToUse[i])
               processedData.splice(position, 0, adsToUse[i])
             }
           }
         }
+      }
 
-        // 更新视频数据
-        videoData.value = processedData
+      // 更新视频数据
+      videoData.value = processedData
 
-        console.log('🔄 [换一批] 最终数据长度:', videoData.value.length, '（目标：20条）')
-      })
-      .catch((error) => {
-        console.error('换一批加载数据失败:', error)
-        hasError.value = true
-        errorMessage.value = error.message || '加载失败，请稍后再试'
-      })
-      .finally(() => {
-        isLoading.value = false
-      })
-  } else {
-    // 其他标签不显示换一批按钮，改为无限滚动
-    console.log('当前标签使用无限滚动，不支持换一批')
-  }
+      // 更新缓存
+      updateTabCache(activeTypeId.value)
+
+      console.log('📄 [分页] 最终数据长度:', videoData.value.length)
+    })
+    .catch((error) => {
+      console.error('分页加载数据失败:', error)
+      hasError.value = true
+      errorMessage.value = error.message || '加载失败，请稍后再试'
+    })
+    .finally(() => {
+      isLoading.value = false
+    })
 }
 
 // 获取轮播图广告数据
@@ -968,24 +1072,6 @@ const useDefaultTags = () => {
   console.log('已设置默认标签数据:', defaultTags)
 }
 
-// 处理图片URL (通用方法)
-const processImageUrl = (imgPath: string): string => {
-  if (!imgPath) return ''
-
-  let imageUrl = ''
-
-  // 处理图片URL
-  if (imgPath.startsWith('/')) {
-    imageUrl = `${BASE_URL}${imgPath}`
-  } else if (imgPath.startsWith('http')) {
-    imageUrl = imgPath
-  } else {
-    imageUrl = `${BASE_URL}/${imgPath}`
-  }
-
-  return imageUrl
-}
-
 // 处理标签图片加载错误
 const handleTagImageError = (event: Event) => {
   console.error('标签图片加载失败')
@@ -1069,89 +1155,7 @@ const fetchListAds = async () => {
   }
 }
 
-// 添加滚动监听，检测何时到达底部进行懒加载
-const checkScrollForLazyLoad = () => {
-  // 如果正在加载、已经加载完所有数据、有错误，或者是第一个标签，则不处理
-  const firstTypeId = typesList.value.length > 0 ? typesList.value[0].type_id : 1
-  const isFirstTab = activeTypeId.value === firstTypeId
-
-  if (
-    isLoading.value ||
-    isLoadingMore.value ||
-    !hasMoreVideos.value ||
-    hasError.value ||
-    isFirstTab
-  ) {
-    return
-  }
-
-  // 获取滚动位置
-  const scrollTop = window.scrollY || document.documentElement.scrollTop
-  // 更新当前滚动位置
-  currentScrollPosition.value = scrollTop
-
-  // 获取视口高度
-  const windowHeight = window.innerHeight
-  // 获取文档总高度
-  const documentHeight = document.documentElement.scrollHeight
-
-  // 当距离底部不足100px时，进行懒加载
-  if (documentHeight - (scrollTop + windowHeight) < 100) {
-    loadMoreVideos()
-  }
-}
-
-// 加载更多视频
-const loadMoreVideos = () => {
-  // 检查是否为第一个标签
-  const firstTypeId = typesList.value.length > 0 ? typesList.value[0].type_id : 1
-  const isFirstTab = activeTypeId.value === firstTypeId
-
-  if (isFirstTab) {
-    // 第一个标签不使用无限滚动
-    return
-  }
-
-  // 如果是第一次加载（懒加载）且当前没有数据
-  if (isFirstLoad.value && videoData.value.length === 0) {
-    console.log(`首次加载第1页数据，标签ID: ${activeTypeId.value}`)
-    fetchRecommendVideosData(1, activeTypeId.value)
-    return
-  }
-
-  // 如果当前没有更多数据或正在加载，则不处理
-  if (!hasMoreVideos.value || isLoadingMore.value) {
-    console.log(
-      `无更多数据或正在加载中，hasMoreVideos: ${hasMoreVideos.value}, isLoadingMore: ${isLoadingMore.value}`,
-    )
-    return
-  }
-
-  // 计算下一页，如果已到最后一页则不加载
-  if (currentPage.value < totalPages.value) {
-    const nextPage = currentPage.value + 1
-    console.log(
-      `加载更多数据 - 第 ${nextPage} 页，当前已有${videoData.value.length}条数据，标签ID: ${activeTypeId.value}`,
-    )
-    fetchRecommendVideosData(nextPage, activeTypeId.value, true)
-  } else {
-    console.log('已经是最后一页了')
-    hasMoreVideos.value = false
-  }
-}
-
-// 添加滚动事件监听
-const addScrollListener = () => {
-  // 移除已存在的监听器避免重复添加
-  window.removeEventListener('scroll', checkScrollForLazyLoad)
-  // 添加新的监听器
-  window.addEventListener('scroll', checkScrollForLazyLoad)
-}
-
-// 移除滚动事件监听
-const removeScrollListener = () => {
-  window.removeEventListener('scroll', checkScrollForLazyLoad)
-}
+// 已移除无限滚动相关函数，所有标签统一使用翻页模式
 
 // 处理页面关闭或刷新的函数
 const handlePageUnload = () => {
@@ -1276,11 +1280,7 @@ onMounted(async () => {
     fetchLatestVideosData()
   }
 
-  // 如果不是首页标签，添加滚动监听
-  if (!isFirstTab) {
-    // 添加滚动监听
-    addScrollListener()
-  }
+  // 所有标签都使用翻页模式，无需滚动监听
 })
 
 // 从其他页面返回时激活的钩子（用于处理从详情页返回的情况）
@@ -1297,10 +1297,6 @@ onActivated(() => {
       expandedTypeId: expandedTypeId.value,
     })
   }
-
-  // 确定是否是首页标签
-  const firstTypeId = typesList.value.length > 0 ? typesList.value[0].type_id : 1
-  const isFirstTab = activeTypeId.value === firstTypeId
 
   // 尝试恢复当前标签的缓存数据
   const currentTabCache = tabStates.value[activeTypeId.value]
@@ -1337,11 +1333,7 @@ onActivated(() => {
     }, 50)
   }
 
-  // 如果不是首页标签，重新添加滚动监听
-  if (!isFirstTab) {
-    console.log('重新添加滚动监听器')
-    addScrollListener()
-  }
+  // 所有标签都使用翻页模式，无需滚动监听
 
   // 从详情页返回时不再检查弹窗状态，保持关闭状态
 })
@@ -1353,8 +1345,6 @@ onBeforeUnmount(() => {
 
   // 保存会话数据
   saveSessionData()
-
-  removeScrollListener()
 
   // 移除页面关闭或刷新的事件监听
   window.removeEventListener('beforeunload', handlePageUnload)
@@ -1484,7 +1474,7 @@ const performTouristLogin = async () => {
     <!-- 加载状态组件 -->
     <LoadingStates
       :isFullScreenLoading="isFullScreenLoading"
-      :isLoadingMore="isLoadingMore"
+      :isLoadingMore="false"
       :isFirstTabActive="isFirstTabActive"
       :videoDataLength="videoData.length"
       :hasMoreVideos="hasMoreVideos"
@@ -1566,6 +1556,9 @@ const performTouristLogin = async () => {
         :latestErrorMessage="latestErrorMessage"
         :latestVideoData="latestVideoData"
         :isRefreshingLatest="isLoadingLatest"
+        :current-page="currentPage"
+        :total-pages="totalPages"
+        @page-change="handlePageChange"
         @refresh-videos="refreshVideos"
         @refresh-latest-videos="refreshLatestVideos"
       />
