@@ -70,7 +70,8 @@ const handleRightClick = () => {
   left: 0;
   right: 0;
   z-index: 100;
-  background-color: #111;
+  display: flex;
+  justify-content: center;
 }
 
 .header-content {
@@ -79,6 +80,9 @@ const handleRightClick = () => {
   justify-content: space-between;
   align-items: center;
   padding: 0 15px;
+  width: 100%;
+  max-width: 420px;
+  background-color: #111;
 }
 
 .left-area, .right-area {

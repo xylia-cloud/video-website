@@ -432,12 +432,14 @@ onMounted(async () => {
 
         <!-- 选项卡切换 -->
         <div class="nav-tabs">
-            <div class="tab-container">
-                <div class="tab-button" :class="{ active: activeTab === 'video' }" @click="switchTab('video')">
-                    视频充值
-                </div>
-                <div class="tab-button" :class="{ active: activeTab === 'game' }" @click="switchTab('game')">
-                    游戏充值
+            <div class="nav-tabs-wrapper">
+                <div class="tab-container">
+                    <div class="tab-button" :class="{ active: activeTab === 'video' }" @click="switchTab('video')">
+                        视频充值
+                    </div>
+                    <div class="tab-button" :class="{ active: activeTab === 'game' }" @click="switchTab('game')">
+                        游戏充值
+                    </div>
                 </div>
             </div>
         </div>
@@ -555,7 +557,7 @@ onMounted(async () => {
 }
 
 .vip-container {
-    padding: 150px 16px 100px;
+    padding: 120px 16px 100px;
 }
 
 /* 🔥 导航选项卡 - 圆角按钮样式 */
@@ -565,26 +567,34 @@ onMounted(async () => {
     left: 0;
     right: 0;
     width: 100%;
-    background-color: #111;
     z-index: 99;
-    padding: 15px 20px;
+    display: flex;
+    justify-content: center;
+}
+
+.nav-tabs-wrapper {
+    width: 100%;
+    max-width: 420px;
+    padding: 10px 20px;
+    background-color: #111;
 }
 
 .tab-container {
     display: flex;
     background-color: #333;
-    border-radius: 25px;
-    padding: 4px;
-    gap: 4px;
+    border-radius: 20px;
+    padding: 3px;
+    gap: 3px;
+    width: 100%;
 }
 
 .tab-button {
     flex: 1;
-    padding: 12px 0;
-    font-size: 16px;
+    padding: 8px 0;
+    font-size: 14px;
     font-weight: 500;
     text-align: center;
-    border-radius: 20px;
+    border-radius: 16px;
     cursor: pointer;
     transition: all 0.3s ease;
     color: #999;
@@ -938,6 +948,16 @@ onMounted(async () => {
 
     .purchase-section {
         padding: 12px;
+    }
+}
+
+/* 桌面端：限制底部购买区域宽度与页面一致 */
+@media screen and (min-width: 768px) {
+    .purchase-section {
+        left: 50% !important;
+        right: auto !important;
+        width: 420px !important;
+        transform: translateX(-50%) !important;
     }
 }
 </style>

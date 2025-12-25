@@ -219,7 +219,24 @@ const fetchPaymentChannels = async () => {
         }),
       )
 
-      // 🔥 不再默认选中任何支付方式，让用户主动选择
+      // 🔥 默认选中支付宝支付方式
+      const alipayChannel = paymentChannels.value.find(
+        (channel) =>
+          channel.id === '5' ||
+          channel.type === '5' ||
+          (channel.type === '1' &&
+            (channel.name.includes('支付宝') ||
+              channel.name.toLowerCase().includes('alipay') ||
+              channel.name.toLowerCase().includes('ali'))),
+      )
+
+      if (alipayChannel) {
+        // 自动选中支付宝
+        alipayChannel.selected = true
+        selectedPaymentMethod.value = alipayChannel.id
+        // 自动获取支付宝的充值规则
+        await fetchRules(alipayChannel.id)
+      }
 
       console.log('支付渠道数据:', paymentChannels.value)
     } else {
@@ -267,6 +284,36 @@ const fetchRules = async (channelId: string) => {
       // 如果是虚拟币（类型2），设置转账账号
       if (qudaoid === 2 && !Array.isArray(info.list)) {
         transferAccount.value = info.list.bankno || ''
+      }
+
+      // 🔥 如果是支付宝（类型5）且有子渠道，自动选中第一个支付宝平台
+      // 检查当前选中的支付方式是否是支付宝
+      const currentChannel = paymentChannels.value.find(
+        (c) => c.id === channelId,
+      )
+      const isAlipay =
+        qudaoid === 5 ||
+        currentChannel?.id === '5' ||
+        currentChannel?.type === '5' ||
+        (currentChannel?.type === '1' &&
+          (currentChannel?.name.includes('支付宝') ||
+            currentChannel?.name.toLowerCase().includes('alipay') ||
+            currentChannel?.name.toLowerCase().includes('ali')))
+
+      if (isAlipay && Array.isArray(info.list) && info.list.length > 0) {
+        // 找到第一个支付宝平台（名称包含"支付宝"的平台）
+        const alipayPlatform = info.list.find(
+          (platform: PaymentSubChannel) =>
+            platform.name?.includes('支付宝') ||
+            platform.name?.toLowerCase().includes('alipay') ||
+            platform.name?.toLowerCase().includes('ali'),
+        )
+        if (alipayPlatform) {
+          selectedSubChannel.value = alipayPlatform
+        } else if (info.list.length > 0) {
+          // 如果没找到明确的支付宝平台，就选中第一个
+          selectedSubChannel.value = info.list[0]
+        }
       }
 
       console.log('充值规则数据:', result)
@@ -684,20 +731,22 @@ onMounted(async () => {
 
     <!-- 选项卡切换 -->
     <div class="nav-tabs">
-      <div class="tab-container">
-        <div
-          class="tab-button"
-          :class="{ active: activeTab === 'video' }"
-          @click="switchTab('video')"
-        >
-          视频充值
-        </div>
-        <div
-          class="tab-button"
-          :class="{ active: activeTab === 'game' }"
-          @click="switchTab('game')"
-        >
-          游戏充值
+      <div class="nav-tabs-wrapper">
+        <div class="tab-container">
+          <div
+            class="tab-button"
+            :class="{ active: activeTab === 'video' }"
+            @click="switchTab('video')"
+          >
+            视频充值
+          </div>
+          <div
+            class="tab-button"
+            :class="{ active: activeTab === 'game' }"
+            @click="switchTab('game')"
+          >
+            游戏充值
+          </div>
         </div>
       </div>
     </div>
@@ -930,7 +979,7 @@ onMounted(async () => {
   flex-shrink: 0;
   background-color: #111;
   border-bottom: 1px solid rgba(255, 255, 255, 0.1);
-  margin-top: 150px;
+  margin-top: 110px;
 }
 
 /* 可滚动内容区域 */
@@ -947,26 +996,34 @@ onMounted(async () => {
   left: 0;
   right: 0;
   width: 100%;
-  background-color: #111;
   z-index: 99;
-  padding: 15px 20px;
+  display: flex;
+  justify-content: center;
+}
+
+.nav-tabs-wrapper {
+  width: 100%;
+  max-width: 420px;
+  padding: 10px 20px;
+  background-color: #111;
 }
 
 .tab-container {
   display: flex;
   background-color: #333;
-  border-radius: 25px;
-  padding: 4px;
-  gap: 4px;
+  border-radius: 20px;
+  padding: 3px;
+  gap: 3px;
+  width: 100%;
 }
 
 .tab-button {
   flex: 1;
-  padding: 12px 0;
-  font-size: 16px;
+  padding: 8px 0;
+  font-size: 14px;
   font-weight: 500;
   text-align: center;
-  border-radius: 20px;
+  border-radius: 16px;
   cursor: pointer;
   transition: all 0.3s ease;
   color: #999;
