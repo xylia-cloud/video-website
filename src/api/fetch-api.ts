@@ -482,8 +482,22 @@ export const updateUserLog = async (params: {
     throw new Error('请先登录再进行收藏或播放记录操作')
   }
 
+  // 获取用户信息
+  const userInfo = getUserInfo()
+  if (!userInfo || !userInfo.token) {
+    throw new Error('用户信息不完整，请重新登录')
+  }
+
+  // 兼容游客用户和正式用户的数据结构
+  const uid = userInfo.user_id || userInfo.id
+  if (!uid) {
+    throw new Error('用户ID不存在，请重新登录')
+  }
+
   // 创建 FormData 对象
   const formData = new FormData()
+  formData.append('uid', String(uid))
+  formData.append('token', userInfo.token)
   formData.append('mid', String(params.mid))
   formData.append('id', String(params.id))
   formData.append('type', String(params.type))
