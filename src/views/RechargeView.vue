@@ -613,6 +613,16 @@ const createOrder = async () => {
       return
     }
 
+    // 此时 selectedMoneyItem.value 一定不为 null（前面已经检查并创建）
+    if (!selectedMoneyItem.value) {
+      showToast({
+        message: '金额信息缺失',
+        duration: 2000,
+      })
+      isCreatingOrder.value = false
+      return
+    }
+
     const orderParams = {
       qudaoid: qudaoid,
       money: selectedMoneyItem.value.money,

@@ -17,7 +17,7 @@
         class="page-number-btn"
         :class="{ active: page === currentPage, 'page-ellipsis': page === '...' }"
         :disabled="page === '...'"
-        @click="page !== '...' && $emit('page-change', page)"
+        @click="page !== '...' && typeof page === 'number' && $emit('page-change', page)"
       >
         {{ page }}
       </button>
