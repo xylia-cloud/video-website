@@ -10,9 +10,9 @@ const router = useRouter()
 const gameUrl = ref((route.query.url as string) || '')
 const returnPath = ref((route.query.returnPath as string) || '/game')
 
-// 悬浮按钮位置 - 默认在右上角
+// 悬浮按钮位置 - 默认在左上角
 const buttonPosition = ref({
-  x: window.innerWidth - 70,
+  x: 20,
   y: 80,
 })
 
@@ -26,7 +26,7 @@ const dragThreshold = 10 // 拖拽阈值，超过这个距离才认为是拖拽
 const startDrag = (e: MouseEvent | TouchEvent) => {
   const clientX = 'touches' in e ? e.touches[0].clientX : e.clientX
   const clientY = 'touches' in e ? e.touches[0].clientY : e.clientY
-  
+
   isDragging.value = true
   dragStart.value = {
     x: clientX - buttonPosition.value.x,
@@ -46,8 +46,7 @@ const onDrag = (e: MouseEvent | TouchEvent) => {
 
   // 计算移动距离
   const moveDistance = Math.sqrt(
-    Math.pow(clientX - dragStart.value.startX, 2) +
-    Math.pow(clientY - dragStart.value.startY, 2)
+    Math.pow(clientX - dragStart.value.startX, 2) + Math.pow(clientY - dragStart.value.startY, 2),
   )
 
   // 如果移动距离超过阈值，才更新位置
@@ -66,7 +65,7 @@ const onDrag = (e: MouseEvent | TouchEvent) => {
 
     buttonPosition.value = { x: newX, y: newY }
   }
-  
+
   e.preventDefault()
 }
 
@@ -93,8 +92,7 @@ const endDrag = (e: MouseEvent | TouchEvent) => {
 
   // 计算移动距离
   const moveDistance = Math.sqrt(
-    Math.pow(clientX - dragStart.value.startX, 2) +
-    Math.pow(clientY - dragStart.value.startY, 2)
+    Math.pow(clientX - dragStart.value.startX, 2) + Math.pow(clientY - dragStart.value.startY, 2),
   )
 
   isDragging.value = false
@@ -126,11 +124,16 @@ const handleBackClick = () => {
 
 // 监听窗口大小变化
 const handleResize = () => {
-  // 确保按钮在可视区域内，并保持在右上角区域
+  // 确保按钮在可视区域内，并保持在左上角区域
   const maxX = window.innerWidth - 60
   const maxY = window.innerHeight - 60
-  buttonPosition.value.x = Math.min(buttonPosition.value.x, maxX)
-  // 如果按钮位置太靠下（超过屏幕一半），重置到右上角
+  const minX = 0
+  buttonPosition.value.x = Math.max(minX, Math.min(buttonPosition.value.x, maxX))
+  // 如果按钮位置太靠右（超过屏幕一半），重置到左上角
+  if (buttonPosition.value.x > window.innerWidth / 2) {
+    buttonPosition.value.x = 20
+  }
+  // 如果按钮位置太靠下（超过屏幕一半），重置到顶部
   if (buttonPosition.value.y > window.innerHeight / 2) {
     buttonPosition.value.y = 80
   }
