@@ -2595,6 +2595,7 @@ export const fetchUserPoints = async () => {
             code: 1,
             data: {
               points: result.data.info.points,
+              coin: result.data.info.coin || '0', // 账户余额和游戏余额
               video_nums: result.data.info.video_nums,
               is_vip: result.data.info.is_vip,
               endtime: result.data.info.endtime,

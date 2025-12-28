@@ -1,7 +1,13 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
 import { NEW_API_BASE_URL } from '@/utils/config'
-import { getUserInfo, isLoggedIn, fetchNotices, type NoticeGroup } from '@/api/fetch-api'
+import {
+  getUserInfo,
+  isLoggedIn,
+  fetchNotices,
+  fetchUserPoints,
+  type NoticeGroup,
+} from '@/api/fetch-api'
 import { useRouter, useRoute } from 'vue-router'
 import { showToast } from 'vant'
 
@@ -745,13 +751,30 @@ const goToRegister = () => {
 }
 
 // 获取用户余额和登录状态
-const fetchUserBalance = () => {
+const fetchUserBalance = async () => {
   const userInfo = getUserInfo()
   if (userInfo && userInfo.token) {
     // 用户已登录
     isUserLoggedIn.value = true
-    userBalance.value = userInfo.coin || 0 // 账户余额改为使用coin字段
-    gameBalance.value = userInfo.coin || 0 // 游戏余额也使用coin字段
+    try {
+      // 调用接口获取余额
+      const result = await fetchUserPoints()
+      if (result && result.code === 1 && result.data) {
+        // coin就是账户余额和游戏余额
+        const coin = parseFloat(result.data.coin || '0')
+        userBalance.value = coin
+        gameBalance.value = coin
+      } else {
+        // 接口调用失败，使用本地存储的余额
+        userBalance.value = userInfo.coin || 0
+        gameBalance.value = userInfo.coin || 0
+      }
+    } catch (error) {
+      console.error('获取余额失败:', error)
+      // 出错时使用本地存储的余额
+      userBalance.value = userInfo.coin || 0
+      gameBalance.value = userInfo.coin || 0
+    }
   } else {
     // 用户未登录
     isUserLoggedIn.value = false
