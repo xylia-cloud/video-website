@@ -28,6 +28,7 @@ import SearchView from '../views/SearchView.vue'
 import AboutUsView from '../views/AboutUsView.vue'
 import PrivacyPolicyView from '../views/PrivacyPolicyView.vue'
 import GameRecordView from '../views/GameRecordView.vue'
+import GamePlayView from '../views/GamePlayView.vue'
 import FollowListView from '../views/FollowListView.vue'
 import CollectionView from '../views/CollectionView.vue'
 import WatchHistoryView from '../views/WatchHistoryView.vue'
@@ -81,6 +82,11 @@ const router = createRouter({
       name: 'game-secondary',
       component: GameSecondaryView,
       props: true,
+    },
+    {
+      path: '/game-play',
+      name: 'game-play',
+      component: GamePlayView,
     },
     {
       path: '/lottery/:primaryCategoryId',

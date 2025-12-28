@@ -2538,6 +2538,10 @@ const handleAdClick = (ad: ListAd) => {
 
         <!-- 视频播放器 -->
         <template v-if="isPlaying">
+          <!-- 视频顶部横条 -->
+          <div class="video-top-banner">
+            <div class="banner-text">365娱乐永久网址：68.fo 十年品牌 大额提现秒到账</div>
+          </div>
           <div v-if="hasError" class="play-error">
             <Icon name="warning-o" size="50" color="#ff6b6b" />
             <div class="error-msg">{{ errorMessage || '视频播放失败' }}</div>
@@ -2566,6 +2570,11 @@ const handleAdClick = (ad: ListAd) => {
           >
             您的浏览器不支持 HTML5 视频播放
           </video>
+
+          <!-- 视频右下角半透明色块 -->
+          <div class="video-bottom-right-banner">
+            <div class="banner-text">68.fo</div>
+          </div>
 
           <!-- 🔥 装饰性圆形元素 -->
           <div class="video-decorations">
@@ -2877,6 +2886,52 @@ const handleAdClick = (ad: ListAd) => {
   font-size: 14px;
   font-weight: bold;
   cursor: pointer;
+}
+
+/* 视频顶部横条 */
+.video-top-banner {
+  position: absolute;
+  top: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 90%;
+  background-color: rgba(0, 0, 0, 0.4);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  color: #fff;
+  padding: 2px 15px;
+  text-align: center;
+  z-index: 5;
+  font-size: 13px;
+  font-weight: 500;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 0 0 4px 4px;
+}
+
+.banner-text {
+  color: #fff;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* 视频右下角半透明色块 */
+.video-bottom-right-banner {
+  position: absolute;
+  bottom: 20px;
+  right: 20px;
+  background-color: rgba(0, 0, 0, 0.4);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  color: #fff;
+  padding: 1px 8px;
+  text-align: center;
+  z-index: 5;
+  font-size: 11px;
+  font-weight: 500;
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+  border-left: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 4px;
 }
 
 /* 视频播放器 */

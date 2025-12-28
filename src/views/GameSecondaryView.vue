@@ -649,18 +649,22 @@ const handleGameClick = async (game: Game) => {
       console.log('进入游戏成功:', result)
       showToast(`成功进入游戏: ${game.name}`)
 
-      // 处理游戏链接跳转 - 参考充值界面的iOS兼容方案
+      // 处理游戏链接跳转 - 跳转到游戏页面组件
       if (result.data && result.data.purl) {
         const gameUrl = result.data.purl
         console.log('🔗 准备跳转到游戏页面:', gameUrl)
 
-        // 使用 window.location.href 替代 window.open 以兼容iOS（参考充值界面实现）
-        showToast('正在跳转到游戏...')
+        // 获取当前路由路径作为返回路径
+        const returnPath = route.fullPath
 
-        // 延迟跳转，让用户看到提示
-        setTimeout(() => {
-          window.location.href = gameUrl
-        }, 500)
+        // 跳转到游戏页面组件
+        router.push({
+          name: 'game-play',
+          query: {
+            url: gameUrl,
+            returnPath: returnPath,
+          },
+        })
       } else {
         console.warn('返回数据中没有找到游戏链接 (purl)')
         showToast('游戏启动成功，但未获取到游戏链接')
