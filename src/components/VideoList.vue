@@ -228,7 +228,7 @@ const handleVideoClick = (videoId: number) => {
 
 .video-badge {
   position: absolute;
-  top: 5px;
+  bottom: 5px;
   right: 5px;
   background-color: #ff9500;
   color: #fff;

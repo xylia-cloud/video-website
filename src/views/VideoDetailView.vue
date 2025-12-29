@@ -2918,7 +2918,7 @@ const handleAdClick = (ad: ListAd) => {
 /* 视频右下角半透明色块 */
 .video-bottom-right-banner {
   position: absolute;
-  bottom: 20px;
+  bottom: 60px;
   right: 20px;
   background-color: rgba(0, 0, 0, 0.4);
   backdrop-filter: blur(10px);
