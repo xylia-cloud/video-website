@@ -128,7 +128,7 @@ watch(
   (newPage) => {
     jumpPageInput.value = newPage
   },
-  { immediate: true }
+  { immediate: true },
 )
 </script>
 
@@ -307,4 +307,3 @@ watch(
   }
 }
 </style>
-

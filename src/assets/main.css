@@ -17,36 +17,10 @@
   min-height: 100vh;
 }
 
-/* 移动端样式 - 默认100%宽度 */
-@media screen and (max-width: 767px) {
-  #app {
-    width: 100%;
-    max-width: 100%;
-  }
-}
-
-/* 平板和桌面端样式 - 固定宽度并居中 */
-@media screen and (min-width: 768px) {
-  body {
-    background-color: #222; /* 外层背景色，使内容区域更突出 */
-  }
-  
-  #app {
-    width: var(--app-mobile-width);
-    max-width: 100%;
-    margin: 0 auto;
-    box-shadow: 0 0 20px rgba(0, 0, 0, 0.5); /* 给应用添加阴影效果 */
-    overflow: hidden; /* 确保内容不溢出容器 */
-    position: relative; /* 创建上下文 */
-  }
-  
-  /* 底部导航栏固定宽度 */
-  .bottom-nav {
-    left: 50% !important;
-    right: auto !important;
-    width: var(--app-mobile-width) !important;
-    transform: translateX(-50%) !important;
-  }
+/* 所有设备都使用100%宽度，自适应设备宽度 */
+#app {
+  width: 100%;
+  max-width: 100%;
 }
 
 a,

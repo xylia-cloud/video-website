@@ -81,7 +81,6 @@ const handleRightClick = () => {
   align-items: center;
   padding: 0 15px;
   width: 100%;
-  max-width: 420px;
   background-color: #111;
 }
 
