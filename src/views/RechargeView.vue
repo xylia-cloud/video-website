@@ -291,33 +291,38 @@ const fetchRules = async (channelId: string) => {
         transferAccount.value = info.list.bankno || ''
       }
 
-      // 🔥 如果是支付宝（类型5）且有子渠道，自动选中第一个支付宝平台
-      // 检查当前选中的支付方式是否是支付宝
-      const currentChannel = paymentChannels.value.find(
-        (c) => c.id === channelId,
-      )
-      const isAlipay =
-        qudaoid === 5 ||
-        currentChannel?.id === '5' ||
-        currentChannel?.type === '5' ||
-        (currentChannel?.type === '1' &&
-          (currentChannel?.name.includes('支付宝') ||
-            currentChannel?.name.toLowerCase().includes('alipay') ||
-            currentChannel?.name.toLowerCase().includes('ali')))
+      // 🔥 自动选中支付平台逻辑
+      if (Array.isArray(info.list) && info.list.length > 0) {
+        // 检查当前选中的支付方式是否是支付宝
+        const currentChannel = paymentChannels.value.find((c) => c.id === channelId)
+        const isAlipay =
+          qudaoid === 5 ||
+          currentChannel?.id === '5' ||
+          currentChannel?.type === '5' ||
+          (currentChannel?.type === '1' &&
+            (currentChannel?.name.includes('支付宝') ||
+              currentChannel?.name.toLowerCase().includes('alipay') ||
+              currentChannel?.name.toLowerCase().includes('ali')))
 
-      if (isAlipay && Array.isArray(info.list) && info.list.length > 0) {
-        // 找到第一个支付宝平台（名称包含"支付宝"的平台）
-        const alipayPlatform = info.list.find(
-          (platform: PaymentSubChannel) =>
-            platform.name?.includes('支付宝') ||
-            platform.name?.toLowerCase().includes('alipay') ||
-            platform.name?.toLowerCase().includes('ali'),
-        )
-        if (alipayPlatform) {
-          selectedSubChannel.value = alipayPlatform
-        } else if (info.list.length > 0) {
-          // 如果没找到明确的支付宝平台，就选中第一个
-          selectedSubChannel.value = info.list[0]
+        let targetPlatform = null
+
+        // 如果是支付宝，优先尝试找到名称匹配的平台
+        if (isAlipay) {
+          targetPlatform = info.list.find(
+            (platform: PaymentSubChannel) =>
+              platform.name?.includes('支付宝') ||
+              platform.name?.toLowerCase().includes('alipay') ||
+              platform.name?.toLowerCase().includes('ali'),
+          )
+        }
+
+        // 如果没找到匹配的（或者是其他支付方式），默认选中第一个
+        if (!targetPlatform) {
+          targetPlatform = info.list[0]
+        }
+
+        if (targetPlatform) {
+          selectedSubChannel.value = targetPlatform
         }
       }
 
@@ -473,7 +478,7 @@ const handleCustomAmountInput = (value: string) => {
 // 计算手动输入金额对应的钻石数
 const calculateCustomCoin = computed(() => {
   if (!customAmount.value || !availableAmounts.value.length) return 0
-  
+
   const amount = parseFloat(customAmount.value)
   if (amount <= 0) return 0
 
