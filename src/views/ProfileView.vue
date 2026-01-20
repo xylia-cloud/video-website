@@ -976,7 +976,7 @@ const confirmApplyAgent = async () => {
             </div>
             <div class="credential-website">永久网址: sese1188.cc</div>
             <div class="credential-desc">
-              账户凭证为唯一防失联和恢复账户依据<br />请截图妥善保存
+              账户凭证为唯一防失联和恢复账户依据<br /><span style="color: #ff4d4f">请截图妥善保存</span>
             </div>
           </div>
         </div>

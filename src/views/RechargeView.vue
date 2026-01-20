@@ -1,6 +1,6 @@
 <script setup lang="ts">
 // 充值页面逻辑
-import { ref, onMounted, computed } from 'vue'
+import { ref, onMounted, computed, nextTick } from 'vue'
 import { showToast, showDialog } from 'vant'
 import { useRouter } from 'vue-router'
 import {
@@ -394,6 +394,17 @@ const selectPlatform = (platform: PaymentSubChannel | Record<string, unknown>) =
   rechargeAmount.value = ''
   isCustomAmount.value = false
   customAmount.value = ''
+
+  // 🔥 滚动到底部，方便用户看到金额选择
+  nextTick(() => {
+    const scrollContainer = document.querySelector('.scrollable-content')
+    if (scrollContainer) {
+      scrollContainer.scrollTo({
+        top: scrollContainer.scrollHeight,
+        behavior: 'smooth',
+      })
+    }
+  })
 }
 
 // 🔥 处理支付成功
