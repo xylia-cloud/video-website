@@ -257,7 +257,7 @@ onBeforeUnmount(() => {
 
           <!-- 卡片内容 -->
           <div class="card-content">
-            <div class="content-row">
+            <div class="content-grid">
               <div class="content-col">
                 <span class="label">玩法</span>
                 <span class="value">{{ record.playtitle }}</span>
@@ -266,19 +266,16 @@ onBeforeUnmount(() => {
                 <span class="label">倍数</span>
                 <span class="value">{{ record.beishu }}倍</span>
               </div>
-            </div>
-            <div class="content-row">
-              <div class="content-col">
-                <span class="label">投注号码</span>
-                <span class="value">{{ record.tzcode }}</span>
-              </div>
               <div class="content-col">
                 <span class="label">投注金额</span>
                 <span class="value amount">{{ record.amount }}</span>
               </div>
-            </div>
-            <div v-if="record.opencode" class="content-row">
-              <div class="content-col full-width">
+
+              <div class="content-col">
+                <span class="label">投注号码</span>
+                <span class="value">{{ record.tzcode }}</span>
+              </div>
+              <div v-if="record.opencode" class="content-col">
                 <span class="label">开奖码</span>
                 <span class="value">{{ record.opencode }}</span>
               </div>
@@ -433,67 +430,59 @@ onBeforeUnmount(() => {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 14px 16px;
+  padding: 10px 12px;
   border-bottom: 1px solid rgba(255, 255, 255, 0.05);
-  gap: 12px;
+  gap: 8px;
   background: rgba(255, 149, 0, 0.02);
 }
 
 .header-left {
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: 4px;
   flex: 1;
 }
 
 .lottery-name {
-  font-size: 15px;
+  font-size: 14px;
   font-weight: 700;
   color: #fff;
   letter-spacing: 0.5px;
 }
 
 .lottery-issue {
-  font-size: 12px;
+  font-size: 11px;
   color: #999;
   letter-spacing: 0.3px;
 }
 
 .status-badge {
-  font-size: 12px;
+  font-size: 11px;
   font-weight: 600;
   white-space: nowrap;
-  padding: 4px 12px;
+  padding: 2px 8px;
   color: #fff;
   border-radius: 4px;
-  min-width: 60px;
+  min-width: 50px;
   text-align: center;
 }
 
 /* 卡片内容 */
 .card-content {
-  padding: 10px 16px;
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
+  padding: 8px 12px;
 }
 
-.content-row {
+.content-grid {
   display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 12px;
-  font-size: 12px;
-}
-
-.content-row:last-child {
-  grid-template-columns: 1fr;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
 }
 
 .content-col {
   display: flex;
   flex-direction: column;
-  gap: 4px;
-  padding: 6px 0;
+  gap: 2px;
+  padding: 2px 0;
 }
 
 .content-col.full-width {
@@ -503,7 +492,7 @@ onBeforeUnmount(() => {
 .label {
   color: #999;
   font-weight: 500;
-  font-size: 11px;
+  font-size: 10px;
   text-transform: uppercase;
   letter-spacing: 0.5px;
 }
@@ -511,26 +500,26 @@ onBeforeUnmount(() => {
 .value {
   color: #e0e0e0;
   font-weight: 500;
-  font-size: 13px;
+  font-size: 12px;
   word-break: break-word;
 }
 
 .value.amount {
   color: #ff9500;
   font-weight: 700;
-  font-size: 14px;
+  font-size: 13px;
 }
 
 /* 卡片底部 */
 .card-footer {
-  padding: 10px 16px;
+  padding: 6px 12px;
   background-color: rgba(255, 255, 255, 0.01);
   border-top: 1px solid rgba(255, 255, 255, 0.03);
   text-align: right;
 }
 
 .time {
-  font-size: 11px;
+  font-size: 10px;
   color: #777;
   letter-spacing: 0.3px;
 }

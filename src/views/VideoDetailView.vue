@@ -2890,11 +2890,12 @@ const handleAdClick = (ad: ListAd) => {
 
 /* 视频顶部横条 */
 .video-top-banner {
+  display: none;
   position: absolute;
   top: 0;
   left: 50%;
   transform: translateX(-50%);
-  width: 90%;
+  width: 82%;
   background-color: rgba(0, 0, 0, 0.4);
   backdrop-filter: blur(10px);
   -webkit-backdrop-filter: blur(10px);
@@ -2918,19 +2919,17 @@ const handleAdClick = (ad: ListAd) => {
 /* 视频右下角半透明色块 */
 .video-bottom-right-banner {
   position: absolute;
-  bottom: 60px;
-  right: 20px;
+  bottom: 4px;
+  right: 4px;
   background-color: rgba(0, 0, 0, 0.4);
   backdrop-filter: blur(10px);
   -webkit-backdrop-filter: blur(10px);
   color: #fff;
-  padding: 1px 8px;
+  padding: 4px 12px;
   text-align: center;
   z-index: 5;
-  font-size: 11px;
+  font-size: 13px;
   font-weight: 500;
-  border-top: 1px solid rgba(255, 255, 255, 0.1);
-  border-left: 1px solid rgba(255, 255, 255, 0.1);
   border-radius: 4px;
 }
 

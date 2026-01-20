@@ -1,13 +1,41 @@
 <script setup lang="ts">
-// 活动页面逻辑
+import { useRouter } from 'vue-router'
+import HeaderNav from '@/components/HeaderNav.vue'
+import hd01 from '@/assets/img/hd-01.png'
+import hd02 from '@/assets/img/hd-02.png'
+import hd03 from '@/assets/img/hd-03.png'
+import hd04 from '@/assets/img/hd-04.png'
+
+const router = useRouter()
+
+const activities = [
+  { id: '1', image: hd01, disabled: true },
+  { id: '2', image: hd02, disabled: true },
+  { id: '3', image: hd03 },
+  { id: '4', image: hd04 },
+]
+
+const goToDetail = (item: { id: string; disabled?: boolean }) => {
+  if (item.disabled) return
+  router.push({ name: 'activityDetail', params: { id: item.id } })
+}
 </script>
 
 <template>
   <div class="live-page">
+    <HeaderNav title="活动" :showBack="false" />
     <!-- 活动内容区域 -->
     <div class="live-content">
-      <div class="coming-soon">
-        <div class="coming-soon-text">敬请期待</div>
+      <div class="activity-list">
+        <div
+          v-for="item in activities"
+          :key="item.id"
+          class="activity-item"
+          :class="{ disabled: item.disabled }"
+          @click="goToDetail(item)"
+        >
+          <img :src="item.image" class="activity-banner" alt="活动Banner" />
+        </div>
       </div>
     </div>
 
@@ -45,21 +73,41 @@
 }
 
 .live-content {
-  padding: 20px;
-  display: flex;
-  justify-content: center;
-  align-items: center;
+  padding: 62px 12px 12px;
   min-height: calc(100vh - 50px);
+  overflow-y: auto;
 }
 
-.coming-soon {
-  text-align: center;
+.activity-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
 }
 
-.coming-soon-text {
-  font-size: 24px;
-  color: #999;
-  font-weight: 500;
+.activity-item {
+  border-radius: 8px;
+  overflow: hidden;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+  cursor: pointer;
+  transition: transform 0.2s;
+}
+
+.activity-item:active {
+  transform: scale(0.98);
+}
+
+.activity-item.disabled {
+  cursor: default;
+}
+
+.activity-item.disabled:active {
+  transform: none;
+}
+
+.activity-banner {
+  width: 100%;
+  display: block;
+  height: auto;
 }
 
 /* 底部导航 */

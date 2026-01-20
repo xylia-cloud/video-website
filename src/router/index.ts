@@ -238,6 +238,11 @@ const router = createRouter({
       name: 'promotionRecord',
       component: PromotionRecordView,
     },
+    {
+      path: '/activity/:id',
+      name: 'activityDetail',
+      component: () => import('../views/ActivityDetailView.vue'),
+    },
   ],
 })
 
