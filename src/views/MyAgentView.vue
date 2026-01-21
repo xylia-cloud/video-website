@@ -266,10 +266,7 @@ const goToPerformanceQuery = () => {
 
 // 跳转到代理报表
 const goToAgentReport = () => {
-  showToast({
-    message: '代理报表功能开发中',
-    duration: 2000,
-  })
+  router.push('/agent-report')
 }
 
 // 查看团队详情
