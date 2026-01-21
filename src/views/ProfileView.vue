@@ -753,23 +753,20 @@ const confirmApplyAgent = async () => {
 
         <div class="common-item" @click="goToVipRecharge">
           <div class="common-icon">
-            <img src="@/assets/img/icon-chongzhi2.svg" alt="" />
+            <img src="@/assets/img/icon-user-chongzhi.png" alt="" />
           </div>
-          <div class="common-name">充值</div>
         </div>
 
         <div class="common-item" @click="goToWithdraw">
           <div class="common-icon">
-            <img src="@/assets/img/icon-tixian2.svg" alt="" />
+            <img src="@/assets/img/icon-user-tixian.png" alt="" />
           </div>
-          <div class="common-name">提现</div>
         </div>
 
         <div class="common-item" @click="goToShareFriends">
           <div class="common-icon">
-            <img src="@/assets/img/icon-tuiguang.svg" alt="" />
+            <img src="@/assets/img/icon-user-tuiguang.png" alt="" />
           </div>
-          <div class="common-name">推广</div>
         </div>
 
         <!-- <div class="common-item" @click="goToWallet">
@@ -781,9 +778,8 @@ const confirmApplyAgent = async () => {
 
         <div class="common-item" @click="goToCustomerService">
           <div class="common-icon">
-            <img src="@/assets/img/icon-rgkf.svg" alt="" />
+            <img src="@/assets/img/icon-user-zaixiankefu.png" alt="" />
           </div>
-          <div class="common-name">在线客服</div>
         </div>
       </div>
     </div>
@@ -976,7 +972,9 @@ const confirmApplyAgent = async () => {
             </div>
             <div class="credential-website">永久网址: sese1188.cc</div>
             <div class="credential-desc">
-              账户凭证为唯一防失联和恢复账户依据<br /><span style="color: #ff4d4f">请截图妥善保存</span>
+              账户凭证为唯一防失联和恢复账户依据<br /><span style="color: #ff4d4f"
+                >请截图妥善保存</span
+              >
             </div>
           </div>
         </div>
@@ -1045,7 +1043,7 @@ export default {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 20px 15px;
+  padding: 15px 15px 10px;
 }
 
 .user-info {
@@ -1055,10 +1053,10 @@ export default {
 
 .avatar {
   position: relative;
-  width: 60px;
-  height: 60px;
+  width: 50px;
+  height: 50px;
   border-radius: 50%;
-  margin-right: 15px;
+  margin-right: 12px;
 }
 
 .avatar img {
@@ -1071,10 +1069,11 @@ export default {
 .user-details {
   display: flex;
   flex-direction: column;
+  gap: 2px;
 }
 
 .username {
-  font-size: 18px;
+  font-size: 16px;
   font-weight: bold;
   display: flex;
   align-items: center;
@@ -1083,7 +1082,7 @@ export default {
 
 .user-id {
   color: #999;
-  font-size: 14px;
+  font-size: 12px;
 }
 
 .user-arrow {
@@ -1094,7 +1093,7 @@ export default {
 }
 
 .user-arrow div {
-  font-size: 14px;
+  font-size: 12px;
   color: #fff;
 }
 
@@ -1102,7 +1101,7 @@ export default {
 .vip-card {
   text-align: center;
   line-height: 1;
-  padding: 16px;
+  padding: 10px 16px;
 }
 
 .vip-card img {
@@ -1146,8 +1145,8 @@ export default {
 .account-info {
   display: flex;
   gap: 10px;
-  margin: 0 15px 15px;
-  padding: 15px;
+  margin: 0 15px 10px;
+  padding: 12px;
   background-color: #222;
   border-radius: 10px;
 }
@@ -1159,13 +1158,14 @@ export default {
   align-items: center;
   text-align: center;
   color: #ccc;
-  font-size: 14px;
+  font-size: 12px;
 }
 
 .info-value {
-  margin-top: 5px;
+  margin-top: 4px;
   color: #fff;
   font-weight: bold;
+  font-size: 14px;
 }
 
 .info-item img {
@@ -1214,7 +1214,7 @@ export default {
 
 /* u5e38u7528u529fu80fdu533au57df */
 .common-section {
-  margin: 0 15px 15px;
+  margin: 0 15px 10px;
 }
 
 .section-title {
@@ -1226,7 +1226,7 @@ export default {
 .common-grid {
   display: grid;
   grid-template-columns: repeat(4, 1fr);
-  gap: 15px;
+  gap: 8px;
 }
 
 .common-item {
@@ -1235,23 +1235,23 @@ export default {
   align-items: center;
   gap: 8px;
   border-radius: 8px;
-  border: 1px solid rgba(255, 255, 255, 0.35);
-  background: rgba(255, 255, 255, 0.22);
-  padding: 8px 12px;
+  border: none;
+  background: transparent;
+  padding: 0px;
 }
 
 .common-icon {
-  width: 30px;
-  height: 30px;
+  width: 100%;
   display: flex;
   justify-content: center;
   align-items: center;
-  border-radius: 50%;
+  border-radius: 0;
 }
 
 .common-icon img {
-  width: 24px;
-  height: 24px;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
 }
 
 .common-name {
@@ -1263,8 +1263,8 @@ export default {
 /* 公告版块样式 */
 .notice-section {
   background: #2c2c2c;
-  margin: 0 15px 15px;
-  padding: 12px 16px;
+  margin: 0 15px 10px;
+  padding: 10px 16px;
   border-radius: 8px;
   overflow: hidden;
 }
@@ -1317,7 +1317,7 @@ export default {
 /* 记录列表样式 */
 .record-list-section {
   background: #2c2c2c;
-  margin: 0 15px 15px;
+  margin: 0 15px 10px;
   border-radius: 8px;
   overflow: hidden;
 }
@@ -1325,7 +1325,7 @@ export default {
 .record-item {
   display: flex;
   align-items: center;
-  padding: 16px 20px;
+  padding: 12px 16px;
   cursor: pointer;
   transition: background-color 0.3s ease;
   border-bottom: 1px solid #333;
@@ -1340,8 +1340,8 @@ export default {
 }
 
 .record-icon {
-  width: 32px;
-  height: 32px;
+  width: 28px;
+  height: 28px;
   margin-right: 8px;
   display: flex;
   align-items: center;
@@ -1351,14 +1351,14 @@ export default {
 }
 
 .record-icon img {
-  width: 24px;
-  height: 24px;
+  width: 20px;
+  height: 20px;
   object-fit: contain;
 }
 
 .record-name {
   flex: 1;
-  font-size: 16px;
+  font-size: 14px;
   color: #fff;
   font-weight: 500;
 }
@@ -1371,7 +1371,7 @@ export default {
 
 /* 退出登录前的广告位样式 */
 .profile-ads-container {
-  margin: 0 15px 15px;
+  margin: 0 15px 10px;
   border-radius: 10px;
   overflow: hidden;
   background-color: #222;
@@ -1415,8 +1415,8 @@ export default {
   background-color: #ff9500;
   color: #fff;
   text-align: center;
-  padding: 12px 0;
-  margin: 0 15px 15px;
+  padding: 10px 0;
+  margin: 0 15px 20px;
   border-radius: 10px;
   font-size: 14px;
 }
