@@ -9,8 +9,15 @@ import { NEW_API_BASE_URL } from '@/utils/config'
 
 const router = useRouter()
 
+type UserInfo = {
+  rec_code?: string
+  user_id?: string | number
+  id?: string | number
+  token?: string
+}
+
 // 用户信息
-const userInfo = ref<any>(null)
+const userInfo = ref<UserInfo | null>(null)
 // 二维码数据URL
 const qrCodeDataUrl = ref<string>('')
 // 是否显示二维码弹窗
@@ -52,7 +59,7 @@ const fetchUserInfo = () => {
 
   const info = getUserInfo()
   if (info) {
-    userInfo.value = info
+    userInfo.value = info as UserInfo
   }
 }
 
@@ -362,19 +369,19 @@ onMounted(() => {
       <div class="management-tools">
         <div class="tool-item" @click="goToTeamManagement">
           <div class="tool-icon">
-            <van-icon name="friends-o" size="24" color="#fff" />
+            <van-icon name="friends-o" size="24" color="#ff9500" />
           </div>
           <div class="tool-text">团队管理</div>
         </div>
         <div class="tool-item" @click="goToPerformanceQuery">
           <div class="tool-icon">
-            <van-icon name="bar-chart-o" size="24" color="#fff" />
+            <van-icon name="bar-chart-o" size="24" color="#ff9500" />
           </div>
           <div class="tool-text">业绩查询</div>
         </div>
         <div class="tool-item" @click="goToAgentReport">
           <div class="tool-icon">
-            <van-icon name="description" size="24" color="#fff" />
+            <van-icon name="description-o" size="24" color="#ff9500" />
           </div>
           <div class="tool-text">代理报表</div>
         </div>
@@ -460,12 +467,18 @@ onMounted(() => {
 
 .method-item {
   flex: 1;
-  background:
-    linear-gradient(135deg, #2c2c2c 0%, #1a1a1a 100%) padding-box,
-    linear-gradient(90deg, #805123, #f2e29a, #805123) border-box;
-  border: 1px solid transparent;
+  background-image: 
+    linear-gradient(135deg, rgba(44, 44, 44, 0) 0%, rgba(26, 26, 26, 0.0) 100%),
+    url('@/assets/img/bg-daili-01.png'),
+    linear-gradient(90deg, #805123, #f2e29a, #805123);
+  background-size: auto, cover, auto;
+  background-position: center, center, center;
+  background-repeat: no-repeat, no-repeat, no-repeat;
+  background-clip: padding-box, padding-box, border-box;
+  background-origin: padding-box, padding-box, border-box;
+  border: 2px solid transparent;
   border-radius: 12px;
-  padding: 20px 10px;
+  padding: 10px 10px;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -553,7 +566,11 @@ onMounted(() => {
 
 /* 佣金统计 */
 .commission-section {
-  background: linear-gradient(135deg, #2c2c2c 0%, #1a1a1a 100%);
+  background-image: url('@/assets/img/bg-daili-02.png'),
+    linear-gradient(135deg, rgba(44, 44, 44, 0.5) 0%, rgba(26, 26, 26, 0.5) 100%);
+  background-size: cover, auto;
+  background-position: center, center;
+  background-repeat: no-repeat, no-repeat;
   border-radius: 12px;
   padding: 20px;
   margin-bottom: 20px;
@@ -597,8 +614,18 @@ onMounted(() => {
 }
 
 .currency {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  background-color: #ff9500;
+  border-radius: 50%;
+  color: rgba(0, 0, 0, 1);
   font-size: 14px;
-  color: #ff9500;
+  font-weight: bold;
+  margin-right: 4px;
+  vertical-align: middle;
 }
 
 .claimable-text {
@@ -665,7 +692,7 @@ onMounted(() => {
 .team-section {
   background: linear-gradient(135deg, #2c2c2c 0%, #1a1a1a 100%);
   border-radius: 12px;
-  padding: 20px;
+  padding: 16px;
   margin-bottom: 20px;
 }
 
@@ -692,14 +719,15 @@ onMounted(() => {
   display: grid;
   grid-template-columns: repeat(4, 1fr);
   grid-template-rows: repeat(1, 1fr);
-  gap: 12px;
+  column-gap: 12px;
+  row-gap: 8px;
   margin-bottom: 15px;
 }
 
 .team-stat-card {
   background-color: rgba(0, 0, 0, 0.3);
   border-radius: 8px;
-  padding: 15px;
+  padding: 15px 10px;
   text-align: center;
 }
 
@@ -711,7 +739,7 @@ onMounted(() => {
 }
 
 .team-stat-label {
-  font-size: 12px;
+  font-size: 11px;
   color: #999;
 }
 
