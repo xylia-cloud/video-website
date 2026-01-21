@@ -535,36 +535,17 @@ const goToGameRecord = () => {
 // 跳转到人工客服
 // 跳转到我的代理页面
 const goToMyAgent = () => {
-  try {
-    // 获取当前用户信息
-    const currentUserInfo = getUserInfo()
-
-    // 兼容游客用户和正式用户的数据结构
-    const uid = currentUserInfo?.user_id || currentUserInfo?.id
-    const token = currentUserInfo?.token
-
-    if (!currentUserInfo || !uid || !token) {
-      showToast({
-        message: '请先登录后再访问代理页面',
-        duration: 2000,
-      })
-      return
-    }
-
-    // 构建代理页面URL，传递uid和token参数
-    const agentUrl = `https://live.88tv.co/appapi/daili/index?uid=${uid}&token=${token}`
-
-    // 在新窗口中打开代理页面
-    window.open(agentUrl, '_blank')
-
-    console.log('代理页面链接已生成并打开:', agentUrl)
-  } catch (error) {
-    console.error('跳转代理页面失败:', error)
+  // 检查登录状态
+  if (!isLoggedIn()) {
     showToast({
-      message: '跳转代理页面失败，请稍后重试',
+      message: '请先登录后再访问代理页面',
       duration: 2000,
     })
+    return
   }
+
+  // 跳转到我的代理页面
+  router.push('/my-agent')
 }
 
 // 跳转到我的收藏页面

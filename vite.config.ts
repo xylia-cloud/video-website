@@ -26,7 +26,7 @@ export default defineConfig({
   },
   server: {
     host: '0.0.0.0', // 监听所有地址
-    port: 3000, // 指定端口号
+    port: 3001, // 指定端口号
     strictPort: false, // 如果端口被占用，尝试下一个可用端口
     open: true, // 启动后自动打开浏览器
     proxy: {

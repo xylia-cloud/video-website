@@ -33,6 +33,7 @@ import FollowListView from '../views/FollowListView.vue'
 import CollectionView from '../views/CollectionView.vue'
 import WatchHistoryView from '../views/WatchHistoryView.vue'
 import PromotionRecordView from '../views/PromotionRecordView.vue'
+import MyAgentView from '../views/MyAgentView.vue'
 
 const router = createRouter({
   history: createWebHashHistory(import.meta.env.BASE_URL),
@@ -237,6 +238,11 @@ const router = createRouter({
       path: '/promotion-record',
       name: 'promotionRecord',
       component: PromotionRecordView,
+    },
+    {
+      path: '/my-agent',
+      name: 'myAgent',
+      component: MyAgentView,
     },
     {
       path: '/activity/:id',
