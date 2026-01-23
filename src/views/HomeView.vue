@@ -1307,18 +1307,66 @@ onActivated(() => {
   ) {
     console.log(`从有效缓存恢复标签${activeTypeId.value}的数据`)
 
+    // 检查是否为首页标签
+    const firstTypeId = typesList.value.length > 0 ? typesList.value[0].type_id : 1
+    const isFirstTab = activeTypeId.value === firstTypeId
+
     // 恢复所有状态
     currentPage.value = currentTabCache.currentPage
     totalPages.value = currentTabCache.totalPages
     hasMoreVideos.value = currentTabCache.hasMoreVideos
-    videoData.value = [...currentTabCache.videos]
     isFirstLoad.value = false // 重要：标记为非首次加载
 
-    // 恢复滚动位置
-    setTimeout(() => {
-      window.scrollTo(0, currentTabCache.scrollPosition)
-      console.log(`恢复滚动位置到: ${currentTabCache.scrollPosition}`)
-    }, 50)
+    // 如果是首页标签，需要重新获取广告并插入
+    if (isFirstTab) {
+      console.log('首页标签从缓存恢复，重新获取广告并插入')
+      
+      // 从缓存数据中过滤出非广告的视频数据
+      const videosWithoutAds = currentTabCache.videos.filter((item) => !item.isAd)
+      console.log('缓存中的纯视频数据长度:', videosWithoutAds.length)
+      console.log('当前广告数据长度:', listAds.value.length)
+
+      // 如果广告数据已存在，直接使用；否则先获取广告数据
+      const processAds = () => {
+        // 重新插入最新的广告数据
+        const finalData = processDataWithAds(videosWithoutAds, 1)
+        videoData.value = finalData
+        console.log('重新插入广告后的数据长度:', finalData.length)
+
+        // 恢复滚动位置
+        setTimeout(() => {
+          window.scrollTo(0, currentTabCache.scrollPosition)
+          console.log(`恢复滚动位置到: ${currentTabCache.scrollPosition}`)
+        }, 50)
+      }
+
+      if (listAds.value.length > 0) {
+        // 广告数据已存在，直接处理
+        processAds()
+      } else {
+        // 广告数据不存在，先获取再处理
+        fetchListAds().then(() => {
+          processAds()
+        })
+      }
+    } else {
+      // 非首页标签直接使用缓存数据
+      videoData.value = [...currentTabCache.videos]
+
+      // 恢复滚动位置
+      setTimeout(() => {
+        window.scrollTo(0, currentTabCache.scrollPosition)
+        console.log(`恢复滚动位置到: ${currentTabCache.scrollPosition}`)
+      }, 50)
+    }
+  } else {
+    // 如果没有有效缓存，确保广告数据已加载（特别是首页标签）
+    const firstTypeId = typesList.value.length > 0 ? typesList.value[0].type_id : 1
+    const isFirstTab = activeTypeId.value === firstTypeId
+    if (isFirstTab && listAds.value.length === 0) {
+      console.log('首页标签没有缓存且广告未加载，重新获取广告')
+      fetchListAds()
+    }
   }
 
   // 检查是否有从详情页返回的滚动位置需要恢复
