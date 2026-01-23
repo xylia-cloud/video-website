@@ -921,9 +921,10 @@ export const userLogin = async (params: {
 /**
  * 游客登录接口
  * @param imei 设备IMEI号
+ * @param rec_code 推荐码（可选）
  * @returns 游客登录结果
  */
-export const touristLogin = async (imei: string) => {
+export const touristLogin = async (imei: string, rec_code?: string) => {
   return withTopLoading(async () => {
     if (!imei) {
       throw new Error('IMEI不能为空')
@@ -937,6 +938,12 @@ export const touristLogin = async (imei: string) => {
     // 构建表单数据（目标API不支持JSON，必须使用表单格式）
     const formData = new URLSearchParams()
     formData.append('IMEI', imei)
+    
+    // 如果有推荐码，添加到表单数据
+    if (rec_code) {
+      formData.append('rec_code', rec_code)
+      console.log('游客登录携带推荐码:', rec_code)
+    }
 
     console.log('正在发送游客登录请求到:', url)
     console.log('表单body数据:', formData.toString())

@@ -250,10 +250,7 @@ const fetchAgentData = async () => {
 
 // 跳转到团队管理
 const goToTeamManagement = () => {
-  showToast({
-    message: '团队管理功能开发中',
-    duration: 2000,
-  })
+  router.push('/team-management')
 }
 
 // 跳转到业绩查询
@@ -269,12 +266,14 @@ const goToAgentReport = () => {
   router.push('/agent-report')
 }
 
-// 查看团队详情
+// 查看团队详情/查看更多
 const viewTeamDetails = () => {
-  showToast({
-    message: '团队详情功能开发中',
-    duration: 2000,
-  })
+  router.push('/team-management')
+}
+
+// 跳转到代理扶持活动页面
+const goToAgentSupport = () => {
+  router.push('/activity/4')
 }
 
 // 显示代理扶持
@@ -318,7 +317,7 @@ onMounted(() => {
             <div class="method-subtitle">分享</div>
           </div>
         </div>
-        <div class="method-item" @click="showAgentSupport">
+        <div class="method-item" @click="goToAgentSupport">
           <div class="method-icon">
               <img src="@/assets/img/icon-daili-dlfc.png" alt="代理扶持" />
           </div>
@@ -458,12 +457,14 @@ onMounted(() => {
 .promotion-methods {
   display: flex;
   justify-content: space-between;
-  gap: 12px;
-  margin-bottom: 20px;
+  gap: 16px;
+  margin-bottom: 22px;
 }
 
 .method-item {
   flex: 1;
+  min-height: 120px;
+  width: 100%;
   background-image: 
     linear-gradient(135deg, rgba(44, 44, 44, 0) 0%, rgba(26, 26, 26, 0.0) 100%),
     url('@/assets/img/bg-daili-01.png'),
@@ -474,19 +475,20 @@ onMounted(() => {
   background-clip: padding-box, padding-box, border-box;
   background-origin: padding-box, padding-box, border-box;
   border: 2px solid transparent;
-  border-radius: 12px;
-  padding: 10px 10px;
+  border-radius: 14px;
+  padding: 16px 14px;
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 8px;
+  gap: 10px;
   cursor: pointer;
   transition: all 0.3s ease;
+  box-shadow: 0 12px 28px rgba(0, 0, 0, 0.35);
 }
 
 .method-item:active {
-  transform: scale(0.95);
+  transform: scale(0.97);
 }
 
 .method-icon {
@@ -508,7 +510,7 @@ onMounted(() => {
 }
 
 .method-title {
-  font-size: 14px;
+  font-size: 15px;
   color: #fff;
   margin-bottom: 4px;
 }
@@ -563,6 +565,7 @@ onMounted(() => {
 
 /* 佣金统计 */
 .commission-section {
+  display: none;
   background-image: url('@/assets/img/bg-daili-02.png'),
     linear-gradient(135deg, rgba(44, 44, 44, 0.5) 0%, rgba(26, 26, 26, 0.5) 100%);
   background-size: cover, auto;
@@ -765,13 +768,21 @@ onMounted(() => {
 /* 二维码弹窗 */
 .qr-code-modal,
 .agent-support-modal {
-  background-color: #2c2c2c;
+  background: rgba(0, 0, 0, 0.6);
 }
 
 .qr-code-content,
 .agent-support-content {
-  padding: 30px 20px;
+  padding: 28px 22px;
   text-align: center;
+  background: linear-gradient(145deg, rgba(42, 42, 42, 0.95), rgba(24, 24, 24, 0.95));
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 16px;
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.35);
+}
+
+.qr-code-content {
+  width: 350px;
 }
 
 .qr-code-title,
@@ -779,18 +790,23 @@ onMounted(() => {
   font-size: 18px;
   font-weight: bold;
   color: #fff;
-  margin-bottom: 20px;
+  margin-bottom: 12px;
 }
 
 .qr-code-image {
-  margin: 20px 0;
+  margin: 16px 0 8px;
   display: flex;
   justify-content: center;
+  background: radial-gradient(circle at 50% 20%, rgba(255, 149, 0, 0.1), transparent 65%);
+  padding: 12px;
+  border-radius: 12px;
 }
 
 .qr-code-image img {
   width: 200px;
   height: 200px;
+  border-radius: 12px;
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.35);
 }
 
 .close-qr-btn,
@@ -799,11 +815,12 @@ onMounted(() => {
   color: #fff;
   border: none;
   border-radius: 8px;
-  padding: 10px 30px;
-  font-size: 14px;
+  padding: 12px 30px;
+  font-size: 15px;
   font-weight: bold;
   cursor: pointer;
   margin-top: 20px;
+  box-shadow: 0 10px 20px rgba(255, 149, 0, 0.25);
 }
 
 .modal-text {

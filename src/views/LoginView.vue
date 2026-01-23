@@ -138,7 +138,13 @@ const handleGuestLogin = async () => {
     const deviceIMEI = getDeviceIMEI()
     console.log('📱 使用设备IMEI进行游客登录:', deviceIMEI)
 
-    const result = await touristLogin(deviceIMEI)
+    // 获取邀请码（优先从URL参数获取，其次从localStorage获取）
+    const recCode = inviteCode.value || localStorage.getItem('inviteCode') || undefined
+    if (recCode) {
+      console.log('📝 检测到邀请码，将在游客登录时传递:', recCode)
+    }
+
+    const result = await touristLogin(deviceIMEI, recCode)
     console.log('📥 游客登录API响应:', result)
 
     if (result.code === 1 && result.data) {

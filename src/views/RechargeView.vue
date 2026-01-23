@@ -327,6 +327,19 @@ const fetchRules = async (channelId: string) => {
       }
 
       console.log('充值规则数据:', result)
+      
+      // 🔥 自动滚动到底部，显示完整的充值金额
+      nextTick(() => {
+        setTimeout(() => {
+          const scrollContainer = document.querySelector('.scrollable-content')
+          if (scrollContainer) {
+            scrollContainer.scrollTo({
+              top: scrollContainer.scrollHeight,
+              behavior: 'smooth',
+            })
+          }
+        }, 300) // 延迟300ms确保DOM完全渲染
+      })
     }
   } catch (error) {
     console.error('获取充值规则错误:', error)
@@ -826,6 +839,19 @@ onMounted(async () => {
   await refreshUserBalance()
   // 获取支付渠道数据
   fetchPaymentChannels()
+  
+  // 🔥 页面加载完成后，延迟滚动到底部（作为备用方案）
+  nextTick(() => {
+    setTimeout(() => {
+      const scrollContainer = document.querySelector('.scrollable-content')
+      if (scrollContainer) {
+        scrollContainer.scrollTo({
+          top: scrollContainer.scrollHeight,
+          behavior: 'smooth',
+        })
+      }
+    }, 1000) // 延迟1秒，等待数据加载完成
+  })
 })
 </script>
 
