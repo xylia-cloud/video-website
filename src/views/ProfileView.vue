@@ -1,6 +1,6 @@
 <script setup lang="ts">
 // 个人中心页面逻辑
-import { ref, onMounted, computed } from 'vue'
+import { ref, onMounted, computed, watch } from 'vue'
 import { showToast } from 'vant'
 import { useRouter } from 'vue-router'
 import {
@@ -53,6 +53,12 @@ const isNoticeLoading = ref(false)
 const hasNoticeError = ref(false)
 const noticeText = ref('')
 
+// 默认头像URL
+const defaultAvatarUrl = new URL('@/assets/img/img-avatar-default.png', import.meta.url).href
+
+// 实际使用的头像URL（可以回退到默认头像）
+const currentAvatarUrl = ref<string>('')
+
 // 处理头像URL
 const avatarUrl = computed(() => {
   try {
@@ -61,7 +67,7 @@ const avatarUrl = computed(() => {
     // 如果用户信息不存在，返回默认头像
     if (!userInfo.value) {
       console.log('用户信息不存在，返回默认头像')
-      return new URL('@/assets/img/img-avatar-default.png', import.meta.url).href
+      return defaultAvatarUrl
     }
 
     // 游客用户使用avatar字段，正式用户使用user_portrait字段
@@ -71,7 +77,7 @@ const avatarUrl = computed(() => {
     // 如果没有头像，返回默认头像
     if (!portrait) {
       console.log('未找到用户头像，返回默认头像')
-      return new URL('@/assets/img/img-avatar-default.png', import.meta.url).href
+      return defaultAvatarUrl
     }
 
     // 处理不同的头像路径格式
@@ -89,9 +95,27 @@ const avatarUrl = computed(() => {
   } catch (error) {
     console.error('处理头像URL时出错:', error)
     // 出错时返回默认头像
-    return new URL('@/assets/img/img-avatar-default.png', import.meta.url).href
+    return defaultAvatarUrl
   }
 })
+
+// 监听头像URL变化，更新当前使用的头像URL
+watch(avatarUrl, (newUrl) => {
+  currentAvatarUrl.value = newUrl
+}, { immediate: true })
+
+// 处理头像图片加载错误
+const handleAvatarError = (event: Event) => {
+  const img = event.target as HTMLImageElement
+  console.error('头像图片加载失败，URL:', img.src)
+  
+  // 如果当前不是默认头像，则回退到默认头像
+  if (img.src !== defaultAvatarUrl) {
+    console.log('回退到默认头像')
+    currentAvatarUrl.value = defaultAvatarUrl
+    img.src = defaultAvatarUrl
+  }
+}
 
 // 处理广告图片URL
 const processAdImageUrl = (imgPath: string): string => {
@@ -677,7 +701,7 @@ const confirmApplyAgent = async () => {
     <div class="user-header" @click="goToEditProfile">
       <div class="user-info">
         <div class="avatar">
-          <img :src="avatarUrl" :alt="displayName" />
+          <img :src="currentAvatarUrl || avatarUrl" :alt="displayName" @error="handleAvatarError" />
         </div>
         <div class="user-details">
           <div class="username">
@@ -943,7 +967,7 @@ const confirmApplyAgent = async () => {
           <!-- 使用背景图片的凭证内容区 -->
           <div class="credential-main-content">
             <div class="credential-avatar">
-              <img :src="avatarUrl" alt="头像" />
+              <img :src="currentAvatarUrl || avatarUrl" alt="头像" @error="handleAvatarError" />
             </div>
             <div class="credential-username">{{ userName }}</div>
             <div class="credential-id">ID：{{ userInfo?.user_id || userInfo?.id || '未知' }}</div>
