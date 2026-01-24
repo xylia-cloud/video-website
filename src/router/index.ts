@@ -34,8 +34,8 @@ import CollectionView from '../views/CollectionView.vue'
 import WatchHistoryView from '../views/WatchHistoryView.vue'
 import PromotionRecordView from '../views/PromotionRecordView.vue'
 import MyAgentView from '../views/MyAgentView.vue'
-import AgentReportView from '../views/AgentReportView.vue'
 import TeamManagementView from '../views/TeamManagementView.vue'
+import AgentReportView from '../views/AgentReportView.vue'
 
 const router = createRouter({
   history: createWebHashHistory(import.meta.env.BASE_URL),
@@ -242,6 +242,11 @@ const router = createRouter({
       component: PromotionRecordView,
     },
     {
+      path: '/activity/:id',
+      name: 'activityDetail',
+      component: () => import('../views/ActivityDetailView.vue'),
+    },
+    {
       path: '/my-agent',
       name: 'myAgent',
       component: MyAgentView,
@@ -255,11 +260,6 @@ const router = createRouter({
       path: '/agent-report',
       name: 'agentReport',
       component: AgentReportView,
-    },
-    {
-      path: '/activity/:id',
-      name: 'activityDetail',
-      component: () => import('../views/ActivityDetailView.vue'),
     },
   ],
 })
