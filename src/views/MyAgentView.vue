@@ -204,9 +204,9 @@ const fetchAgentData = async () => {
 
     if (!uid || !token) return
 
-    // 构建请求URL
+    // 构建请求URL - 调用 Daili.index 接口
     const queryParams = new URLSearchParams()
-    queryParams.append('service', 'User.GetAgentData')
+    queryParams.append('service', 'Daili.index')
     queryParams.append('uid', String(uid))
     queryParams.append('token', token)
 
@@ -229,19 +229,28 @@ const fetchAgentData = async () => {
 
     if (result && result.ret === 200 && result.data && result.data.code === 0) {
       const data = result.data.info || {}
-      
+
       // 更新佣金数据
-      todayCommission.value = parseFloat(data.today_commission || '0').toFixed(2)
-      yesterdayCommission.value = parseFloat(data.yesterday_commission || '0').toFixed(2)
-      claimableCommission.value = parseFloat(data.claimable_commission || '0').toFixed(2)
-      
+      // total_team_profit 对应今日预估佣金（团队总盈利）
+      todayCommission.value = parseFloat(data.total_team_profit || '0').toFixed(2)
+      // yestoday_team_profit 对应昨日预估佣金（昨日团队盈利）
+      yesterdayCommission.value = parseFloat(data.yestoday_team_profit || '0').toFixed(2)
+      // total_profit 作为可领取佣金（个人总盈利）
+      claimableCommission.value = parseFloat(data.total_profit || '0').toFixed(2)
+
       // 更新团队数据
-      newUsers.value = parseInt(data.new_users || '0')
-      newDirect.value = parseInt(data.new_direct || '0')
-      rechargeCount.value = parseInt(data.recharge_count || '0')
-      totalTeamMembers.value = parseInt(data.total_team_members || '0')
-      effectiveRecharge.value = parseFloat(data.effective_recharge || '0').toFixed(2)
-      effectiveBetting.value = parseFloat(data.effective_betting || '0').toFixed(2)
+      // today_total_people 对应今日活跃
+      newUsers.value = parseInt(data.today_total_people || '0')
+      // zhishu_total_people 对应新增直属（直属总人数）
+      newDirect.value = parseInt(data.zhishu_total_people || '0')
+      // chongzhi_total_people 对应充值人数
+      rechargeCount.value = parseInt(data.chongzhi_total_people || '0')
+      // team_total_people 对应团队总人数
+      totalTeamMembers.value = parseInt(data.team_total_people || '0')
+      // chongzhi_total_money 对应有效充值
+      effectiveRecharge.value = parseFloat(data.chongzhi_total_money || '0').toFixed(2)
+      // touzhu_total_money 对应有效投注
+      effectiveBetting.value = parseFloat(data.touzhu_total_money || '0').toFixed(2)
     }
   } catch (error) {
     console.error('获取代理数据失败:', error)
@@ -295,13 +304,13 @@ onMounted(() => {
 <template>
   <div class="my-agent-page">
     <HeaderNav title="推广赚钱" />
-    
+
     <div class="agent-content">
       <!-- 推广方式 -->
       <div class="promotion-methods">
         <div class="method-item" @click="copyLink">
           <div class="method-icon">
-              <img src="@/assets/img/icon-daili-fzlj.png" alt="复制链接" />
+            <img src="@/assets/img/icon-daili-fzlj.png" alt="复制链接" />
           </div>
           <div class="method-text">
             <div class="method-title">复制链接</div>
@@ -310,7 +319,7 @@ onMounted(() => {
         </div>
         <div class="method-item" @click="showQRCode">
           <div class="method-icon">
-              <img src="@/assets/img/icon-daili-ewm.png" alt="二维码" />
+            <img src="@/assets/img/icon-daili-ewm.png" alt="二维码" />
           </div>
           <div class="method-text">
             <div class="method-title">二维码</div>
@@ -319,7 +328,7 @@ onMounted(() => {
         </div>
         <div class="method-item" @click="goToAgentSupport">
           <div class="method-icon">
-              <img src="@/assets/img/icon-daili-dlfc.png" alt="代理扶持" />
+            <img src="@/assets/img/icon-daili-dlfc.png" alt="代理扶持" />
           </div>
           <div class="method-text">
             <div class="method-title">代理扶持</div>
@@ -392,7 +401,7 @@ onMounted(() => {
         <div class="team-stats-grid">
           <div class="team-stat-card">
             <div class="team-stat-value">{{ newUsers }}</div>
-            <div class="team-stat-label">新增用户</div>
+            <div class="team-stat-label">今日活跃</div>
           </div>
           <div class="team-stat-card">
             <div class="team-stat-value">{{ newDirect }}</div>
@@ -414,9 +423,7 @@ onMounted(() => {
       </div>
 
       <!-- 重要提示 -->
-      <div class="important-note">
-        好友注册时一定要填写您的专属邀请码才有效哦!
-      </div>
+      <div class="important-note">好友注册时一定要填写您的专属邀请码才有效哦!</div>
     </div>
 
     <!-- 二维码弹窗 -->
@@ -465,10 +472,9 @@ onMounted(() => {
   flex: 1;
   min-height: 120px;
   width: 100%;
-  background-image: 
-    linear-gradient(135deg, rgba(44, 44, 44, 0) 0%, rgba(26, 26, 26, 0.0) 100%),
-    url('@/assets/img/bg-daili-01.png'),
-    linear-gradient(90deg, #805123, #f2e29a, #805123);
+  background-image:
+    linear-gradient(135deg, rgba(44, 44, 44, 0) 0%, rgba(26, 26, 26, 0) 100%),
+    url('@/assets/img/bg-daili-01.png'), linear-gradient(90deg, #805123, #f2e29a, #805123);
   background-size: auto, cover, auto;
   background-position: center, center, center;
   background-repeat: no-repeat, no-repeat, no-repeat;
@@ -565,8 +571,8 @@ onMounted(() => {
 
 /* 佣金统计 */
 .commission-section {
-  display: none;
-  background-image: url('@/assets/img/bg-daili-02.png'),
+  background-image:
+    url('@/assets/img/bg-daili-02.png'),
     linear-gradient(135deg, rgba(44, 44, 44, 0.5) 0%, rgba(26, 26, 26, 0.5) 100%);
   background-size: cover, auto;
   background-position: center, center;
@@ -577,7 +583,8 @@ onMounted(() => {
 }
 
 .commission-stats {
-  display: flex;
+  /* display: flex; */
+  display: none;
   justify-content: space-between;
   margin-bottom: 20px;
 }
@@ -603,8 +610,8 @@ onMounted(() => {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding-top: 15px;
-  border-top: 1px solid rgba(255, 255, 255, 0.1);
+  /* padding-top: 15px; */
+  /* border-top: 1px solid rgba(255, 255, 255, 0.1); */
 }
 
 .claimable-info {
@@ -829,4 +836,3 @@ onMounted(() => {
   margin-bottom: 20px;
 }
 </style>
-

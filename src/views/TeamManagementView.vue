@@ -1,38 +1,160 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue'
+import { computed, ref, onMounted } from 'vue'
 import HeaderNav from '@/components/HeaderNav.vue'
+import { getUserInfo } from '@/api/fetch-api'
+import { NEW_API_BASE_URL } from '@/utils/config'
 
-const stats = [
+// 统计数据
+const stats = ref([
   { label: '团队人数', value: 0 },
   { label: '充值人数', value: 0 },
   { label: '今日活跃', value: 0 },
-]
+])
 
 const searchQuery = ref('')
 
-const teamMembers = ref([
-  {
-    account: '123123123',
-    memberId: '1241212',
-    performance: '4141243',
-  },
-])
+// 团队成员列表
+const teamMembers = ref<
+  Array<{
+    account: string
+    memberId: string
+  }>
+>([])
+
+// 分页信息
+const currentPage = ref(1)
+const totalPages = ref(1)
+const isLoading = ref(false)
 
 const filteredTeamMembers = computed(() => {
   const query = searchQuery.value.trim()
   if (!query) return teamMembers.value
 
   return teamMembers.value.filter(
-    (member) =>
-      member.account.includes(query) ||
-      member.memberId.includes(query) ||
-      member.performance.includes(query),
+    (member) => member.account.includes(query) || member.memberId.includes(query),
   )
 })
 
-const handleSearch = () => {
-  // 预留后端搜索接入
+// 获取统计数据（Daili.index）
+const fetchStats = async () => {
+  try {
+    const currentUserInfo = getUserInfo()
+    if (!currentUserInfo) return
+
+    const uid = currentUserInfo.user_id || currentUserInfo.id
+    const token = currentUserInfo.token
+
+    if (!uid || !token) return
+
+    const queryParams = new URLSearchParams()
+    queryParams.append('service', 'Daili.index')
+    queryParams.append('uid', String(uid))
+    queryParams.append('token', token)
+
+    const separator = NEW_API_BASE_URL.includes('?') ? '&' : '?'
+    const requestUrl = `${NEW_API_BASE_URL}${separator}${queryParams.toString()}`
+
+    const response = await fetch(requestUrl, {
+      method: 'POST',
+      headers: {
+        Accept: 'application/json',
+      },
+    })
+
+    if (!response.ok) {
+      throw new Error(`HTTP error! Status: ${response.status}`)
+    }
+
+    const result = await response.json()
+    console.log('获取统计数据返回:', result)
+
+    if (result && result.ret === 200 && result.data && result.data.code === 0) {
+      const data = result.data.info || {}
+
+      // 更新统计数据
+      stats.value = [
+        { label: '团队人数', value: parseInt(data.team_total_people || '0') },
+        { label: '充值人数', value: parseInt(data.chongzhi_total_people || '0') },
+        { label: '今日活跃', value: parseInt(data.today_total_people || '0') },
+      ]
+    }
+  } catch (error) {
+    console.error('获取统计数据失败:', error)
+  }
 }
+
+// 获取团队成员列表（Daili.agent）
+const fetchTeamMembers = async (page: number = 1) => {
+  if (isLoading.value) return
+
+  try {
+    isLoading.value = true
+    const currentUserInfo = getUserInfo()
+    if (!currentUserInfo) return
+
+    const uid = currentUserInfo.user_id || currentUserInfo.id
+    const token = currentUserInfo.token
+
+    if (!uid || !token) return
+
+    const queryParams = new URLSearchParams()
+    queryParams.append('service', 'Daili.agent')
+    queryParams.append('uid', String(uid))
+    queryParams.append('token', token)
+    queryParams.append('page', String(page))
+    queryParams.append('pagesize', '20')
+
+    const separator = NEW_API_BASE_URL.includes('?') ? '&' : '?'
+    const requestUrl = `${NEW_API_BASE_URL}${separator}${queryParams.toString()}`
+
+    const response = await fetch(requestUrl, {
+      method: 'POST',
+      headers: {
+        Accept: 'application/json',
+      },
+    })
+
+    if (!response.ok) {
+      throw new Error(`HTTP error! Status: ${response.status}`)
+    }
+
+    const result = await response.json()
+    console.log('获取团队成员列表返回:', result)
+
+    if (result && result.ret === 200 && result.data && result.data.code === 0) {
+      const info = result.data.info || {}
+      const dataList = info.data || []
+
+      // 更新分页信息
+      totalPages.value = parseInt(info.total_page || '1')
+      currentPage.value = page
+
+      // 转换数据格式
+      teamMembers.value = dataList.map(
+        (item: { id?: string; user_nicename?: string; create_time?: string; avatar?: string }) => ({
+          account: item.user_nicename || '',
+          memberId: item.id || '',
+        }),
+      )
+    }
+  } catch (error) {
+    console.error('获取团队成员列表失败:', error)
+  } finally {
+    isLoading.value = false
+  }
+}
+
+const handleSearch = () => {
+  // 搜索功能：如果搜索框为空，重新加载列表；否则使用本地过滤
+  if (!searchQuery.value.trim()) {
+    fetchTeamMembers(1)
+  }
+}
+
+onMounted(() => {
+  fetchStats()
+  fetchTeamMembers(1)
+})
 </script>
 
 <template>
@@ -75,13 +197,9 @@ const handleSearch = () => {
           <span>排名</span>
           <span>账号</span>
           <span>ID</span>
-          <span>业绩</span>
         </div>
 
-        <div
-          v-if="filteredTeamMembers.length"
-          class="table-body"
-        >
+        <div v-if="filteredTeamMembers.length" class="table-body">
           <div
             v-for="(member, index) in filteredTeamMembers"
             :key="`${member.account}-${member.memberId}-${index}`"
@@ -90,7 +208,6 @@ const handleSearch = () => {
             <span>{{ index + 1 }}</span>
             <span>{{ member.account }}</span>
             <span>{{ member.memberId }}</span>
-            <span>{{ member.performance }}</span>
           </div>
         </div>
 
@@ -202,7 +319,7 @@ const handleSearch = () => {
 
 .table-header {
   display: grid;
-  grid-template-columns: 1fr 2fr 2fr 2fr;
+  grid-template-columns: 1fr 3fr 1.5fr;
   padding: 14px 16px;
   background: rgba(255, 255, 255, 0.04);
   background-image: url('@/assets/img/bg-tdgl-01.png');
@@ -221,7 +338,7 @@ const handleSearch = () => {
 
 .table-row {
   display: grid;
-  grid-template-columns: 1fr 2fr 2fr 2fr;
+  grid-template-columns: 1fr 3fr 1.5fr;
   padding: 14px 16px;
   color: #fff;
   font-size: 15px;
@@ -244,8 +361,7 @@ const handleSearch = () => {
 
   .table-header,
   .table-row {
-    grid-template-columns: 1fr 2fr 2fr 2fr;
+    grid-template-columns: 1fr 3fr 1.5fr;
   }
 }
 </style>
-
