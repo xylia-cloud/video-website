@@ -612,10 +612,14 @@ const processDataWithAds = (processedData: VideoItem[], page: number): VideoItem
     // 插入广告到预设位置（位置3、6、11）
     for (let i = 0; i < Math.min(adPositions.value.length, adsToUse.length); i++) {
       const position = adPositions.value[i]
-      // 确保位置在有效范围内
-      if (finalData.length >= position) {
+      // 确保位置在有效范围内（位置需要小于等于当前数组长度）
+      if (position <= finalData.length) {
         console.log(`在位置${position}插入第${i + 1}个广告:`, adsToUse[i])
+        console.log(`插入前数据长度: ${finalData.length}`)
         finalData.splice(position, 0, adsToUse[i])
+        console.log(`插入后数据长度: ${finalData.length}`)
+      } else {
+        console.warn(`⚠️ 位置${position}超出数据范围(${finalData.length})，跳过第${i + 1}个广告`)
       }
     }
 
@@ -710,9 +714,11 @@ const refreshVideos = () => {
         for (let i = 0; i < Math.min(adPositions.value.length, adsToUse.length); i++) {
           const position = adPositions.value[i]
           // 确保位置在有效范围内
-          if (processedData.length >= position) {
+          if (position <= processedData.length) {
             console.log(`🔄 [换一批] 在位置${position}插入第${i + 1}个广告:`, adsToUse[i])
             processedData.splice(position, 0, adsToUse[i])
+          } else {
+            console.warn(`🔄 [换一批] ⚠️ 位置${position}超出数据范围(${processedData.length})，跳过第${i + 1}个广告`)
           }
         }
       }
@@ -828,9 +834,11 @@ const handlePageChange = (page: number) => {
           for (let i = 0; i < Math.min(adPositions.value.length, adsToUse.length); i++) {
             const position = adPositions.value[i]
             // 确保位置在有效范围内
-            if (processedData.length >= position) {
+            if (position <= processedData.length) {
               console.log(`📄 [分页] 在位置${position}插入第${i + 1}个广告:`, adsToUse[i])
               processedData.splice(position, 0, adsToUse[i])
+            } else {
+              console.warn(`📄 [分页] ⚠️ 位置${position}超出数据范围(${processedData.length})，跳过第${i + 1}个广告`)
             }
           }
         }

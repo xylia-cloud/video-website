@@ -17,9 +17,11 @@ import {
   registerUser,
   createAuthHeaders,
   fetchUserPoints,
+  touristLogin,
 } from '@/api/fetch-api'
 import type { VideoDetail } from '@/api/fetch-api'
 import { BASE_URL } from '@/utils/config'
+import { getDeviceIMEI } from '@/utils/device'
 // 导入Vant组件
 import { Icon, Loading, showToast, showDialog, closeToast } from 'vant'
 // 导入hls.js
@@ -2185,7 +2187,65 @@ onBeforeUnmount(() => {
   window.removeEventListener('scroll', handleScroll)
 })
 
+// 游客自动登录函数
+const performTouristLogin = async () => {
+  console.log('=== 视频详情页游客登录开始 ===')
+
+  // 检查本地是否已有用户信息
+  const localUserInfo = getUserInfo()
+
+  if (localUserInfo) {
+    console.log('✅ 本地已有用户信息，跳过游客登录')
+    return
+  }
+
+  // 检查是否已登录
+  if (isLoggedIn()) {
+    console.log('✅ 用户已登录，跳过游客登录')
+    return
+  }
+
+  try {
+    console.log('🔄 开始游客登录流程...')
+
+    const deviceIMEI = getDeviceIMEI()
+    console.log('📱 使用设备IMEI进行游客登录:', deviceIMEI)
+
+    // 获取邀请码（优先从URL参数获取，其次从localStorage获取）
+    const recCode = inviteCode.value || localStorage.getItem('inviteCode') || undefined
+    if (recCode) {
+      console.log('📝 检测到邀请码，将在游客登录时传递:', recCode)
+    }
+
+    const result = await touristLogin(deviceIMEI, recCode)
+    console.log('📥 游客登录API响应:', result)
+
+    if (result.code === 1 && result.data) {
+      // 游客登录成功，保存用户信息
+      console.log('✅ 游客登录成功，用户信息已保存到本地')
+
+      showToast({
+        message: '已获取游客信息',
+        duration: 1000,
+      })
+      
+      // 游客登录成功后，重新获取用户信息
+      await fetchUserInfo()
+    } else {
+      // 游客登录失败
+      console.error('❌ 游客登录失败:', result)
+    }
+  } catch (error) {
+    console.error('❌ 游客登录异常:', error)
+  }
+
+  console.log('=== 视频详情页游客登录结束 ===')
+}
+
 onMounted(async () => {
+  // 首先执行游客登录（如果需要的话）
+  await performTouristLogin()
+  
   // 尝试解析URL中的邀请码
   const urlInviteCode = parseUrlInviteCode()
   if (urlInviteCode) {
@@ -2416,9 +2476,9 @@ const handleAdClick = (ad: ListAd) => {
     <!-- 充值选项弹窗 -->
     <div v-if="showChargeModal" class="charge-modal-overlay" @click.self="showChargeModal = false">
       <div class="charge-modal">
-        <div class="charge-header">
-          <h3>选择充值方案</h3>
-          <div class="charge-subtitle">积分不足，请选择充值方案</div>
+        <!-- 广告位 -->
+        <div class="charge-ad-banner">
+          <img src="@/assets/img/recharge-ad.webp" alt="充值广告" />
         </div>
 
         <div class="charge-content">
@@ -3591,37 +3651,31 @@ const handleAdClick = (ad: ListAd) => {
 }
 
 .charge-modal {
-  background: linear-gradient(135deg, #1a1a1a 0%, #2d2d2d 100%);
   border-radius: 16px;
   width: 100%;
   max-width: 400px;
   max-height: 80vh;
   overflow-y: auto;
-  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
-  border: 1px solid rgba(255, 149, 0, 0.2);
 }
 
-.charge-header {
-  padding: 24px 24px 16px;
-  text-align: center;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+.charge-ad-banner {
+  width: 100%;
+  overflow: hidden;
+  border-radius: 16px 16px 0 0;
 }
 
-.charge-header h3 {
-  color: #fff;
-  font-size: 20px;
-  font-weight: bold;
-  margin: 0 0 8px 0;
-}
-
-.charge-subtitle {
-  color: #aaa;
-  font-size: 14px;
-  margin: 0;
+.charge-ad-banner img {
+  width: 100%;
+  height: auto;
+  display: block;
+  object-fit: cover;
 }
 
 .charge-content {
   padding: 20px 24px;
+  background: linear-gradient(135deg, #1a1a1a 0%, #2d2d2d 100%);
+  border-left: 1px solid rgba(255, 149, 0, 0.2);
+  border-right: 1px solid rgba(255, 149, 0, 0.2);
 }
 
 .charge-loading {
@@ -3676,10 +3730,15 @@ const handleAdClick = (ad: ListAd) => {
 }
 
 .option-price {
-  color: #ff9500;
+  color: #fff;
   font-size: 20px;
   font-weight: bold;
   margin-bottom: 4px;
+  transition: color 0.3s ease;
+}
+
+.charge-option.selected .option-price {
+  color: #ff9500;
 }
 
 .option-desc {
@@ -3693,7 +3752,10 @@ const handleAdClick = (ad: ListAd) => {
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 12px;
-  border-top: 1px solid rgba(255, 255, 255, 0.1);
+  background: linear-gradient(135deg, #1a1a1a 0%, #2d2d2d 100%);
+  border: 1px solid rgba(255, 149, 0, 0.2);
+  border-radius: 0 0 16px 16px;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
 }
 
 .charge-cancel-btn {
@@ -3743,8 +3805,8 @@ const handleAdClick = (ad: ListAd) => {
     max-width: none;
   }
 
-  .charge-header {
-    padding: 20px 16px 12px;
+  .charge-ad-banner img {
+    border-radius: 12px 12px 0 0;
   }
 
   .charge-content {

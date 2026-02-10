@@ -160,7 +160,10 @@ const handleVideoClick = (videoId: number) => {
             "
             @load="() => console.log('图片加载成功:', item.coverUrl)"
           />
-          <div class="video-badge" v-if="item.isVip">{{ item.points || '付费' }}</div>
+          <div class="video-badge vip" v-if="item.isVip">
+            <img src="@/assets/img/icon-diamond.png" alt="付费" class="vip-icon" />
+            <span class="vip-text">VIP</span>
+          </div>
           <div class="video-badge free" v-else>限免</div>
           <div class="video-duration" v-if="item.duration">{{ item.duration }}</div>
         </div>
@@ -174,7 +177,24 @@ const handleVideoClick = (videoId: number) => {
       <!-- 广告项 -->
       <div v-else class="video-item ad-item" @click="handleAdClick(item)">
         <div class="video-cover">
-          <img v-lazy="item.coverUrl" alt="Ad Cover" />
+          <img 
+            v-lazy="item.coverUrl" 
+            alt="Ad Cover"
+            @error="
+              (e) => {
+                console.error('广告图片加载失败:', item.coverUrl, e)
+                const target = e.target as HTMLImageElement
+                if (target) {
+                  target.style.background = '#333'
+                  target.style.display = 'flex'
+                  target.style.alignItems = 'center'
+                  target.style.justifyContent = 'center'
+                  target.alt = '广告图片加载失败'
+                }
+              }
+            "
+            @load="() => console.log('广告图片加载成功:', item.coverUrl)"
+          />
           <!-- <div class="video-badge ad">广告</div> -->
         </div>
         <div class="video-title">{{ item.title }}</div>
@@ -226,15 +246,43 @@ const handleVideoClick = (videoId: number) => {
   display: block;
 }
 
+.video-cover .vip-icon {
+  width: 14px;
+  height: 14px;
+  object-fit: contain;
+}
+
 .video-badge {
   position: absolute;
-  bottom: 5px;
+  top: 5px;
   right: 5px;
   background-color: #ff9500;
   color: #fff;
   padding: 2px 6px;
   border-radius: 4px;
   font-size: 12px;
+}
+
+.video-badge.vip {
+  background: linear-gradient(135deg, #a78bfa 0%, #c084fc 100%);
+  padding: 4px 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+}
+
+.vip-icon {
+  width: 14px;
+  height: 14px;
+  display: block;
+}
+
+.vip-text {
+  font-size: 12px;
+  color: #fff;
+  font-weight: normal;
+  line-height: 1;
 }
 
 .video-badge.free {

@@ -70,8 +70,8 @@ const avatarUrl = computed(() => {
       return defaultAvatarUrl
     }
 
-    // 游客用户使用avatar字段，正式用户使用user_portrait字段
-    const portrait = userInfo.value.avatar || userInfo.value.user_portrait
+    // 优先使用 avatar 字段，其次 user_portrait，最后 avatar_thumb
+    const portrait = userInfo.value.avatar || userInfo.value.user_portrait || userInfo.value.avatar_thumb
     console.log('获取到头像路径:', portrait)
 
     // 如果没有头像，返回默认头像
@@ -82,7 +82,7 @@ const avatarUrl = computed(() => {
 
     // 处理不同的头像路径格式
     let finalUrl: string
-    if (portrait.startsWith('http')) {
+    if (portrait.startsWith('http://') || portrait.startsWith('https://')) {
       finalUrl = portrait
     } else if (portrait.startsWith('/')) {
       finalUrl = `${BASE_URL}${portrait}`
@@ -101,20 +101,23 @@ const avatarUrl = computed(() => {
 
 // 监听头像URL变化，更新当前使用的头像URL
 watch(avatarUrl, (newUrl) => {
-  currentAvatarUrl.value = newUrl
+  if (newUrl && newUrl !== defaultAvatarUrl) {
+    currentAvatarUrl.value = newUrl
+  } else {
+    currentAvatarUrl.value = defaultAvatarUrl
+  }
 }, { immediate: true })
 
 // 处理头像图片加载错误
 const handleAvatarError = (event: Event) => {
   const img = event.target as HTMLImageElement
   console.error('头像图片加载失败，URL:', img.src)
+  console.error('用户信息:', userInfo.value)
   
-  // 如果当前不是默认头像，则回退到默认头像
-  if (img.src !== defaultAvatarUrl) {
-    console.log('回退到默认头像')
-    currentAvatarUrl.value = defaultAvatarUrl
-    img.src = defaultAvatarUrl
-  }
+  // 回退到默认头像
+  console.log('回退到默认头像')
+  currentAvatarUrl.value = defaultAvatarUrl
+  img.src = defaultAvatarUrl
 }
 
 // 处理广告图片URL
@@ -701,7 +704,11 @@ const confirmApplyAgent = async () => {
     <div class="user-header" @click="goToEditProfile">
       <div class="user-info">
         <div class="avatar">
-          <img :src="currentAvatarUrl || avatarUrl" :alt="displayName" @error="handleAvatarError" />
+          <img 
+            :src="currentAvatarUrl || defaultAvatarUrl" 
+            :alt="displayName" 
+            @error="handleAvatarError" 
+          />
         </div>
         <div class="user-details">
           <div class="username">
@@ -967,7 +974,11 @@ const confirmApplyAgent = async () => {
           <!-- 使用背景图片的凭证内容区 -->
           <div class="credential-main-content">
             <div class="credential-avatar">
-              <img :src="currentAvatarUrl || avatarUrl" alt="头像" @error="handleAvatarError" />
+              <img 
+                :src="currentAvatarUrl || defaultAvatarUrl" 
+                alt="头像" 
+                @error="handleAvatarError" 
+              />
             </div>
             <div class="credential-username">{{ userName }}</div>
             <div class="credential-id">ID：{{ userInfo?.user_id || userInfo?.id || '未知' }}</div>
