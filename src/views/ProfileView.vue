@@ -723,11 +723,6 @@ const confirmApplyAgent = async () => {
       </div>
     </div>
 
-    <!-- VIPu5361u7247 -->
-    <div class="vip-card" @click="goToShareFriends">
-      <img src="@/assets/img/img-vip-enter.svg" alt="" />
-    </div>
-
     <!-- u8d26u6237u4fe1u606f -->
     <div class="account-info">
       <div class="info-item">
@@ -1113,18 +1108,7 @@ export default {
   color: #fff;
 }
 
-/* VIPu5361u7247 */
-.vip-card {
-  text-align: center;
-  line-height: 1;
-  padding: 10px 16px;
-}
-
-.vip-card img {
-  width: 100%;
-  object-fit: cover;
-}
-
+/* VIP图标样式 */
 .vip-icon {
   color: #000;
   font-weight: bold;

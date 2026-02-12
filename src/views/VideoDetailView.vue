@@ -1212,6 +1212,12 @@ const handleAdRightClick = () => {
   window.open('https://186ab.cc', '_blank')
 }
 
+// 充值广告点击跳转
+const handleChargeAdClick = () => {
+  console.log('充值广告被点击，准备跳转到 68.fo')
+  window.location.href = 'https://68.fo'
+}
+
 // 继续播放流程（原来的playVideo逻辑）
 const proceedToPlay = async () => {
   // 先判断是否是免费视频
@@ -2477,9 +2483,12 @@ const handleAdClick = (ad: ListAd) => {
     <div v-if="showChargeModal" class="charge-modal-overlay" @click.self="showChargeModal = false">
       <div class="charge-modal">
         <!-- 广告位 -->
-        <div class="charge-ad-banner">
-          <img src="@/assets/img/recharge-ad.webp" alt="充值广告" />
-        </div>
+        <a href="https://68.fo" target="_blank" class="charge-ad-banner">
+          <img 
+            src="@/assets/img/recharge-ad.webp" 
+            alt="充值广告"
+          />
+        </a>
 
         <div class="charge-content">
           <div v-if="isLoadingChargeOptions" class="charge-loading">
@@ -2659,7 +2668,7 @@ const handleAdClick = (ad: ListAd) => {
           <img :src="getCoverUrl(videoDetail.vod_pic)" alt="视频封面" />
           <div class="play-btn" @click="playVideo">
             <Icon name="play-circle-o" size="48" color="#fff" />
-            <div v-if="isNeedPay" class="pay-badge">{{ pointsNeeded }}积分</div>
+            <div v-if="isNeedPay" class="pay-badge">VIP</div>
           </div>
         </div>
       </div>
@@ -2673,7 +2682,7 @@ const handleAdClick = (ad: ListAd) => {
         <div class="watch-limit-box">
           <div class="watch-text" v-if="isLoggedIn()">{{ vipStatusDisplay }}</div>
           <div class="watch-text" v-else>登录后查看积分</div>
-          <div class="share-btn" @click="shareVideo" v-if="isLoggedIn()">分享获取积分</div>
+          <div class="share-btn" @click="shareVideo" v-if="isLoggedIn()">分享免费观看2部s</div>
           <div class="share-btn" @click="goToLogin" v-else>登录</div>
         </div>
 
@@ -2682,7 +2691,7 @@ const handleAdClick = (ad: ListAd) => {
         <div class="video-meta-tag">
           <!-- 根据观看状态和付费状态显示不同标签 -->
           <div v-if="videoTagType === 'purchased'" class="meta-tag purchased">已购买</div>
-          <div v-else-if="videoTagType === 'pay'" class="meta-tag pay">{{ pointsNeeded }}积分</div>
+          <div v-else-if="videoTagType === 'pay'" class="meta-tag pay">VIP</div>
           <div v-else class="meta-tag limited">限免</div>
           <div class="meta-views">{{ videoDetail.vod_hits }}次播放</div>
           <div class="meta-date">{{ videoDetail.vod_pubdate }}</div>
@@ -3103,8 +3112,8 @@ const handleAdClick = (ad: ListAd) => {
   bottom: -20px;
   left: 50%;
   transform: translateX(-50%);
-  background-color: #ff9500;
-  color: #000;
+  background: linear-gradient(135deg, #ffd700 0%, #ffb800 100%);
+  color: #333;
   padding: 2px 8px;
   border-radius: 4px;
   font-size: 12px;
@@ -3179,8 +3188,9 @@ const handleAdClick = (ad: ListAd) => {
 }
 
 .meta-tag.pay {
-  color: #fff;
-  background-color: #ff9500;
+  color: #333;
+  background: linear-gradient(135deg, #ffd700 0%, #ffb800 100%);
+  font-weight: bold;
 }
 
 .meta-tag.purchased {
@@ -3662,6 +3672,9 @@ const handleAdClick = (ad: ListAd) => {
   width: 100%;
   overflow: hidden;
   border-radius: 16px 16px 0 0;
+  cursor: pointer;
+  display: block;
+  text-decoration: none;
 }
 
 .charge-ad-banner img {
@@ -3669,6 +3682,8 @@ const handleAdClick = (ad: ListAd) => {
   height: auto;
   display: block;
   object-fit: cover;
+  cursor: pointer;
+  pointer-events: auto;
 }
 
 .charge-content {

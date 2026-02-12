@@ -161,7 +161,6 @@ const handleVideoClick = (videoId: number) => {
             @load="() => console.log('图片加载成功:', item.coverUrl)"
           />
           <div class="video-badge vip" v-if="item.isVip">
-            <img src="@/assets/img/icon-diamond.png" alt="付费" class="vip-icon" />
             <span class="vip-text">VIP</span>
           </div>
           <div class="video-badge free" v-else>限免</div>
@@ -255,7 +254,7 @@ const handleVideoClick = (videoId: number) => {
 .video-badge {
   position: absolute;
   top: 5px;
-  right: 5px;
+  left: 5px;
   background-color: #ff9500;
   color: #fff;
   padding: 2px 6px;
@@ -264,7 +263,7 @@ const handleVideoClick = (videoId: number) => {
 }
 
 .video-badge.vip {
-  background: linear-gradient(135deg, #a78bfa 0%, #c084fc 100%);
+  background: linear-gradient(135deg, #ffd700 0%, #ffb800 100%);
   padding: 4px 6px;
   display: flex;
   align-items: center;
@@ -280,8 +279,8 @@ const handleVideoClick = (videoId: number) => {
 
 .vip-text {
   font-size: 12px;
-  color: #fff;
-  font-weight: normal;
+  color: #333;
+  font-weight: bold;
   line-height: 1;
 }
 

@@ -1197,14 +1197,19 @@ export const updateUserPortrait = async (params: { file?: File; imgdata?: string
 
   // 创建 FormData 对象用于文件上传
   const formData = new FormData()
+  
+  // 将所有参数都放在FormData中
+  formData.append('service', 'user.updateAvatar')
+  formData.append('uid', uid.toString())
+  formData.append('token', userInfo.token)
 
   // 添加头像文件参数
   if (params.file) {
     formData.append('file', params.file)
     console.log('使用文件上传模式，参数名: file，文件名:', params.file.name)
   } else if (params.imgdata) {
-    formData.append('file', params.imgdata)
-    console.log('使用base64上传模式，参数名: file，数据长度:', params.imgdata.length)
+    formData.append('imgdata', params.imgdata)
+    console.log('使用base64上传模式，参数名: imgdata，数据长度:', params.imgdata.length)
   }
 
   // 获取基础请求头
@@ -1216,8 +1221,8 @@ export const updateUserPortrait = async (params: { file?: File; imgdata?: string
   }
 
   try {
-    // 发起POST请求到新接口 - 基础参数在URL中，文件在FormData中
-    const response = await fetch(`${NEW_API_BASE_URL}/?${queryParams.toString()}`, {
+    // 发起POST请求 - 所有参数都在FormData中
+    const response = await fetch(`${NEW_API_BASE_URL}`, {
       method: 'POST',
       body: formData,
       headers,
@@ -1238,20 +1243,33 @@ export const updateUserPortrait = async (params: { file?: File; imgdata?: string
       const currentUserInfo = getUserInfo()
 
       if (currentUserInfo) {
+        // 从返回的info数组中获取头像信息
+        const avatarInfo = result.data.info && result.data.info[0]
+        const newAvatar = avatarInfo?.avatar
+        const newAvatarThumb = avatarInfo?.avatar_thumb
+
+        console.log('✅ 头像上传成功，新头像URL:', newAvatar)
+
         // 更新头像路径
         const updatedUserInfo = {
           ...currentUserInfo,
-          user_portrait: result.data.avatar || result.data.info?.avatar,
+          user_portrait: newAvatar,
+          avatar: newAvatar,
+          avatar_thumb: newAvatarThumb,
         }
 
         // 保存到本地存储
         setUserInfo(updatedUserInfo)
+        console.log('✅ 本地用户信息已更新')
       }
 
       return {
         code: 1,
-        data: { user_portrait: result.data.avatar || result.data.info?.avatar },
-        msg: '头像更新成功',
+        data: { 
+          user_portrait: result.data.info?.[0]?.avatar,
+          avatar_thumb: result.data.info?.[0]?.avatar_thumb,
+        },
+        msg: result.data.msg || '头像更新成功',
       }
     } else {
       return {

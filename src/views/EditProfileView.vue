@@ -13,7 +13,11 @@
       <!-- 头像上传区域 -->
       <div class="avatar-upload">
         <div class="current-avatar">
-          <img :src="avatarUrl" alt="头像" />
+          <img 
+            :src="avatarUrl" 
+            alt="头像"
+            @error="handleAvatarError"
+          />
         </div>
         <div class="upload-text">点击更换头像</div>
         <input
@@ -375,8 +379,11 @@ const uploadAvatarBase64 = async (file: File) => {
     console.log('头像上传结果:', result)
 
     if (result && result.code === 1) {
-      // 显示预览
-      avatarUrl.value = URL.createObjectURL(file)
+      // 上传成功，使用服务器返回的头像URL
+      if (result.data && result.data.user_portrait) {
+        avatarUrl.value = result.data.user_portrait
+        console.log('✅ 头像显示已更新:', avatarUrl.value)
+      }
 
       showToast({
         message: '头像上传成功',
@@ -437,8 +444,11 @@ const uploadAvatarFile = async (file: File) => {
     console.log('头像上传结果:', result)
 
     if (result && result.code === 1) {
-      // 显示预览
-      avatarUrl.value = URL.createObjectURL(file)
+      // 上传成功，使用服务器返回的头像URL
+      if (result.data && result.data.user_portrait) {
+        avatarUrl.value = result.data.user_portrait
+        console.log('✅ 头像显示已更新:', avatarUrl.value)
+      }
 
       showToast({
         message: '头像上传成功',
@@ -746,7 +756,8 @@ const loadUserInfo = () => {
         console.log('✅ 使用相对路径头像（不带/）:', avatarUrl.value)
       }
     } else {
-      avatarUrl.value = new URL('@/assets/img/img-avatar-default.png', import.meta.url).href
+      // 使用默认头像
+      avatarUrl.value = '/src/assets/img/icon-avatar-default.svg'
       console.log('⚠️ 未找到头像，使用默认头像')
     }
 
@@ -760,10 +771,17 @@ const loadUserInfo = () => {
     })
   } else {
     console.log('⚠️ 未找到用户信息，使用默认头像')
-    avatarUrl.value = new URL('@/assets/img/img-avatar-default.png', import.meta.url).href
+    avatarUrl.value = '/src/assets/img/icon-avatar-default.svg'
   }
 
   console.log('✅ 页面加载完成，用户类型:', isGuestUser ? '游客' : '正式用户')
+}
+
+// 处理头像加载错误
+const handleAvatarError = (event: Event) => {
+  console.error('❌ 头像加载失败，使用默认头像')
+  const target = event.target as HTMLImageElement
+  target.src = '/src/assets/img/icon-avatar-default.svg'
 }
 
 onMounted(() => {
