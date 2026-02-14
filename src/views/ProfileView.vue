@@ -203,8 +203,16 @@ const vipExpireTime = computed(() => {
   
   if (vipStatus === 1) {
     if (vipEndtime.value) {
-      // 格式化时间戳为可读日期
-      const endDate = new Date(parseInt(vipEndtime.value) * 1000)
+      // 解析日期字符串或时间戳
+      let endDate
+      if (typeof vipEndtime.value === 'string' && vipEndtime.value.includes('-')) {
+        // 字符串格式：2026-03-14 00:00:00
+        endDate = new Date(vipEndtime.value)
+      } else {
+        // 时间戳格式
+        endDate = new Date(parseInt(vipEndtime.value) * 1000)
+      }
+      
       const now = new Date()
 
       if (endDate > now) {
@@ -234,8 +242,16 @@ const isVipUser = computed(() => {
   
   if (!vipEndtime.value) return true // 如果是VIP但没有到期时间，认为是永久VIP
   
-  // 检查是否过期
-  const endDate = new Date(parseInt(vipEndtime.value) * 1000)
+  // 解析日期字符串或时间戳
+  let endDate
+  if (typeof vipEndtime.value === 'string' && vipEndtime.value.includes('-')) {
+    // 字符串格式：2026-03-14 00:00:00
+    endDate = new Date(vipEndtime.value)
+  } else {
+    // 时间戳格式
+    endDate = new Date(parseInt(vipEndtime.value) * 1000)
+  }
+  
   const now = new Date()
   return endDate > now
 })
