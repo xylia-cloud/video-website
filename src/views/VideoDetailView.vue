@@ -2682,7 +2682,7 @@ const handleAdClick = (ad: ListAd) => {
         <div class="watch-limit-box">
           <div class="watch-text" v-if="isLoggedIn()">{{ vipStatusDisplay }}</div>
           <div class="watch-text" v-else>登录后查看积分</div>
-          <div class="share-btn" @click="shareVideo" v-if="isLoggedIn()">分享免费观看2部s</div>
+          <div class="share-btn" @click="shareVideo" v-if="isLoggedIn()">分享免费观看2部</div>
           <div class="share-btn" @click="goToLogin" v-else>登录</div>
         </div>
 

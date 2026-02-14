@@ -39,7 +39,7 @@ const userInfo = ref<any>(null)
 
 // 积分和VIP相关数据
 const userVideoNums = ref(0) // 观影次数
-const isVip = ref('0') // VIP状态
+const isVip = ref<number | string>(0) // VIP状态，可能是数字0/1或字符串'0'/'1'
 const vipEndtime = ref('') // VIP到期时间
 
 // 广告数据
@@ -198,7 +198,10 @@ const watchCount = computed(() => {
 
 // VIP到期时间
 const vipExpireTime = computed(() => {
-  if (isVip.value === '1') {
+  // is_vip 可能是数字或字符串，统一转换为数字比较
+  const vipStatus = Number(isVip.value)
+  
+  if (vipStatus === 1) {
     if (vipEndtime.value) {
       // 格式化时间戳为可读日期
       const endDate = new Date(parseInt(vipEndtime.value) * 1000)
@@ -220,6 +223,21 @@ const vipExpireTime = computed(() => {
   } else {
     return '未开通'
   }
+})
+
+// 判断是否是VIP用户
+const isVipUser = computed(() => {
+  // is_vip 可能是数字或字符串，统一转换为数字比较
+  const vipStatus = Number(isVip.value)
+  
+  if (vipStatus !== 1) return false
+  
+  if (!vipEndtime.value) return true // 如果是VIP但没有到期时间，认为是永久VIP
+  
+  // 检查是否过期
+  const endDate = new Date(parseInt(vipEndtime.value) * 1000)
+  const now = new Date()
+  return endDate > now
 })
 
 // 获取积分和VIP信息
@@ -245,7 +263,7 @@ const fetchPointsAndVipInfo = async () => {
         // 更新页面显示的数据
         userInfo.value = localUserInfo
         userVideoNums.value = pointsResult.data.video_nums
-        isVip.value = pointsResult.data.is_vip || '0'
+        isVip.value = pointsResult.data.is_vip !== undefined ? pointsResult.data.is_vip : 0
         vipEndtime.value = pointsResult.data.endtime || ''
 
         console.log('✅ 个人中心积分信息获取成功:', pointsResult.data)
@@ -390,7 +408,7 @@ onMounted(async () => {
 
     // 初始化积分和VIP数据
     userVideoNums.value = localUserInfo.video_nums || 0
-    isVip.value = localUserInfo.is_vip || '0'
+    isVip.value = localUserInfo.is_vip !== undefined ? localUserInfo.is_vip : 0
     vipEndtime.value = localUserInfo.endtime || ''
 
     console.log('初始化用户数据:', {
@@ -714,7 +732,10 @@ const confirmApplyAgent = async () => {
           <div class="username">
             {{ displayName }}
           </div>
-          <div class="user-id">用户ID：{{ userAccount }}</div>
+          <div class="user-id">
+            用户ID：{{ userAccount }}
+            <span v-if="isVipUser" class="vip-badge">VIP</span>
+          </div>
         </div>
       </div>
       <div class="user-arrow">
@@ -1094,6 +1115,20 @@ export default {
 .user-id {
   color: #999;
   font-size: 12px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.vip-badge {
+  display: inline-block;
+  background: linear-gradient(135deg, #ffd700 0%, #ffb800 100%);
+  color: #333;
+  font-size: 10px;
+  font-weight: bold;
+  padding: 2px 6px;
+  border-radius: 4px;
+  line-height: 1;
 }
 
 .user-arrow {
