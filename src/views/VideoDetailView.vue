@@ -1267,7 +1267,7 @@ const continuePlay = async () => {
     // 未观看过，检查是否需要付费
     if (isNeedPay.value && pointsNeeded.value > 0) {
       // 付费视频，首先检查VIP状态
-      console.log('付费视频且未观看，开始VIP和积分检查')
+      console.log('付费视频且未观看，开始VIP和观看次数检查')
 
       // 1. 优先检查VIP状态
       const currentIsVip = Number(isVip.value) === 1
@@ -1287,36 +1287,65 @@ const continuePlay = async () => {
         startVideoPlayback()
         return
       } else {
-        console.log('❌ 非VIP用户，继续积分检查流程')
+        console.log('❌ 非VIP用户，继续观看次数检查流程')
       }
 
-      // 2. 非VIP用户，检查积分余额
+      // 2. 非VIP用户，先检查观看次数
+      const currentVideoNums = userVideoNums.value || 0
+      
+      console.log('🎬 观看次数检查 - 当前次数:', currentVideoNums, '需要次数: 1')
+      
+      if (currentVideoNums >= 1) {
+        // 观看次数足够，弹窗确认扣除次数
+        console.log('✅ 观看次数充足，弹窗确认')
+        showDialog({
+          title: '付费确认',
+          message: `观看此视频需要扣除 1 观影次数，确认观看吗？`,
+          confirmButtonText: `扣除 1 观影次数观看`,
+          cancelButtonText: '取消',
+          showCancelButton: true,
+          confirmButtonColor: '#ff9500',
+        })
+          .then(() => {
+            // 用户确认扣费，开始播放视频
+            console.log('用户确认扣除观看次数，开始播放视频')
+            deductPointsAndPlay()
+          })
+          .catch(() => {
+            // 用户取消扣费
+          })
+        return
+      } else {
+        console.log('❌ 观看次数不足，检查积分余额')
+      }
+
+      // 3. 观看次数不足，检查积分余额
       const currentPoints =
         latestUserInfo?.user_points !== undefined ? latestUserInfo.user_points : userPoints.value
 
-      // 检查积分余额
-      console.log('🔥 积分检查 - 当前积分:', currentPoints, '需要积分:', pointsNeeded.value)
+      console.log('💰 积分检查 - 当前积分:', currentPoints, '需要积分:', pointsNeeded.value)
+      
       if (currentPoints < pointsNeeded.value) {
-        console.log('🔥 积分不足，显示充值弹窗')
+        console.log('❌ 积分不足，显示充值弹窗')
         // 显示充值选项弹窗
         await showChargeDialog()
         return
       } else {
-        console.log('🔥 积分充足，继续播放流程')
+        console.log('✅ 积分充足，弹窗确认扣费')
       }
 
       // 积分足够，弹窗确认扣费
       showDialog({
         title: '付费确认',
-        message: `观看此视频需要扣除 1 观影次数，确认观看吗？`,
-        confirmButtonText: `扣除 1 观影次数观看`,
+        message: `观看此视频需要扣除 ${pointsNeeded.value} 积分，确认观看吗？`,
+        confirmButtonText: `扣除 ${pointsNeeded.value} 积分观看`,
         cancelButtonText: '取消',
         showCancelButton: true,
         confirmButtonColor: '#ff9500',
       })
         .then(() => {
           // 用户确认扣费，开始播放视频
-          console.log('用户确认扣费，开始播放视频')
+          console.log('用户确认扣除积分，开始播放视频')
           deductPointsAndPlay()
         })
         .catch(() => {
@@ -3664,7 +3693,7 @@ const handleAdClick = (ad: ListAd) => {
   border-radius: 16px;
   width: 100%;
   max-width: 400px;
-  max-height: 80vh;
+  max-height: 70vh;
   overflow-y: auto;
 }
 
@@ -3687,7 +3716,7 @@ const handleAdClick = (ad: ListAd) => {
 }
 
 .charge-content {
-  padding: 20px 24px;
+  padding: 8px;
   background: linear-gradient(135deg, #1a1a1a 0%, #2d2d2d 100%);
   border-left: 1px solid rgba(255, 149, 0, 0.2);
   border-right: 1px solid rgba(255, 149, 0, 0.2);
@@ -3697,8 +3726,8 @@ const handleAdClick = (ad: ListAd) => {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 12px;
-  padding: 40px 20px;
+  gap: 8px;
+  padding: 20px;
   color: #aaa;
 }
 
@@ -3706,22 +3735,22 @@ const handleAdClick = (ad: ListAd) => {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 12px;
-  padding: 40px 20px;
+  gap: 8px;
+  padding: 20px;
   color: #aaa;
 }
 
 .charge-options {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 12px;
+  gap: 8px;
 }
 
 .charge-option {
   background: rgba(255, 255, 255, 0.05);
-  border: 2px solid rgba(255, 255, 255, 0.1);
-  border-radius: 12px;
-  padding: 16px 12px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 8px;
+  padding: 6px 6px;
   cursor: pointer;
   transition: all 0.3s ease;
   position: relative;
@@ -3729,7 +3758,7 @@ const handleAdClick = (ad: ListAd) => {
   flex-direction: column;
   align-items: center;
   text-align: center;
-  min-height: 80px;
+  min-height: 50px;
   justify-content: center;
 }
 
@@ -3746,9 +3775,9 @@ const handleAdClick = (ad: ListAd) => {
 
 .option-price {
   color: #fff;
-  font-size: 20px;
+  font-size: 16px;
   font-weight: bold;
-  margin-bottom: 4px;
+  margin-bottom: 2px;
   transition: color 0.3s ease;
 }
 
@@ -3758,15 +3787,15 @@ const handleAdClick = (ad: ListAd) => {
 
 .option-desc {
   color: #fff;
-  font-size: 14px;
+  font-size: 11px;
   line-height: 1.2;
 }
 
 .charge-footer {
-  padding: 16px 24px 24px;
+  padding: 8px 16px 8px 16px;
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 12px;
+  gap: 10px;
   background: linear-gradient(135deg, #1a1a1a 0%, #2d2d2d 100%);
   border: 1px solid rgba(255, 149, 0, 0.2);
   border-radius: 0 0 16px 16px;
@@ -3774,12 +3803,12 @@ const handleAdClick = (ad: ListAd) => {
 }
 
 .charge-cancel-btn {
-  padding: 12px 20px;
+  padding: 10px 16px;
   background: rgba(255, 255, 255, 0.1);
   color: #fff;
   border: 1px solid rgba(255, 255, 255, 0.2);
   border-radius: 8px;
-  font-size: 16px;
+  font-size: 14px;
   cursor: pointer;
   transition: all 0.3s ease;
 }
@@ -3789,12 +3818,12 @@ const handleAdClick = (ad: ListAd) => {
 }
 
 .charge-confirm-btn {
-  padding: 12px 20px;
+  padding: 10px 16px;
   background: linear-gradient(90deg, #ff9500, #ff6d00);
   color: #fff;
   border: none;
   border-radius: 8px;
-  font-size: 16px;
+  font-size: 14px;
   font-weight: bold;
   cursor: pointer;
   transition: all 0.3s ease;
@@ -3825,7 +3854,7 @@ const handleAdClick = (ad: ListAd) => {
   }
 
   .charge-content {
-    padding: 16px;
+    padding: 8px;
   }
 
   .charge-options {
@@ -3833,17 +3862,16 @@ const handleAdClick = (ad: ListAd) => {
   }
 
   .charge-option {
-    padding: 12px 8px;
-    min-height: 70px;
+    padding: 6px;
   }
 
   .charge-footer {
-    padding: 12px 16px 20px;
+    padding: 8px;
     gap: 8px;
   }
 
   .option-price {
-    font-size: 18px;
+    font-size: 14px;
   }
 
   .option-desc {
