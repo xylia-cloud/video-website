@@ -1093,13 +1093,15 @@ const handleVideoPlay = () => {
 
     // 如果是付费视频且之前未观看，则更新用户信息
     if (isNeedPay.value && pointsNeeded.value > 0) {
-      console.log('付费视频播放开始，将在播放后更新用户积分信息')
+      console.log('付费视频播放开始，将在播放后更新用户积分和观看次数信息')
       // 设置已观看状态，防止重复扣费
       isWatched.value = true
 
-      // 延迟更新用户积分信息，确保后端扣费已完成
+      // 延迟更新用户积分和观看次数信息，确保后端扣费已完成
       setTimeout(async () => {
         await getUserRealTimeInfo()
+        await fetchLatestPointsInfo()
+        console.log('✅ 播放后已更新用户信息，当前观看次数:', userVideoNums.value)
       }, 2000)
     }
   }
@@ -1374,9 +1376,11 @@ const deductPointsAndPlay = () => {
   // 记录视频已经播放，用于防止重复扣费
   isWatched.value = true
 
-  // 视频开始播放后，延迟更新用户积分信息，确保扣费已完成
+  // 视频开始播放后，延迟更新用户积分和观看次数信息，确保扣费已完成
   setTimeout(async () => {
     await getUserRealTimeInfo()
+    await fetchLatestPointsInfo()
+    console.log('✅ 播放后已更新用户信息，当前观看次数:', userVideoNums.value)
   }, 2000)
 }
 

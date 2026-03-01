@@ -3,6 +3,7 @@ import { RouterView } from 'vue-router'
 import { onMounted } from 'vue'
 import { isLoggedIn, isTokenExpired, forceLogin } from '@/api/fetch-api'
 import TopLoading from '@/components/TopLoading.vue'
+import CustomerServiceButton from '@/components/CustomerServiceButton.vue'
 
 // 应用启动时检查TOKEN状态（仅记录，不强制登录）
 onMounted(() => {
@@ -25,6 +26,7 @@ onMounted(() => {
   <div class="app-container">
     <TopLoading />
     <RouterView />
+    <CustomerServiceButton />
   </div>
 </template>
 
