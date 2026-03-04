@@ -7,6 +7,7 @@ import {
   NEW_API_BASE_URL,
 } from '@/utils/config'
 import { showTopLoading, hideTopLoading } from '@/utils/topLoading'
+import { showToast } from 'vant'
 
 // 定义参数接口
 interface VideoParams {
@@ -445,7 +446,15 @@ export const updateVideoDigg = async (params: {
     throw new Error(`HTTP error! Status: ${response.status}, Response: ${errorText}`)
   }
 
-  return await response.json()
+  const result = await response.json()
+  
+  // 检查是否是认证错误
+  if (checkApiAuthError(result)) {
+    handleAuthError('登录已过期，请重新登录后再进行点赞')
+    throw new Error('认证失败，请重新登录')
+  }
+  
+  return result
 }
 
 /**
@@ -518,7 +527,15 @@ export const updateUserLog = async (params: {
     throw new Error(`HTTP error! Status: ${response.status}, Response: ${errorText}`)
   }
 
-  return await response.json()
+  const result = await response.json()
+  
+  // 检查是否是认证错误
+  if (checkApiAuthError(result)) {
+    handleAuthError('登录已过期，请重新登录后再进行操作')
+    throw new Error('认证失败，请重新登录')
+  }
+  
+  return result
 }
 
 /**
@@ -558,7 +575,15 @@ export const fetchUserLogList = async (params: { type: number | string }) => {
     throw new Error(`HTTP error! Status: ${response.status}, Response: ${errorText}`)
   }
 
-  return await response.json()
+  const result = await response.json()
+  
+  // 检查是否是认证错误
+  if (checkApiAuthError(result)) {
+    handleAuthError('登录已过期，请重新登录')
+    throw new Error('认证失败，请重新登录')
+  }
+  
+  return result
 }
 
 // 用户信息存储管理
@@ -642,6 +667,68 @@ export const isTokenExpired = (): boolean => {
   }
 
   return false
+}
+
+// 检查API响应是否表示TOKEN过期或需要重新登录
+export const checkApiAuthError = (result: any): boolean => {
+  // 检查常见的认证失败响应格式
+  if (!result) return false
+  
+  // 格式1: 视频站接口 - 直接判断 code: 700
+  if (result.code === 700) {
+    console.warn('⚠️ 检测到code=700，TOKEN已失效')
+    return true
+  }
+  
+  // 格式2: 直播站接口 - code在第二层 (result.data.code === 700)
+  if (result.data && result.data.code === 700) {
+    console.warn('⚠️ 检测到data.code=700，TOKEN已失效')
+    return true
+  }
+  
+  // 格式3: 其他认证失败响应 (code: 0, -1 且包含登录相关关键词)
+  if (result.code === 0 || result.code === -1) {
+    const msg = result.msg || result.message || ''
+    const authErrorKeywords = ['登录', '超时', '过期', 'token', 'TOKEN', '认证', '授权', 'login', 'expired', 'unauthorized']
+    
+    if (authErrorKeywords.some(keyword => msg.includes(keyword))) {
+      console.warn('⚠️ API返回认证错误:', msg)
+      return true
+    }
+  }
+  
+  // 格式4: HTTP状态码 401/403
+  if (result.ret === 401 || result.ret === 403) {
+    console.warn('⚠️ API返回认证错误，状态码:', result.ret)
+    return true
+  }
+  
+  return false
+}
+
+// 处理认证错误，提示用户重新登录
+let isShowingAuthError = false // 防止重复弹窗
+export const handleAuthError = (message: string = '登录已过期，请重新登录') => {
+  if (isShowingAuthError) {
+    return // 已经在显示错误提示，避免重复
+  }
+  
+  isShowingAuthError = true
+  
+  showToast({
+    message,
+    duration: 3000,
+    onClose: () => {
+      isShowingAuthError = false
+      // 清除过期的用户信息
+      clearAllCache()
+      // 跳转到登录页
+      const currentPath = window.location.hash.replace('#', '')
+      if (!currentPath.startsWith('/login') && !currentPath.startsWith('/register')) {
+        forceLogin()
+      }
+    }
+  })
 }
 
 // 获取TOKEN剩余时间（以分钟为单位）
@@ -2613,6 +2700,12 @@ export const fetchUserPoints = async () => {
 
       const result = await response.json()
       console.log('获取积分信息返回:', result)
+
+      // 检查是否是认证错误
+      if (checkApiAuthError(result) || (result.data && checkApiAuthError(result.data))) {
+        handleAuthError('登录已过期，请重新登录')
+        throw new Error('认证失败，请重新登录')
+      }
 
       if (result && result.ret === 200 && result.data) {
         if (result.data.code === 0) {

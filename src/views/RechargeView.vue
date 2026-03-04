@@ -72,6 +72,25 @@ interface ChargeRulesDisplay {
 
 const router = useRouter()
 
+// 温馨提醒弹窗状态
+const showReminderDialog = ref(false)
+
+// 检查今日是否已显示过提醒
+const checkTodayReminder = () => {
+  const today = new Date().toDateString()
+  const lastShown = localStorage.getItem('rechargeReminderDate')
+  return lastShown === today
+}
+
+// 关闭提醒并记录今日已显示
+const closeReminder = (rememberToday: boolean = false) => {
+  showReminderDialog.value = false
+  if (rememberToday) {
+    const today = new Date().toDateString()
+    localStorage.setItem('rechargeReminderDate', today)
+  }
+}
+
 // 修复返回按钮
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
 const goBack = () => {
@@ -833,6 +852,11 @@ const refreshUserBalance = async () => {
 }
 
 onMounted(async () => {
+  // 检查是否需要显示温馨提醒
+  if (!checkTodayReminder()) {
+    showReminderDialog.value = true
+  }
+  
   // 获取用户钻石余额
   loadUserBalance()
   // 刷新最新余额
@@ -1111,6 +1135,35 @@ onMounted(async () => {
       </div>
     </div>
   </van-popup>
+
+  <!-- 充值温馨提醒弹窗 -->
+  <div v-if="showReminderDialog" class="reminder-overlay" @click.self="closeReminder(false)">
+    <div class="reminder-dialog">
+      <div class="reminder-header">
+        <div class="reminder-icon">
+          <van-icon name="warning-o" size="32" color="#ff9500" />
+        </div>
+        <h3 class="reminder-title">充值温馨提醒</h3>
+      </div>
+      
+      <div class="reminder-content">
+        <div class="reminder-text">
+          <p class="highlight-text">充值时请务必通过游戏内进行充值，不要直接给历史账户私下转账，否则会导致金币延迟到账7日以上。</p>
+          <p class="normal-text">近期支付封控比较严重，建议使用<span class="emphasis">USDT</span>、<span class="emphasis">银行卡</span>或<span class="emphasis">数字人民币</span>充值。</p>
+          <p class="normal-text">如遇充值问题，可找<span class="emphasis">客服线下充值</span>。</p>
+        </div>
+      </div>
+
+      <div class="reminder-footer">
+        <button class="reminder-btn secondary" @click="closeReminder(true)">
+          今日不再提醒
+        </button>
+        <button class="reminder-btn primary" @click="closeReminder(false)">
+          我知道了
+        </button>
+      </div>
+    </div>
+  </div>
 </template>
 
 <style scoped>
@@ -2145,5 +2198,168 @@ onMounted(async () => {
 .failure-btn:active,
 .success-btn:active {
   opacity: 0.8;
+}
+
+/* 充值温馨提醒弹窗样式 */
+.reminder-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(0, 0, 0, 0.75);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 10000;
+  padding: 20px;
+  animation: fadeIn 0.3s ease;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+.reminder-dialog {
+  background: linear-gradient(135deg, #1a1a1a 0%, #2d2d2d 100%);
+  border-radius: 16px;
+  width: 100%;
+  max-width: 400px;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+  border: 1px solid rgba(255, 149, 0, 0.3);
+  animation: slideUp 0.3s ease;
+}
+
+@keyframes slideUp {
+  from {
+    transform: translateY(30px);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+.reminder-header {
+  padding: 24px 20px 16px;
+  text-align: center;
+  border-bottom: 1px solid rgba(255, 149, 0, 0.2);
+}
+
+.reminder-icon {
+  margin-bottom: 12px;
+}
+
+.reminder-title {
+  font-size: 20px;
+  font-weight: bold;
+  color: #ff9500;
+  margin: 0;
+}
+
+.reminder-content {
+  padding: 20px;
+}
+
+.reminder-text p {
+  margin: 0 0 12px 0;
+  line-height: 1.6;
+}
+
+.reminder-text p:last-child {
+  margin-bottom: 0;
+}
+
+.highlight-text {
+  color: #ff9500;
+  font-size: 15px;
+  font-weight: 500;
+  background: rgba(255, 149, 0, 0.1);
+  padding: 12px;
+  border-radius: 8px;
+  border-left: 3px solid #ff9500;
+}
+
+.normal-text {
+  color: #ccc;
+  font-size: 14px;
+}
+
+.emphasis {
+  color: #ff9500;
+  font-weight: bold;
+}
+
+.reminder-footer {
+  padding: 16px 20px 20px;
+  display: flex;
+  gap: 12px;
+}
+
+.reminder-btn {
+  flex: 1;
+  padding: 12px 20px;
+  border: none;
+  border-radius: 8px;
+  font-size: 15px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.reminder-btn.secondary {
+  background: rgba(255, 255, 255, 0.1);
+  color: #ccc;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+.reminder-btn.secondary:hover {
+  background: rgba(255, 255, 255, 0.15);
+}
+
+.reminder-btn.primary {
+  background: linear-gradient(90deg, #ff9500, #ff6d00);
+  color: #fff;
+  box-shadow: 0 4px 12px rgba(255, 149, 0, 0.3);
+}
+
+.reminder-btn.primary:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 16px rgba(255, 149, 0, 0.4);
+}
+
+.reminder-btn:active {
+  transform: translateY(0);
+}
+
+/* 移动端适配 */
+@media (max-width: 480px) {
+  .reminder-dialog {
+    max-width: none;
+    margin: 0 10px;
+  }
+
+  .reminder-title {
+    font-size: 18px;
+  }
+
+  .highlight-text {
+    font-size: 14px;
+  }
+
+  .normal-text {
+    font-size: 13px;
+  }
+
+  .reminder-btn {
+    font-size: 14px;
+    padding: 10px 16px;
+  }
 }
 </style>

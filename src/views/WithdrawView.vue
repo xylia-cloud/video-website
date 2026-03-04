@@ -11,6 +11,8 @@ import {
   deleteUserAccount,
   submitWithdraw,
   getUserInfo,
+  fetchUserPoints,
+  setUserInfo,
 } from '@/api/fetch-api'
 
 const router = useRouter()
@@ -257,7 +259,13 @@ const handleWithdraw = async () => {
     if (result.code === 1) {
       showSuccessModal.value = true
       withdrawAmount.value = ''
+      
+      // 刷新用户收益信息（提现余额）
       await loadUserProfit()
+      
+      // 刷新用户账户余额（如果提现会影响账户余额的话）
+      // 如果提现只是从佣金提现，不影响游戏余额，可以注释掉下面这行
+      await refreshUserBalance()
     } else {
       showToast(result.msg || '提现申请失败')
     }
@@ -265,6 +273,31 @@ const handleWithdraw = async () => {
     closeToast()
     console.error('提现失败:', error)
     showToast('提现申请失败')
+  }
+}
+
+// 刷新用户余额
+const refreshUserBalance = async () => {
+  try {
+    const pointsResult = await fetchUserPoints()
+    if (pointsResult.code === 1 && pointsResult.data) {
+      // 更新本地存储的用户信息
+      const userInfo = getUserInfo()
+      if (userInfo) {
+        userInfo.coin = pointsResult.data.coin
+        userInfo.user_points = pointsResult.data.points
+        userInfo.points = pointsResult.data.points
+        userInfo.video_nums = pointsResult.data.video_nums
+        userInfo.is_vip = pointsResult.data.is_vip
+        if (pointsResult.data.endtime) {
+          userInfo.endtime = pointsResult.data.endtime
+        }
+        setUserInfo(userInfo)
+        console.log('✅ 提现后余额已刷新，当前余额:', pointsResult.data.coin)
+      }
+    }
+  } catch (error) {
+    console.error('刷新余额失败:', error)
   }
 }
 

@@ -1,13 +1,23 @@
 <template>
-  <div class="customer-service-button" @click="handleClick">
+  <div v-if="shouldShowButton" class="customer-service-button" @click="handleClick">
     <img src="@/assets/img/kefu.png" alt="客服" />
   </div>
 </template>
 
 <script setup lang="ts">
+import { computed } from 'vue'
+import { useRoute } from 'vue-router'
 import { showToast } from 'vant'
 import { getUserInfo } from '@/api/fetch-api'
 import { generateCustomerServiceUrl } from '@/utils/rsa'
+
+const route = useRoute()
+
+// 判断是否应该显示客服按钮
+const shouldShowButton = computed(() => {
+  // 在游戏播放页面隐藏客服按钮
+  return route.path !== '/game-play'
+})
 
 const handleClick = () => {
   try {

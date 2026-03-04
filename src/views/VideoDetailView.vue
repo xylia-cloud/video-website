@@ -11,7 +11,6 @@ import {
   getUserInfo,
   isLoggedIn,
   setUserInfo,
-  fetchUserDatas,
   fetchAds,
   userLogin,
   registerUser,
@@ -271,12 +270,24 @@ const getCurrentShareUrl = () => {
   const currentUrl = window.location.href
   const urlObj = new URL(currentUrl)
 
-  // 清除已有的invite参数
-  urlObj.searchParams.delete('invite')
+  // 对于hash路由，需要将invite参数放在hash后面
+  const hashPart = urlObj.hash // 例如: #/video/117622?from=/
+  const basePath = urlObj.origin + urlObj.pathname // 例如: http://localhost:3001/
 
-  // 添加新的invite参数
-  if (userRecCode) {
-    urlObj.searchParams.append('invite', userRecCode)
+  if (hashPart && userRecCode) {
+    // 解析hash中的路径和查询参数
+    const hashMatch = hashPart.match(/^#([^?]*)(\?.*)?$/)
+    if (hashMatch) {
+      const hashPath = hashMatch[1] // 例如: /video/117622
+      const hashQuery = hashMatch[2] || '' // 例如: ?from=/
+
+      // 构建新的查询参数
+      const params = new URLSearchParams(hashQuery)
+      params.set('invite', userRecCode) // 设置或更新invite参数
+
+      // 重新组合URL
+      return `${basePath}#${hashPath}?${params.toString()}`
+    }
   }
 
   return urlObj.toString()
@@ -1131,40 +1142,33 @@ const getUserRealTimeInfo = async () => {
   isLoadingUserInfo.value = true
 
   try {
-    // 发起POST请求获取实时用户信息
-    const result = await fetchUserDatas({})
+    // 使用 fetchUserPoints 接口获取用户积分和观看次数信息
+    const result = await fetchUserPoints()
     console.log('获取用户实时信息结果:', result)
 
-    // 处理API响应，根据提供的数据结构
+    // 处理API响应
     if (result && result.code === 1 && result.data) {
-      // API返回包含user_points的完整用户数据
-      userInfo.value = result.data
-
       // 更新本地存储的用户信息
       const currentUserInfo = getUserInfo()
       if (currentUserInfo) {
         const updatedUserInfo = {
           ...currentUserInfo,
-          user_points: result.data.user_points,
-          // 同步其他可能更新的字段
-          user_nick_name: result.data.user_nick_name,
-          group_id: result.data.group_id,
-          group_name: result.data.group_name,
-          user_portrait: result.data.user_portrait,
-          // 同步VIP相关字段
-          video_nums: result.data.video_nums || currentUserInfo.video_nums || 0,
-          is_vip: result.data.is_vip || currentUserInfo.is_vip || '0',
-          endtime: result.data.endtime || currentUserInfo.endtime || '',
+          user_points: result.data.points,
+          points: result.data.points,
+          video_nums: result.data.video_nums,
+          is_vip: result.data.is_vip,
+          endtime: result.data.endtime || '',
         }
         setUserInfo(updatedUserInfo)
 
-        // 更新页面显示的VIP数据
-        userVideoNums.value = updatedUserInfo.video_nums
-        isVip.value = updatedUserInfo.is_vip
-        vipEndtime.value = updatedUserInfo.endtime
+        // 更新页面显示的数据
+        userInfo.value = updatedUserInfo
+        userVideoNums.value = result.data.video_nums
+        isVip.value = result.data.is_vip
+        vipEndtime.value = result.data.endtime || ''
       }
 
-      console.log('更新用户实时积分:', result.data.user_points)
+      console.log('✅ 更新用户实时信息成功 - 积分:', result.data.points, '观看次数:', result.data.video_nums)
       return result.data
     } else {
       console.error('获取用户实时信息失败:', result)
@@ -1323,7 +1327,7 @@ const continuePlay = async () => {
 
       // 3. 观看次数不足，检查积分余额
       const currentPoints =
-        latestUserInfo?.user_points !== undefined ? latestUserInfo.user_points : userPoints.value
+        latestUserInfo?.points !== undefined ? latestUserInfo.points : userPoints.value
 
       console.log('💰 积分检查 - 当前积分:', currentPoints, '需要积分:', pointsNeeded.value)
       

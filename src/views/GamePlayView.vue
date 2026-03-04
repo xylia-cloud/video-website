@@ -10,10 +10,10 @@ const router = useRouter()
 const gameUrl = ref((route.query.url as string) || '')
 const returnPath = ref((route.query.returnPath as string) || '/game')
 
-// 悬浮按钮位置 - 默认在左上角偏右上
+// 悬浮按钮位置 - 默认在左上角
 const buttonPosition = ref({
-  x: 60,
-  y: 60,
+  x: 20,
+  y: 20,
 })
 
 // 拖拽状态
@@ -124,18 +124,18 @@ const handleBackClick = () => {
 
 // 监听窗口大小变化
 const handleResize = () => {
-  // 确保按钮在可视区域内，并保持在左上角偏右上区域
+  // 确保按钮在可视区域内，并保持在左上角区域
   const maxX = window.innerWidth - 60
   const maxY = window.innerHeight - 60
   const minX = 0
   buttonPosition.value.x = Math.max(minX, Math.min(buttonPosition.value.x, maxX))
-  // 如果按钮位置太靠右（超过屏幕一半），重置到左上角偏右上
+  // 如果按钮位置太靠右（超过屏幕一半），重置到左上角
   if (buttonPosition.value.x > window.innerWidth / 2) {
-    buttonPosition.value.x = 60
+    buttonPosition.value.x = 20
   }
-  // 如果按钮位置太靠下（超过屏幕一半），重置到顶部偏上
+  // 如果按钮位置太靠下（超过屏幕一半），重置到顶部
   if (buttonPosition.value.y > window.innerHeight / 2) {
-    buttonPosition.value.y = 40
+    buttonPosition.value.y = 20
   }
   buttonPosition.value.y = Math.min(buttonPosition.value.y, maxY)
 }

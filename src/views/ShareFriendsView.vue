@@ -256,10 +256,7 @@ onMounted(() => {
     <div class="page-content">
       <!-- 二维码区域 -->
       <div class="qrcode-section">
-        <div class="share-title">
-          <span class="title-text">邀请好友</span>
-          <span class="subtitle-text">分享获得更多积分奖励</span>
-        </div>
+
         
         <div class="qrcode-wrapper">
         <div class="qrcode-container">
@@ -273,8 +270,9 @@ onMounted(() => {
             <div class="loading-text">生成二维码中...</div>
           </div>
         </div>
-          <div class="qrcode-tip">扫描二维码邀请好友</div>
         </div>
+        
+        <div class="qrcode-tip">扫描二维码邀请好友</div>
 
         <div class="button-group">
           <button class="action-button copy-button" @click="copyLink">
@@ -368,10 +366,26 @@ onMounted(() => {
 
 <style scoped>
 .share-page {
+  background-image: url('@/assets/img/bg-share.webp');
+  background-size: 100% auto;
+  background-position: top center;
+  background-repeat: no-repeat;
   background-color: #111;
   color: #fff;
   min-height: 100vh;
   position: relative;
+}
+
+/* 添加半透明遮罩层，确保内容可读 */
+.share-page::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(0, 0, 0, 0.3);
+  z-index: 0;
 }
 
 .page-content {
@@ -379,12 +393,14 @@ onMounted(() => {
   display: flex;
   flex-direction: column;
   align-items: center;
+  position: relative;
+  z-index: 1;
 }
 
 .qrcode-section {
   width: 100%;
   max-width: 400px;
-  padding: 30px 20px;
+  padding: 260px 20px 30px 20px;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -413,15 +429,21 @@ onMounted(() => {
 
 .qrcode-wrapper {
   background: linear-gradient(145deg, #1a1a1a, #222);
-  padding: 25px;
+  padding: 16px;
   border-radius: 20px;
   box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
-  margin-bottom: 30px;
+  margin-bottom: 16px;
   position: relative;
   display: flex;
   flex-direction: column;
   align-items: center;
   gap: 15px;
+  border: 2px solid transparent;
+  background-image: 
+    linear-gradient(145deg, #1a1a1a, #222),
+    linear-gradient(to right, #5D370C 0%, #F2E49C 50%, #5D370C 100%);
+  background-origin: border-box;
+  background-clip: padding-box, border-box;
 }
 
 .qrcode-container {
@@ -453,6 +475,7 @@ onMounted(() => {
   gap: 15px;
   width: 100%;
   padding: 0 20px;
+  margin-top:16px;
 }
 
 .action-button {
