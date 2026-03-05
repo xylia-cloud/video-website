@@ -822,6 +822,25 @@ const availableAmounts = computed(() => {
   return []
 })
 
+// 计算金额范围提示文本
+const amountRangePlaceholder = computed(() => {
+  const amounts = availableAmounts.value
+  if (amounts.length === 0) {
+    return '请输入金额'
+  }
+  
+  // 获取所有金额并排序
+  const moneyValues = amounts.map(item => parseFloat(item.money)).filter(val => !isNaN(val))
+  if (moneyValues.length === 0) {
+    return '请输入金额'
+  }
+  
+  const minAmount = Math.min(...moneyValues)
+  const maxAmount = Math.max(...moneyValues)
+  
+  return `请输入金额 (${minAmount}-${maxAmount}元)`
+})
+
 // 获取用户钻石余额
 const loadUserBalance = () => {
   const userInfo = getUserInfo()
@@ -1005,7 +1024,7 @@ onMounted(async () => {
               v-model="customAmount"
               type="text"
               inputmode="decimal"
-              placeholder="请输入金额"
+              :placeholder="amountRangePlaceholder"
               class="custom-amount-input"
               @input="(e) => handleCustomAmountInput((e.target as HTMLInputElement).value)"
             />
