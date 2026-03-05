@@ -92,6 +92,8 @@ const isRecommendLoading = ref(true)
 const userInfo = ref<any>(null)
 // 是否正在获取用户信息
 const isLoadingUserInfo = ref(false)
+// 是否正在刷新余额
+const isRefreshing = ref(false)
 
 // 用户积分和VIP相关数据
 const userVideoNums = ref(0) // 观影次数
@@ -576,13 +578,81 @@ const refreshUserPoints = async () => {
     // 关闭加载提示
     closeToast()
 
+    // 显示错误提示
     showToast({
-      message: '刷新积分失败，请稍后再试',
+      message: '刷新失败，请稍后重试',
       position: 'top',
       duration: 3000,
       className: 'custom-toast-error',
       icon: 'cross',
     })
+
+    // 关闭充值完成弹窗
+    showChargeCompleteDialog.value = false
+  }
+}
+
+// 手动刷新余额和观看次数
+const handleRefreshBalance = async () => {
+  if (isRefreshing.value) {
+    return // 防止重复点击
+  }
+
+  isRefreshing.value = true
+
+  try {
+    console.log('🔄 手动刷新余额和观看次数...')
+
+    // 调用获取积分接口
+    const pointsResult = await fetchUserPoints()
+
+    if (pointsResult.code === 1 && pointsResult.data) {
+      // 更新用户积分信息
+      const userInfo = getUserInfo()
+      if (userInfo) {
+        // 更新本地存储的用户信息
+        userInfo.user_points = pointsResult.data.points
+        userInfo.points = pointsResult.data.points
+        userInfo.video_nums = pointsResult.data.video_nums
+        userInfo.is_vip = pointsResult.data.is_vip
+        if (pointsResult.data.endtime) {
+          userInfo.endtime = pointsResult.data.endtime
+        }
+        setUserInfo(userInfo)
+
+        // 更新页面显示的数据
+        userVideoNums.value = pointsResult.data.video_nums
+        isVip.value = pointsResult.data.is_vip || 0
+        vipEndtime.value = pointsResult.data.endtime || ''
+      }
+
+      // 显示成功提示
+      showToast({
+        message: `刷新成功！观看次数：${pointsResult.data.video_nums}`,
+        position: 'top',
+        duration: 2000,
+        icon: 'success',
+      })
+
+      console.log('✅ 手动刷新完成 - 观看次数:', pointsResult.data.video_nums, '积分:', pointsResult.data.points)
+    } else {
+      showToast({
+        message: pointsResult.msg || '刷新失败',
+        position: 'top',
+        duration: 2000,
+        icon: 'cross',
+      })
+    }
+  } catch (error) {
+    console.error('❌ 手动刷新失败:', error)
+    showToast({
+      message: '刷新失败，请稍后重试',
+      position: 'top',
+      duration: 2000,
+      icon: 'cross',
+    })
+  } finally {
+    isRefreshing.value = false
   }
 }
 
@@ -1877,12 +1947,13 @@ const shareVideo = () => {
     document.body.removeChild(tempInput)
 
     if (successful) {
-      showToast({
-        message: '复制成功',
-        position: 'top',
-        duration: 3000,
-        className: 'custom-toast',
-        icon: 'success',
+      // 显示分享成功弹窗
+      showDialog({
+        title: '分享链接已复制',
+        message: '链接已复制到剪贴板，可以发送给好友了！\n\n温馨提示：分享成功后，如果观影次数未增加，可以点击"刷新"按钮来更新最新次数。',
+        confirmButtonText: '我知道了',
+        confirmButtonColor: '#ff9500',
+        className: 'dark-dialog',
       })
       console.log('成功复制的链接:', shareUrl)
     } else {
@@ -1896,12 +1967,13 @@ const shareVideo = () => {
       navigator.clipboard
         .writeText(shareUrl)
         .then(() => {
-          showToast({
-            message: '分享链接已复制，可以发送给好友了',
-            position: 'top',
-            duration: 3000,
-            className: 'custom-toast',
-            icon: 'success',
+          // 显示分享成功弹窗
+          showDialog({
+            title: '分享链接已复制',
+            message: '链接已复制到剪贴板，可以发送给好友了！\n\n温馨提示：分享成功后，如果观影次数未增加，可以点击"刷新"按钮来更新最新次数。',
+            confirmButtonText: '我知道了',
+            confirmButtonColor: '#ff9500',
+            className: 'dark-dialog',
           })
           console.log('clipboard API复制成功:', shareUrl)
         })
@@ -2717,8 +2789,19 @@ const handleAdClick = (ad: ListAd) => {
       <div class="video-main">
         <!-- 观看限制提示 -->
         <div class="watch-limit-box">
-          <div class="watch-text" v-if="isLoggedIn()">{{ vipStatusDisplay }}</div>
-          <div class="watch-text" v-else>登录后查看积分</div>
+          <div class="watch-info-wrapper">
+            <div class="watch-text" v-if="isLoggedIn()">{{ vipStatusDisplay }}</div>
+            <div class="watch-text" v-else>登录后查看积分</div>
+            <button 
+              v-if="isLoggedIn()" 
+              class="balance-refresh-btn" 
+              @click="handleRefreshBalance"
+              :disabled="isRefreshing"
+            >
+              <van-icon v-if="isRefreshing" name="loading" class="rotating" />
+              <span v-else>刷新</span>
+            </button>
+          </div>
           <div class="share-btn" @click="shareVideo" v-if="isLoggedIn()">分享免费观看2部</div>
           <div class="share-btn" @click="goToLogin" v-else>登录</div>
         </div>
@@ -3174,11 +3257,72 @@ const handleAdClick = (ad: ListAd) => {
   margin-right: 10px;
 }
 
-.watch-text {
+.watch-info-wrapper {
   flex: 1;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.watch-text {
   font-size: 14px;
   color: #8a4d31;
   font-weight: bold;
+}
+
+.balance-refresh-btn {
+  background-color: #b66d39;
+  color: #fff;
+  padding: 4px 10px;
+  border-radius: 15px;
+  font-size: 11px;
+  font-weight: bold;
+  cursor: pointer;
+  border: none;
+  min-width: 40px;
+  text-align: center;
+  transition: opacity 0.3s ease;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 24px;
+  line-height: 1;
+}
+
+.balance-refresh-btn:hover:not(:disabled) {
+  opacity: 0.9;
+}
+
+.balance-refresh-btn:active:not(:disabled) {
+  opacity: 0.8;
+}
+
+.balance-refresh-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.balance-refresh-btn .van-icon {
+  font-size: 12px;
+  color: #fff;
+}
+
+.balance-refresh-btn span {
+  white-space: nowrap;
+  color: #fff;
+}
+
+.balance-refresh-btn .rotating {
+  animation: rotate 1s linear infinite;
+}
+
+@keyframes rotate {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
 }
 
 .share-btn {
@@ -4080,3 +4224,52 @@ const handleAdClick = (ad: ListAd) => {
   }
 }
 </style>
+
+<style>
+/* 暗色弹窗样式 - 全局样式 */
+.van-dialog.dark-dialog {
+  background: linear-gradient(135deg, #2a2a2a 0%, #1a1a1a 100%) !important;
+  border-radius: 16px !important;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.6) !important;
+}
+
+.van-dialog.dark-dialog .van-dialog__header {
+  color: #fff !important;
+  font-weight: bold !important;
+  padding-top: 24px !important;
+}
+
+.van-dialog.dark-dialog .van-dialog__message {
+  color: #e0e0e0 !important;
+  line-height: 1.6 !important;
+  padding: 20px 24px !important;
+  white-space: pre-line !important;
+}
+
+.van-dialog.dark-dialog .van-dialog__footer {
+  padding-bottom: 20px !important;
+  padding-top: 16px !important;
+  padding-left: 20px !important;
+  padding-right: 20px !important;
+}
+
+.van-dialog.dark-dialog .van-dialog__footer.van-hairline--top::after {
+  border-top-color: rgba(255, 255, 255, 0.1) !important;
+}
+
+.van-dialog.dark-dialog .van-dialog__confirm {
+  background: linear-gradient(135deg, #ff9500 0%, #ff7700 100%) !important;
+  color: #fff !important;
+  border-radius: 20px !important;
+  padding: 10px 24px !important;
+  font-weight: bold !important;
+  border: none !important;
+  width: auto !important;
+  max-width: 100% !important;
+}
+
+.van-dialog.dark-dialog .van-dialog__confirm:active {
+  opacity: 0.8 !important;
+}
+</style>
+
