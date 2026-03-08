@@ -128,7 +128,22 @@ const goToCustomerService = async () => {
     if (result && result.data) {
       const rsaPassWord = result.data
       const customerServiceUrl = `https://help186.xuhgki.cn/index/index/home?code=${rsaPassWord}`
-      window.open(customerServiceUrl, '_blank')
+      
+      // 移动端兼容性更好的跳转方式
+      // 优先使用 location.href，在新标签页打开
+      const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent)
+      
+      if (isMobile) {
+        // 移动端直接跳转
+        window.location.href = customerServiceUrl
+      } else {
+        // PC端尝试新窗口打开
+        const newWindow = window.open(customerServiceUrl, '_blank')
+        // 如果被拦截，则直接跳转
+        if (!newWindow || newWindow.closed || typeof newWindow.closed === 'undefined') {
+          window.location.href = customerServiceUrl
+        }
+      }
     } else {
       throw new Error('获取客服密钥失败')
     }
