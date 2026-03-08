@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, computed } from 'vue'
 import { NEW_API_BASE_URL } from '@/utils/config'
 import {
   getUserInfo,
@@ -96,6 +96,25 @@ const isGlobalLoading = ref(false)
 // 用户余额数据
 const userBalance = ref(0)
 const gameBalance = ref(0)
+
+// 用户信息计算属性
+const displayUserName = computed(() => {
+  const userInfo = getUserInfo()
+  if (!userInfo) return '未知用户'
+  
+  return userInfo.user_nick_name || 
+         userInfo.user_name || 
+         userInfo.user_login || 
+         userInfo.id || 
+         '未知用户'
+})
+
+const displayUserId = computed(() => {
+  const userInfo = getUserInfo()
+  if (!userInfo) return ''
+  
+  return userInfo.user_id || userInfo.id || ''
+})
 
 // 用户登录状态
 const isUserLoggedIn = ref(false)
@@ -815,15 +834,26 @@ onMounted(() => {
 
     <!-- 充值版块 -->
     <div v-if="isUserLoggedIn" class="recharge-section">
-      <!-- 左侧余额显示 -->
-      <div class="balance-display">
-        <div class="balance-item">
-          <span class="balance-label">账户余额：</span>
-          <span class="balance-value">{{ userBalance.toFixed(2) }}</span>
+      <!-- 用户信息和余额显示 -->
+      <div class="user-balance-container">
+        <!-- 用户信息 -->
+        <div class="user-info-display">
+          <div class="user-name-row">
+            <span class="user-name">{{ displayUserName }}</span>
+            <span class="user-id-tag">ID: {{ displayUserId }}</span>
+          </div>
         </div>
-        <div class="balance-item">
-          <span class="balance-label">游戏余额：</span>
-          <span class="balance-value">{{ gameBalance.toFixed(2) }}</span>
+        
+        <!-- 余额显示 -->
+        <div class="balance-display">
+          <div class="balance-item">
+            <span class="balance-label">账户余额：</span>
+            <span class="balance-value">{{ userBalance.toFixed(2) }}</span>
+          </div>
+          <div class="balance-item">
+            <span class="balance-label">游戏余额：</span>
+            <span class="balance-value">{{ gameBalance.toFixed(2) }}</span>
+          </div>
         </div>
       </div>
 
@@ -1200,6 +1230,45 @@ onMounted(() => {
   justify-content: space-between;
   padding: 10px 15px;
   border-radius: 8px;
+}
+
+/* 用户信息和余额容器 */
+.user-balance-container {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  flex: 1;
+}
+
+/* 用户信息显示 */
+.user-info-display {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin-bottom: 4px;
+}
+
+.user-name-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.user-name {
+  font-size: 15px;
+  color: #fff;
+  font-weight: 600;
+}
+
+.user-id-tag {
+  display: inline-block;
+  font-size: 11px;
+  color: #ff9500;
+  background: rgba(255, 149, 0, 0.15);
+  border: 1px solid rgba(255, 149, 0, 0.3);
+  padding: 2px 8px;
+  border-radius: 10px;
+  font-weight: 500;
 }
 
 /* 左侧余额显示 */
