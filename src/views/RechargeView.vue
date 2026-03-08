@@ -1,8 +1,8 @@
 <script setup lang="ts">
 // 充值页面逻辑
-import { ref, onMounted, computed, nextTick } from 'vue'
+import { ref, onMounted, computed, nextTick, onActivated } from 'vue'
 import { showToast, showDialog } from 'vant'
-import { useRouter } from 'vue-router'
+import { useRouter, useRoute } from 'vue-router'
 import {
   fetchPayChannels,
   fetchChargeRules,
@@ -71,6 +71,7 @@ interface ChargeRulesDisplay {
 }
 
 const router = useRouter()
+const route = useRoute()
 
 // 温馨提醒弹窗状态
 const showReminderDialog = ref(false)
@@ -208,6 +209,10 @@ const isCreatingOrder = ref(false)
 
 // 订单成功弹窗状态
 const showOrderSuccessModal = ref(false)
+// 支付成功弹窗状态
+const showPaymentSuccessModal = ref(false)
+// 支付失败弹窗状态
+const showPaymentFailureModal = ref(false)
 const orderInfo = ref({
   orderNumber: '',
   payUrl: '',
@@ -439,24 +444,20 @@ const selectPlatform = (platform: PaymentSubChannel | Record<string, unknown>) =
   })
 }
 
-// 🔥 处理支付成功
-const handlePaymentSuccess = () => {
-  showOrderSuccessModal.value = false
+// 🔥 处理支付成功确认
+const handleConfirmSuccess = () => {
+  showPaymentSuccessModal.value = false
+  // 可以刷新余额或跳转到其他页面
   showToast({
-    message: '支付成功！',
+    message: '充值成功',
     duration: 2000,
   })
-  // 可以在这里添加跳转到成功页面或刷新余额等逻辑
 }
 
-// 🔥 处理支付失败
-const handlePaymentFailure = () => {
-  showOrderSuccessModal.value = false
-  showToast({
-    message: '支付失败，请重试',
-    duration: 2000,
-  })
-  // 保持在当前页面，用户可以重新选择支付方式
+// 🔥 处理返回充值页
+const handleReturnToRecharge = () => {
+  showPaymentFailureModal.value = false
+  // 关闭弹窗，用户可以重新选择充值
 }
 
 // 🔥 打开支付页面（兼容Safari）
@@ -895,7 +896,32 @@ onMounted(async () => {
       }
     }, 1000) // 延迟1秒，等待数据加载完成
   })
+  
+  // 检查支付结果（从URL参数）
+  checkPaymentResult()
 })
+
+// 页面激活时也检查支付结果
+onActivated(() => {
+  checkPaymentResult()
+})
+
+// 检查支付结果
+const checkPaymentResult = () => {
+  const paymentStatus = route.query.payment_status as string
+  
+  if (paymentStatus === 'success') {
+    // 显示支付成功弹窗
+    showPaymentSuccessModal.value = true
+    // 清除URL参数
+    router.replace({ query: {} })
+  } else if (paymentStatus === 'failure' || paymentStatus === 'cancel') {
+    // 显示支付失败弹窗
+    showPaymentFailureModal.value = true
+    // 清除URL参数
+    router.replace({ query: {} })
+  }
+}
 </script>
 
 <template>
@@ -1147,10 +1173,53 @@ onMounted(async () => {
           <span class="countdown" v-if="paymentCountdown > 0">{{ paymentCountdown }}s</span>
         </div>
       </div>
+    </div>
+  </van-popup>
 
-      <div class="action-buttons">
-        <button class="failure-btn" @click="handlePaymentFailure">支付失败</button>
-        <button class="success-btn" @click="handlePaymentSuccess">支付成功</button>
+  <!-- 支付成功弹窗 -->
+  <van-popup
+    v-model:show="showPaymentSuccessModal"
+    :close-on-click-overlay="false"
+    class="payment-result-popup"
+  >
+    <div class="payment-result-modal">
+      <div class="result-header">
+        <div class="result-icon success-icon">
+          <van-icon name="checked" size="48" color="#52c41a" />
+        </div>
+        <h2 class="result-title">支付成功</h2>
+      </div>
+
+      <div class="result-content">
+        <p class="result-message">您的充值已成功到账</p>
+      </div>
+
+      <div class="result-actions">
+        <button class="result-btn primary-btn" @click="handleConfirmSuccess">确认</button>
+      </div>
+    </div>
+  </van-popup>
+
+  <!-- 支付失败弹窗 -->
+  <van-popup
+    v-model:show="showPaymentFailureModal"
+    :close-on-click-overlay="false"
+    class="payment-result-popup"
+  >
+    <div class="payment-result-modal">
+      <div class="result-header">
+        <div class="result-icon failure-icon">
+          <van-icon name="close" size="48" color="#ff4d4f" />
+        </div>
+        <h2 class="result-title">支付失败</h2>
+      </div>
+
+      <div class="result-content">
+        <p class="result-message">支付未完成，请重试</p>
+      </div>
+
+      <div class="result-actions">
+        <button class="result-btn secondary-btn" @click="handleReturnToRecharge">返回</button>
       </div>
     </div>
   </van-popup>
@@ -2190,8 +2259,8 @@ onMounted(async () => {
   border-top: 1px solid #444;
 }
 
-.failure-btn,
-.success-btn {
+.cancel-btn,
+.continue-btn {
   flex: 1;
   padding: 16px;
   border: none;
@@ -2202,20 +2271,125 @@ onMounted(async () => {
   transition: background-color 0.3s;
 }
 
-.failure-btn {
+.cancel-btn {
   border-right: 1px solid #444;
+  color: #999;
 }
 
-.failure-btn:hover {
-  background: rgba(255, 107, 107, 0.1);
+.cancel-btn:hover {
+  background: rgba(255, 255, 255, 0.05);
 }
 
-.success-btn:hover {
+.continue-btn {
+  color: #ff9500;
+  font-weight: 500;
+}
+
+.continue-btn:hover {
   background: rgba(255, 149, 0, 0.1);
 }
 
-.failure-btn:active,
-.success-btn:active {
+.cancel-btn:active,
+.continue-btn:active {
+  opacity: 0.8;
+}
+
+/* 支付结果弹窗样式 */
+.payment-result-popup {
+  background: transparent;
+}
+
+.payment-result-modal {
+  background: linear-gradient(135deg, #2a2a2a 0%, #1a1a1a 100%);
+  border-radius: 16px;
+  padding: 32px 24px 24px;
+  min-width: 300px;
+  max-width: 90vw;
+}
+
+.result-header {
+  text-align: center;
+  margin-bottom: 24px;
+}
+
+.result-icon {
+  width: 80px;
+  height: 80px;
+  margin: 0 auto 16px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.success-icon {
+  background: rgba(82, 196, 26, 0.1);
+}
+
+.failure-icon {
+  background: rgba(255, 77, 79, 0.1);
+}
+
+.result-title {
+  font-size: 20px;
+  font-weight: 600;
+  color: #fff;
+  margin: 0;
+}
+
+.result-content {
+  text-align: center;
+  margin-bottom: 24px;
+}
+
+.result-message {
+  font-size: 14px;
+  color: #999;
+  margin: 0;
+  line-height: 1.6;
+}
+
+.result-actions {
+  display: flex;
+  gap: 12px;
+}
+
+.result-btn {
+  flex: 1;
+  padding: 14px 24px;
+  border: none;
+  border-radius: 8px;
+  font-size: 16px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.3s;
+}
+
+.primary-btn {
+  background: linear-gradient(135deg, #ff9500 0%, #ff7700 100%);
+  color: #fff;
+}
+
+.primary-btn:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(255, 149, 0, 0.4);
+}
+
+.primary-btn:active {
+  transform: translateY(0);
+}
+
+.secondary-btn {
+  background: rgba(255, 255, 255, 0.1);
+  color: #fff;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+.secondary-btn:hover {
+  background: rgba(255, 255, 255, 0.15);
+}
+
+.secondary-btn:active {
   opacity: 0.8;
 }
 
