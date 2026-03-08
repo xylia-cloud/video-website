@@ -16,6 +16,7 @@ import {
 } from '@/api/fetch-api'
 import { BASE_URL } from '@/utils/config'
 import QRCode from 'qrcode'
+import BottomTabbar from '@/components/BottomTabbar.vue'
 
 const router = useRouter()
 
@@ -975,25 +976,8 @@ const confirmApplyAgent = async () => {
     <!-- u9000u51fau767bu5f55u6309u94ae -->
     <div class="logout-button" @click="handleLogout">退出登录</div>
 
-    <!-- u5e95u90e8u5bfcu822a -->
-    <div class="bottom-nav">
-      <router-link to="/" class="nav-item">
-        <img src="@/assets/img/icon-tabbar-home-normal.svg" alt="首页" class="tabbar-icon" />
-        <div class="nav-text">首页</div>
-      </router-link>
-      <router-link to="/live" class="nav-item">
-        <img src="@/assets/img/icon-tabbar-live-normal.svg" alt="活动" class="tabbar-icon" />
-        <div class="nav-text">活动</div>
-      </router-link>
-      <router-link to="/game" class="nav-item">
-        <img src="@/assets/img/icon-tabbar-game-normal.svg" alt="游戏" class="tabbar-icon" />
-        <div class="nav-text">游戏</div>
-      </router-link>
-      <router-link to="/profile" class="nav-item active">
-        <img src="@/assets/img/icon-tabbar-account-active.svg" alt="我的" class="tabbar-icon" />
-        <div class="nav-text">我的</div>
-      </router-link>
-    </div>
+    <!-- 底部导航 -->
+    <BottomTabbar />
 
     <!-- 游客提示弹窗 -->
     <div class="guest-tip-overlay" v-if="showGuestTip" @click.self="closeGuestTip">
@@ -1511,41 +1495,7 @@ export default {
   font-size: 14px;
 }
 
-/* u5e95u90e8u5bfcu822a */
-.bottom-nav {
-  position: fixed;
-  bottom: 0;
-  left: 0;
-  right: 0;
-  height: 50px;
-  background-color: #222;
-  display: flex;
-  justify-content: space-around;
-  align-items: center;
-  border-top: 1px solid #333;
-}
-
-.nav-item {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  color: #999;
-  text-decoration: none;
-}
-
-.tabbar-icon {
-  width: 24px;
-  height: 24px;
-}
-
-.nav-item.active,
-.nav-item.router-link-active {
-  color: #ff9500;
-}
-
-.nav-text {
-  font-size: 12px;
-}
+/* 底部导航样式已移至 BottomTabbar 组件 */
 
 /* 游客提示弹窗 */
 .guest-tip-overlay {

@@ -11,6 +11,7 @@ import TagsView from '../views/TagsView.vue'
 import TagDetailsView from '../views/TagDetailsView.vue'
 import VideoDetailView from '../views/VideoDetailView.vue'
 import RechargeView from '../views/RechargeView.vue'
+import RechargeCallbackView from '../views/RechargeCallbackView.vue'
 import VipRechargeView from '../views/VipRechargeView.vue'
 import WithdrawView from '../views/WithdrawView.vue'
 import EditProfileView from '../views/EditProfileView.vue'
@@ -145,6 +146,11 @@ const router = createRouter({
       path: '/recharge',
       name: 'recharge',
       component: RechargeView,
+    },
+    {
+      path: '/recharge-callback',
+      name: 'rechargeCallback',
+      component: RechargeCallbackView,
     },
     {
       path: '/vip-recharge',

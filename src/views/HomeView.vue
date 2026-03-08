@@ -7,6 +7,7 @@ import SearchBar from '@/components/SearchBar.vue'
 import AdBanner from '@/components/AdBanner.vue'
 import VideoSection from '@/components/VideoSection.vue'
 import LoadingStates from '@/components/LoadingStates.vue'
+import BottomTabbar from '@/components/BottomTabbar.vue'
 import { ref, onMounted, onBeforeUnmount, computed, onActivated } from 'vue'
 import { getRecommendVideos } from '@/api/video'
 import {
@@ -1627,24 +1628,7 @@ const performTouristLogin = async () => {
     </div>
 
     <!-- 底部导航 -->
-    <div class="bottom-nav">
-      <router-link to="/" class="nav-item active">
-        <img src="@/assets/img/icon-tabbar-home-active.svg" alt="首页" class="tabbar-icon" />
-        <div class="nav-text">首页</div>
-      </router-link>
-      <router-link to="/live" class="nav-item">
-        <img src="@/assets/img/icon-tabbar-live-normal.svg" alt="活动" class="tabbar-icon" />
-        <div class="nav-text">活动</div>
-      </router-link>
-      <router-link to="/game" class="nav-item">
-        <img src="@/assets/img/icon-tabbar-game-normal.svg" alt="游戏" class="tabbar-icon" />
-        <div class="nav-text">游戏</div>
-      </router-link>
-      <router-link to="/profile" class="nav-item">
-        <img src="@/assets/img/icon-tabbar-account-normal.svg" alt="我的" class="tabbar-icon" />
-        <div class="nav-text">我的</div>
-      </router-link>
-    </div>
+    <BottomTabbar />
   </div>
 </template>
 
@@ -1736,41 +1720,7 @@ const performTouristLogin = async () => {
   margin-bottom: 15px;
 }
 
-/* 底部导航 */
-.bottom-nav {
-  position: fixed;
-  bottom: 0;
-  left: 0;
-  right: 0;
-  height: 50px;
-  background-color: #222;
-  display: flex;
-  justify-content: space-around;
-  align-items: center;
-  border-top: 1px solid #333;
-}
-
-.nav-item {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  color: #999;
-  text-decoration: none;
-}
-
-.tabbar-icon {
-  width: 24px;
-  height: 24px;
-}
-
-.nav-item.active,
-.nav-item.router-link-active {
-  color: #ff9500;
-}
-
-.nav-text {
-  font-size: 12px;
-}
+/* 底部导航样式已移至 BottomTabbar 组件 */
 
 .tag-item.more-tags {
   background-color: #1c1c1c;

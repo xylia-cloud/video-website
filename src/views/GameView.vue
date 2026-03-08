@@ -10,6 +10,7 @@ import {
 } from '@/api/fetch-api'
 import { useRouter, useRoute } from 'vue-router'
 import { showToast } from 'vant'
+import BottomTabbar from '@/components/BottomTabbar.vue'
 
 // 顶级游戏分类接口
 interface TopGameCategory {
@@ -1018,25 +1019,8 @@ onMounted(() => {
       </div>
     </div>
 
-    <!-- u5e95u90e8u5bfcu822a -->
-    <div class="bottom-nav">
-      <router-link to="/" class="nav-item">
-        <img src="@/assets/img/icon-tabbar-home-normal.svg" alt="首页" class="tabbar-icon" />
-        <div class="nav-text">首页</div>
-      </router-link>
-      <router-link to="/live" class="nav-item">
-        <img src="@/assets/img/icon-tabbar-live-normal.svg" alt="活动" class="tabbar-icon" />
-        <div class="nav-text">活动</div>
-      </router-link>
-      <router-link to="/game" class="nav-item active">
-        <img src="@/assets/img/icon-tabbar-game-active.svg" alt="游戏" class="tabbar-icon" />
-        <div class="nav-text">游戏</div>
-      </router-link>
-      <router-link to="/profile" class="nav-item">
-        <img src="@/assets/img/icon-tabbar-account-normal.svg" alt="我的" class="tabbar-icon" />
-        <div class="nav-text">我的</div>
-      </router-link>
-    </div>
+    <!-- 底部导航 -->
+    <BottomTabbar />
 
     <!-- 游戏确认弹窗 -->
     <van-popup v-model:show="showGameDialog" class="game-confirm-popup">
@@ -2077,46 +2061,7 @@ onMounted(() => {
   color: #fff;
 }
 
-/* 底部导航 */
-.bottom-nav {
-  height: 50px;
-  background-color: #222;
-  display: flex;
-  justify-content: space-around;
-  align-items: center;
-  border-top: 1px solid #333;
-  flex-shrink: 0;
-  /* 不允许收缩 */
-  position: fixed;
-  bottom: 0;
-  left: 0;
-  right: 0;
-  z-index: 1000;
-  /* 确保始终显示在最上层 */
-  width: 100%;
-}
-
-.nav-item {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  color: #999;
-  text-decoration: none;
-}
-
-.tabbar-icon {
-  width: 24px;
-  height: 24px;
-}
-
-.nav-item.active,
-.nav-item.router-link-active {
-  color: #ff9500;
-}
-
-.nav-text {
-  font-size: 12px;
-}
+/* 底部导航样式已移至 BottomTabbar 组件 */
 
 /* 游戏确认弹窗样式 */
 .game-confirm-popup {
