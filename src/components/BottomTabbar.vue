@@ -18,8 +18,12 @@
       <div class="nav-text">活动</div>
     </router-link>
     
-    <div class="nav-item" @click="goToCustomerService">
-      <img src="@/assets/img/icon-service.svg" alt="客服" class="tabbar-icon" />
+    <div class="nav-item" :class="{ active: isCustomerServiceActive }" @click="goToCustomerService">
+      <img 
+        :src="isCustomerServiceActive ? kefuActiveIcon : kefuNormalIcon" 
+        alt="客服" 
+        class="tabbar-icon" 
+      />
       <div class="nav-text">客服</div>
     </div>
     
@@ -53,11 +57,16 @@ const route = useRoute()
 // 当前路由路径
 const currentRoute = computed(() => route.path)
 
+// 客服按钮是否激活（客服没有对应的路由，所以需要单独控制）
+const isCustomerServiceActive = ref(false)
+
 // 图标路径
 const homeActiveIcon = '/src/assets/img/icon-tabbar-home-active.svg'
 const homeNormalIcon = '/src/assets/img/icon-tabbar-home-normal.svg'
 const liveActiveIcon = '/src/assets/img/icon-tabbar-live-active.svg'
 const liveNormalIcon = '/src/assets/img/icon-tabbar-live-normal.svg'
+const kefuActiveIcon = '/src/assets/img/icon-tabbar-kefu-active.svg'
+const kefuNormalIcon = '/src/assets/img/icon-tabbar-kefu-normal.svg'
 const gameActiveIcon = '/src/assets/img/icon-tabbar-game-active.svg'
 const gameNormalIcon = '/src/assets/img/icon-tabbar-game-normal.svg'
 const accountActiveIcon = '/src/assets/img/icon-tabbar-account-active.svg'
@@ -66,6 +75,12 @@ const accountNormalIcon = '/src/assets/img/icon-tabbar-account-normal.svg'
 // 跳转到客服
 const goToCustomerService = async () => {
   try {
+    // 点击时短暂激活客服图标
+    isCustomerServiceActive.value = true
+    setTimeout(() => {
+      isCustomerServiceActive.value = false
+    }, 300)
+
     showToast({
       message: '正在跳转客服...',
       duration: 1000,
