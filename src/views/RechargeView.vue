@@ -460,6 +460,83 @@ const handleReturnToRecharge = () => {
   // 关闭弹窗，用户可以重新选择充值
 }
 
+// 🔥 跳转到手动充值（客服）
+const goToManualRecharge = async () => {
+  try {
+    showToast({
+      message: '正在跳转客服...',
+      duration: 1000,
+    })
+
+    // 获取或生成浏览器指纹
+    let browserId = localStorage.getItem('browserId')
+    
+    if (!browserId) {
+      // 生成简单的浏览器指纹
+      const fingerprint = [
+        navigator.userAgent,
+        navigator.language,
+        screen.colorDepth,
+        screen.width + 'x' + screen.height,
+        new Date().getTimezoneOffset(),
+        navigator.hardwareConcurrency || 'unknown',
+        navigator.platform
+      ].join('|')
+      
+      let hash = 0
+      for (let i = 0; i < fingerprint.length; i++) {
+        const char = fingerprint.charCodeAt(i)
+        hash = ((hash << 5) - hash) + char
+        hash = hash & hash
+      }
+      browserId = Math.abs(hash).toString(36)
+      localStorage.setItem('browserId', browserId)
+    }
+
+    // 调用接口获取RSA密钥
+    const formData = new URLSearchParams()
+    formData.append('murmur', browserId)
+    
+    const response = await fetch('https://help.186web.cc/admin/RSAEncrypt/gtRsP', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/x-www-form-urlencoded',
+      },
+      body: formData.toString()
+    })
+    
+    const result = await response.json()
+    
+    if (result && result.data) {
+      const rsaPassWord = result.data
+      const customerServiceUrl = `https://help186.xuhgki.cn/index/index/home?code=${rsaPassWord}`
+      
+      // 移动端兼容性更好的跳转方式
+      const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent)
+      
+      if (isMobile) {
+        // 移动端直接跳转
+        window.location.href = customerServiceUrl
+      } else {
+        // PC端尝试新窗口打开
+        const newWindow = window.open(customerServiceUrl, '_blank')
+        // 如果被拦截，则直接跳转
+        if (!newWindow || newWindow.closed || typeof newWindow.closed === 'undefined') {
+          window.location.href = customerServiceUrl
+        }
+      }
+    } else {
+      throw new Error('获取客服密钥失败')
+    }
+  } catch (error) {
+    console.error('跳转客服失败:', error)
+    showToast({
+      message: '客服功能暂时不可用，请稍后重试',
+      duration: 2000,
+    })
+  }
+}
+
 // 🔥 打开支付页面（兼容Safari）
 const openPaymentPage = (payUrl: string) => {
   if (!payUrl) return
@@ -996,6 +1073,23 @@ const checkPaymentResult = () => {
               <van-icon name="success" size="10" color="#fff" />
             </div>
           </div>
+          
+          <!-- 手动充值选项 -->
+          <div
+            class="selection-item manual-recharge-item"
+            @click="goToManualRecharge"
+          >
+            <div class="item-content">
+              <div class="item-icon-container">
+                <img
+                  src="@/assets/img/icon-sd-recharge.svg"
+                  alt="手动充值"
+                  class="item-icon"
+                />
+              </div>
+              <div class="item-name">手动充值</div>
+            </div>
+          </div>
         </div>
       </div>
     </div>
@@ -1401,14 +1495,14 @@ const checkPaymentResult = () => {
 
 .selection-grid {
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
+  grid-template-columns: repeat(3, 1fr);
   gap: 4px;
   grid-auto-rows: auto;
 }
 
-/* 确保支付方式选择保持4列 */
+/* 确保支付方式选择保持3列 */
 .selection-grid:not(.platform-grid):not(.amount-grid) {
-  grid-template-columns: repeat(4, 1fr) !important;
+  grid-template-columns: repeat(3, 1fr) !important;
 }
 
 .selection-grid.platform-grid,
