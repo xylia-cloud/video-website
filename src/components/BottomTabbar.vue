@@ -52,6 +52,18 @@ import { computed, ref } from 'vue'
 import { useRoute } from 'vue-router'
 import { showToast } from 'vant'
 
+// 导入图标
+import homeActiveIcon from '@/assets/img/icon-tabbar-home-active.svg'
+import homeNormalIcon from '@/assets/img/icon-tabbar-home-normal.svg'
+import liveActiveIcon from '@/assets/img/icon-tabbar-live-active.svg'
+import liveNormalIcon from '@/assets/img/icon-tabbar-live-normal.svg'
+import kefuActiveIcon from '@/assets/img/icon-tabbar-kefu-active.svg'
+import kefuNormalIcon from '@/assets/img/icon-tabbar-kefu-normal.svg'
+import gameActiveIcon from '@/assets/img/icon-tabbar-game-active.svg'
+import gameNormalIcon from '@/assets/img/icon-tabbar-game-normal.svg'
+import accountActiveIcon from '@/assets/img/icon-tabbar-account-active.svg'
+import accountNormalIcon from '@/assets/img/icon-tabbar-account-normal.svg'
+
 const route = useRoute()
 
 // 当前路由路径
@@ -59,18 +71,6 @@ const currentRoute = computed(() => route.path)
 
 // 客服按钮是否激活（客服没有对应的路由，所以需要单独控制）
 const isCustomerServiceActive = ref(false)
-
-// 图标路径
-const homeActiveIcon = '/src/assets/img/icon-tabbar-home-active.svg'
-const homeNormalIcon = '/src/assets/img/icon-tabbar-home-normal.svg'
-const liveActiveIcon = '/src/assets/img/icon-tabbar-live-active.svg'
-const liveNormalIcon = '/src/assets/img/icon-tabbar-live-normal.svg'
-const kefuActiveIcon = '/src/assets/img/icon-tabbar-kefu-active.svg'
-const kefuNormalIcon = '/src/assets/img/icon-tabbar-kefu-normal.svg'
-const gameActiveIcon = '/src/assets/img/icon-tabbar-game-active.svg'
-const gameNormalIcon = '/src/assets/img/icon-tabbar-game-normal.svg'
-const accountActiveIcon = '/src/assets/img/icon-tabbar-account-active.svg'
-const accountNormalIcon = '/src/assets/img/icon-tabbar-account-normal.svg'
 
 // 跳转到客服
 const goToCustomerService = async () => {
