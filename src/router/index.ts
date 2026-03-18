@@ -38,6 +38,10 @@ import MyAgentView from '../views/MyAgentView.vue'
 import TeamManagementView from '../views/TeamManagementView.vue'
 import AgentReportView from '../views/AgentReportView.vue'
 import CustomerServiceView from '../views/CustomerServiceView.vue'
+import AgentRecruitmentView from '../views/AgentRecruitmentView.vue'
+import BonusDescriptionView from '../views/BonusDescriptionView.vue'
+import CreativeLibraryView from '../views/CreativeLibraryView.vue'
+import TutorialDetailView from '../views/TutorialDetailView.vue'
 
 const router = createRouter({
   history: createWebHashHistory(import.meta.env.BASE_URL),
@@ -273,7 +277,33 @@ const router = createRouter({
       name: 'agentReport',
       component: AgentReportView,
     },
+    {
+      path: '/agent-recruitment',
+      name: 'agentRecruitment',
+      component: AgentRecruitmentView,
+    },
+    {
+      path: '/bonus-description',
+      name: 'bonusDescription',
+      component: BonusDescriptionView,
+    },
+    {
+      path: '/creative-library',
+      name: 'creativeLibrary',
+      component: CreativeLibraryView,
+    },
+    {
+      path: '/tutorial-detail/:id',
+      name: 'tutorialDetail',
+      component: TutorialDetailView,
+    },
   ],
+})
+
+router.afterEach((to) => {
+  if (!sessionStorage.getItem('initialRouteName') && to.name) {
+    sessionStorage.setItem('initialRouteName', String(to.name))
+  }
 })
 
 export default router

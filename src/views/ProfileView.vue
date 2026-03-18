@@ -71,7 +71,8 @@ const avatarUrl = computed(() => {
     }
 
     // 优先使用 avatar 字段，其次 user_portrait，最后 avatar_thumb
-    const portrait = userInfo.value.avatar || userInfo.value.user_portrait || userInfo.value.avatar_thumb
+    const portrait =
+      userInfo.value.avatar || userInfo.value.user_portrait || userInfo.value.avatar_thumb
     console.log('获取到头像路径:', portrait)
 
     // 如果没有头像，返回默认头像
@@ -100,20 +101,24 @@ const avatarUrl = computed(() => {
 })
 
 // 监听头像URL变化，更新当前使用的头像URL
-watch(avatarUrl, (newUrl) => {
-  if (newUrl && newUrl !== defaultAvatarUrl) {
-    currentAvatarUrl.value = newUrl
-  } else {
-    currentAvatarUrl.value = defaultAvatarUrl
-  }
-}, { immediate: true })
+watch(
+  avatarUrl,
+  (newUrl) => {
+    if (newUrl && newUrl !== defaultAvatarUrl) {
+      currentAvatarUrl.value = newUrl
+    } else {
+      currentAvatarUrl.value = defaultAvatarUrl
+    }
+  },
+  { immediate: true },
+)
 
 // 处理头像图片加载错误
 const handleAvatarError = (event: Event) => {
   const img = event.target as HTMLImageElement
   console.error('头像图片加载失败，URL:', img.src)
   console.error('用户信息:', userInfo.value)
-  
+
   // 回退到默认头像
   console.log('回退到默认头像')
   currentAvatarUrl.value = defaultAvatarUrl
@@ -200,7 +205,7 @@ const watchCount = computed(() => {
 const vipExpireTime = computed(() => {
   // is_vip 可能是数字或字符串，统一转换为数字比较
   const vipStatus = Number(isVip.value)
-  
+
   if (vipStatus === 1) {
     if (vipEndtime.value) {
       // 解析日期字符串或时间戳
@@ -212,7 +217,7 @@ const vipExpireTime = computed(() => {
         // 时间戳格式
         endDate = new Date(parseInt(vipEndtime.value) * 1000)
       }
-      
+
       const now = new Date()
 
       if (endDate > now) {
@@ -237,11 +242,11 @@ const vipExpireTime = computed(() => {
 const isVipUser = computed(() => {
   // is_vip 可能是数字或字符串，统一转换为数字比较
   const vipStatus = Number(isVip.value)
-  
+
   if (vipStatus !== 1) return false
-  
+
   if (!vipEndtime.value) return true // 如果是VIP但没有到期时间，认为是永久VIP
-  
+
   // 解析日期字符串或时间戳
   let endDate
   if (typeof vipEndtime.value === 'string' && vipEndtime.value.includes('-')) {
@@ -251,7 +256,7 @@ const isVipUser = computed(() => {
     // 时间戳格式
     endDate = new Date(parseInt(vipEndtime.value) * 1000)
   }
-  
+
   const now = new Date()
   return endDate > now
 })
@@ -619,6 +624,16 @@ const goToPurchasedVideos = () => {
   router.push('/watch-history')
 }
 
+// 跳转到合营计划页面
+const goToAgentRecruitment = () => {
+  router.push('/agent-recruitment')
+}
+
+// 跳转到创意素材库页面
+const goToCreativeLibrary = () => {
+  showToast('创意素材库开发中')
+}
+
 // 跳转到推广记录页面
 const goToPromotionRecord = () => {
   router.push('/promotion-record')
@@ -666,7 +681,7 @@ const goToCustomerService = async () => {
 
     // 获取或生成浏览器指纹
     let browserId = localStorage.getItem('browserId')
-    
+
     if (!browserId) {
       console.log('生成新的浏览器指纹')
       // 生成简单的浏览器指纹（基于navigator信息）
@@ -677,14 +692,14 @@ const goToCustomerService = async () => {
         screen.width + 'x' + screen.height,
         new Date().getTimezoneOffset(),
         navigator.hardwareConcurrency || 'unknown',
-        navigator.platform
+        navigator.platform,
       ].join('|')
-      
+
       // 简单hash函数
       let hash = 0
       for (let i = 0; i < fingerprint.length; i++) {
         const char = fingerprint.charCodeAt(i)
-        hash = ((hash << 5) - hash) + char
+        hash = (hash << 5) - hash + char
         hash = hash & hash
       }
       browserId = Math.abs(hash).toString(36)
@@ -699,32 +714,32 @@ const goToCustomerService = async () => {
     // 调用接口获取RSA密钥 - 使用表单格式
     const formData = new URLSearchParams()
     formData.append('murmur', browserId)
-    
+
     const response = await fetch('https://help.186web.cc/admin/RSAEncrypt/gtRsP', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/x-www-form-urlencoded',
       },
-      body: formData.toString()
+      body: formData.toString(),
     })
 
     console.log('接口响应状态:', response.status)
-    
+
     const result = await response.json()
     console.log('接口返回结果:', result)
-    
+
     if (result && result.data) {
       const rsaPassWord = result.data
       const customerServiceUrl = `https://help186.xuhgki.cn/index/index/home?code=${rsaPassWord}`
-      
+
       console.log('人工客服链接已生成:', customerServiceUrl)
-      
+
       // 跳转到客服页面（使用iframe嵌入）
       router.push({
         name: 'customerService',
         query: {
-          url: encodeURIComponent(customerServiceUrl)
-        }
+          url: encodeURIComponent(customerServiceUrl),
+        },
       })
     } else {
       console.error('接口返回数据格式错误:', result)
@@ -783,10 +798,10 @@ const confirmApplyAgent = async () => {
     <div class="user-header" @click="goToEditProfile">
       <div class="user-info">
         <div class="avatar">
-          <img 
-            :src="currentAvatarUrl || defaultAvatarUrl" 
-            :alt="displayName" 
-            @error="handleAvatarError" 
+          <img
+            :src="currentAvatarUrl || defaultAvatarUrl"
+            :alt="displayName"
+            @error="handleAvatarError"
           />
         </div>
         <div class="user-details">
@@ -865,7 +880,7 @@ const confirmApplyAgent = async () => {
           <div class="common-name">钱包</div>
         </div> -->
 
-        <div class="common-item" @click="goToCustomerService">
+        <div class="common-item" @click="router.push('/creative-library')">
           <div class="common-icon">
             <img src="@/assets/img/icon-user-zaixiankefu.png" alt="" />
           </div>
@@ -892,6 +907,26 @@ const confirmApplyAgent = async () => {
           <img src="@/assets/img/icon-ygyp.svg" alt="已购影片" />
         </div>
         <div class="record-name">已购影片</div>
+        <div class="record-arrow">
+          <van-icon name="arrow" size="16" color="#ccc" />
+        </div>
+      </div>
+
+      <div class="record-item" @click="goToAgentRecruitment">
+        <div class="record-icon">
+          <img src="@/assets/img/icon-hjjh.svg" alt="合营计划" />
+        </div>
+        <div class="record-name">合营计划</div>
+        <div class="record-arrow">
+          <van-icon name="arrow" size="16" color="#ccc" />
+        </div>
+      </div>
+
+      <div class="record-item" @click="goToCreativeLibrary">
+        <div class="record-icon">
+          <img src="@/assets/img/icon-cysck.svg" alt="创意素材库" />
+        </div>
+        <div class="record-name">创意素材库</div>
         <div class="record-arrow">
           <van-icon name="arrow" size="16" color="#ccc" />
         </div>
@@ -1034,10 +1069,10 @@ const confirmApplyAgent = async () => {
           <!-- 使用背景图片的凭证内容区 -->
           <div class="credential-main-content">
             <div class="credential-avatar">
-              <img 
-                :src="currentAvatarUrl || defaultAvatarUrl" 
-                alt="头像" 
-                @error="handleAvatarError" 
+              <img
+                :src="currentAvatarUrl || defaultAvatarUrl"
+                alt="头像"
+                @error="handleAvatarError"
               />
             </div>
             <div class="credential-username">{{ userName }}</div>
