@@ -645,20 +645,23 @@ const handleSearch = () => {
     })
   }
 }
+const handleHotPageChange = (page: number) => {
+  // 防止重复点击
+  if (isLoading.value) return
 
-// 热门视频换一批
-const refreshVideos = () => {
-  // 检查是否为第一个标签
-  const firstTypeId = typesList.value.length > 0 ? typesList.value[0].type_id : 1
-  const isFirstTab = activeTypeId.value === firstTypeId
-
-  if (!isFirstTab) {
-    // 非热门标签不使用换一批，应该使用分页
+  // 检查页码是否有效
+  if (page < 1 || page > totalPages.value || page === currentPage.value) {
     return
   }
 
-  const nextPage = currentPage.value < totalPages.value ? currentPage.value + 1 : 1
-  console.log(`加载第 ${nextPage} 页数据，标签ID: ${activeTypeId.value}`)
+  console.log(`加载第 ${page} 页数据，标签ID: ${activeTypeId.value}`)
+
+  const loadingToast = showToast({
+    type: 'loading',
+    message: '加载中...',
+    duration: 0,
+    forbidClick: true,
+  })
 
   // 设置临时加载状态
   isLoading.value = true
@@ -667,7 +670,7 @@ const refreshVideos = () => {
   const params = {
     mid: 1,
     limit: DEFAULT_PAGE_SIZE,
-    page: nextPage,
+    page: page,
     tid: 1, // 首页标签必须使用 tid=1
   }
 
@@ -696,15 +699,15 @@ const refreshVideos = () => {
 
       // 映射字段
       const processedData = apiData.map(processVideoData)
-      console.log('🔄 [换一批] API返回原始数据长度:', apiData.length)
-      console.log('🔄 [换一批] 视频映射后数据长度:', processedData.length)
-      console.log('🔄 [换一批] DEFAULT_PAGE_SIZE:', DEFAULT_PAGE_SIZE)
+      console.log('🔄 [分页] API返回原始数据长度:', apiData.length)
+      console.log('🔄 [分页] 视频映射后数据长度:', processedData.length)
+      console.log('🔄 [分页] DEFAULT_PAGE_SIZE:', DEFAULT_PAGE_SIZE)
 
       // 🔥 目标：17条视频 + 3条广告 = 20条
       // 移除最后3条视频（20-3=17），为广告腾出位置
       if (processedData.length >= 20) {
         processedData.splice(17) // 只保留前17条视频
-        console.log('🔄 [换一批] 保留前17条视频，移除后的数据长度:', processedData.length)
+        console.log('🔄 [分页] 保留前17条视频，移除后的数据长度:', processedData.length)
       }
 
       // 直接使用之前保存的广告位置插入广告
@@ -716,10 +719,12 @@ const refreshVideos = () => {
           const position = adPositions.value[i]
           // 确保位置在有效范围内
           if (position <= processedData.length) {
-            console.log(`🔄 [换一批] 在位置${position}插入第${i + 1}个广告:`, adsToUse[i])
+            console.log(`🔄 [分页] 在位置${position}插入第${i + 1}个广告:`, adsToUse[i])
             processedData.splice(position, 0, adsToUse[i])
           } else {
-            console.warn(`🔄 [换一批] ⚠️ 位置${position}超出数据范围(${processedData.length})，跳过第${i + 1}个广告`)
+            console.warn(
+              `🔄 [分页] ⚠️ 位置${position}超出数据范围(${processedData.length})，跳过第${i + 1}个广告`,
+            )
           }
         }
       }
@@ -730,31 +735,36 @@ const refreshVideos = () => {
       // 更新缓存
       updateTabCache(activeTypeId.value)
 
-      console.log('🔄 [换一批] 最终数据长度:', videoData.value.length)
+      console.log('🔄 [分页] 最终数据长度:', videoData.value.length)
     })
     .catch((error) => {
-      console.error('换一批加载数据失败:', error)
+      console.error('分页加载数据失败:', error)
       hasError.value = true
       errorMessage.value = error.message || '加载失败，请稍后再试'
     })
     .finally(() => {
       isLoading.value = false
+      loadingToast?.close?.()
     })
 }
 
-// 最新视频换一批
-const refreshLatestVideos = () => {
-  // 防止重复点击
+// 最新视频分页变化
+const handleLatestPageChange = async (page: number) => {
   if (isLoadingLatest.value) return
+  if (page < 1 || page > latestTotalPages.value || page === latestCurrentPage.value) return
 
-  const nextPage =
-    latestCurrentPage.value < latestTotalPages.value ? latestCurrentPage.value + 1 : 1
-  console.log(`🔥 最新视频换一批，加载第 ${nextPage} 页数据`)
+  const loadingToast = showToast({
+    type: 'loading',
+    message: '加载中...',
+    duration: 0,
+    forbidClick: true,
+  })
 
-  // 不清空数据，保持原有视频列表显示直到新数据加载完成
-
-  // 然后加载新数据
-  fetchLatestVideosData(nextPage)
+  try {
+    await fetchLatestVideosData(page)
+  } finally {
+    loadingToast?.close?.()
+  }
 }
 
 // 处理分页变化 - 跳转到指定页码（仅用于二级分类）
@@ -774,6 +784,13 @@ const handlePageChange = (page: number) => {
   }
 
   console.log(`跳转到第 ${page} 页，标签ID: ${activeTypeId.value}`)
+
+  const loadingToast = showToast({
+    type: 'loading',
+    message: '加载中...',
+    duration: 0,
+    forbidClick: true,
+  })
 
   // 滚动到顶部
   window.scrollTo(0, 0)
@@ -839,7 +856,9 @@ const handlePageChange = (page: number) => {
               console.log(`📄 [分页] 在位置${position}插入第${i + 1}个广告:`, adsToUse[i])
               processedData.splice(position, 0, adsToUse[i])
             } else {
-              console.warn(`📄 [分页] ⚠️ 位置${position}超出数据范围(${processedData.length})，跳过第${i + 1}个广告`)
+              console.warn(
+                `📄 [分页] ⚠️ 位置${position}超出数据范围(${processedData.length})，跳过第${i + 1}个广告`,
+              )
             }
           }
         }
@@ -860,6 +879,7 @@ const handlePageChange = (page: number) => {
     })
     .finally(() => {
       isLoading.value = false
+      loadingToast?.close?.()
     })
 }
 
@@ -1329,7 +1349,7 @@ onActivated(() => {
     // 如果是首页标签，需要重新获取广告并插入
     if (isFirstTab) {
       console.log('首页标签从缓存恢复，重新获取广告并插入')
-      
+
       // 从缓存数据中过滤出非广告的视频数据
       const videosWithoutAds = currentTabCache.videos.filter((item) => !item.isAd)
       console.log('缓存中的纯视频数据长度:', videosWithoutAds.length)
@@ -1621,9 +1641,11 @@ const performTouristLogin = async () => {
         :isRefreshingLatest="isLoadingLatest"
         :current-page="currentPage"
         :total-pages="totalPages"
+        :latest-current-page="latestCurrentPage"
+        :latest-total-pages="latestTotalPages"
         @page-change="handlePageChange"
-        @refresh-videos="refreshVideos"
-        @refresh-latest-videos="refreshLatestVideos"
+        @hot-page-change="handleHotPageChange"
+        @latest-page-change="handleLatestPageChange"
       />
     </div>
 

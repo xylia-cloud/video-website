@@ -37,6 +37,7 @@ import PromotionRecordView from '../views/PromotionRecordView.vue'
 import MyAgentView from '../views/MyAgentView.vue'
 import TeamManagementView from '../views/TeamManagementView.vue'
 import AgentReportView from '../views/AgentReportView.vue'
+import CustomerServiceView from '../views/CustomerServiceView.vue'
 
 const router = createRouter({
   history: createWebHashHistory(import.meta.env.BASE_URL),
@@ -151,6 +152,11 @@ const router = createRouter({
       path: '/recharge-callback',
       name: 'rechargeCallback',
       component: RechargeCallbackView,
+    },
+    {
+      path: '/customer-service',
+      name: 'customerService',
+      component: CustomerServiceView,
     },
     {
       path: '/vip-recharge',

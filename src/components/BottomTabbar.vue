@@ -49,8 +49,7 @@
 
 <script setup lang="ts">
 import { computed, ref } from 'vue'
-import { useRoute } from 'vue-router'
-import { showToast } from 'vant'
+import { useRoute, useRouter } from 'vue-router'
 
 // 导入图标
 import homeActiveIcon from '@/assets/img/icon-tabbar-home-active.svg'
@@ -65,6 +64,7 @@ import accountActiveIcon from '@/assets/img/icon-tabbar-account-active.svg'
 import accountNormalIcon from '@/assets/img/icon-tabbar-account-normal.svg'
 
 const route = useRoute()
+const router = useRouter()
 
 // 当前路由路径
 const currentRoute = computed(() => route.path)
@@ -73,87 +73,15 @@ const currentRoute = computed(() => route.path)
 const isCustomerServiceActive = ref(false)
 
 // 跳转到客服
-const goToCustomerService = async () => {
-  try {
-    // 点击时短暂激活客服图标
-    isCustomerServiceActive.value = true
-    setTimeout(() => {
-      isCustomerServiceActive.value = false
-    }, 300)
+const goToCustomerService = () => {
+  // 点击时短暂激活客服图标
+  isCustomerServiceActive.value = true
+  setTimeout(() => {
+    isCustomerServiceActive.value = false
+  }, 300)
 
-    showToast({
-      message: '正在跳转客服...',
-      duration: 1000,
-    })
-
-    // 获取或生成浏览器指纹
-    let browserId = localStorage.getItem('browserId')
-    
-    if (!browserId) {
-      // 生成简单的浏览器指纹
-      const fingerprint = [
-        navigator.userAgent,
-        navigator.language,
-        screen.colorDepth,
-        screen.width + 'x' + screen.height,
-        new Date().getTimezoneOffset(),
-        navigator.hardwareConcurrency || 'unknown',
-        navigator.platform
-      ].join('|')
-      
-      let hash = 0
-      for (let i = 0; i < fingerprint.length; i++) {
-        const char = fingerprint.charCodeAt(i)
-        hash = ((hash << 5) - hash) + char
-        hash = hash & hash
-      }
-      browserId = Math.abs(hash).toString(36)
-      localStorage.setItem('browserId', browserId)
-    }
-
-    // 调用接口获取RSA密钥
-    const formData = new URLSearchParams()
-    formData.append('murmur', browserId)
-    
-    const response = await fetch('https://help.186web.cc/admin/RSAEncrypt/gtRsP', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/x-www-form-urlencoded',
-      },
-      body: formData.toString()
-    })
-    
-    const result = await response.json()
-    
-    if (result && result.data) {
-      const rsaPassWord = result.data
-      const customerServiceUrl = `https://help186.xuhgki.cn/index/index/home?code=${rsaPassWord}`
-      
-      // 移动端兼容性更好的跳转方式
-      // 优先使用 location.href，在新标签页打开
-      const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent)
-      
-      if (isMobile) {
-        // 移动端直接跳转
-        window.location.href = customerServiceUrl
-      } else {
-        // PC端尝试新窗口打开
-        const newWindow = window.open(customerServiceUrl, '_blank')
-        // 如果被拦截，则直接跳转
-        if (!newWindow || newWindow.closed || typeof newWindow.closed === 'undefined') {
-          window.location.href = customerServiceUrl
-        }
-      }
-    } else {
-      throw new Error('获取客服密钥失败')
-    }
-  } catch (error) {
-    console.error('跳转客服失败:', error)
-    showToast({
-      message: '客服功能暂时不可用，请稍后重试',
-      duration: 2000,
-    })
-  }
+  // 跳转到客服页面
+  router.push('/customer-service')
 }
 </script>
 

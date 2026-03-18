@@ -15,10 +15,11 @@
 
 <script setup lang="ts">
 import { computed, ref, onMounted, onUnmounted } from 'vue'
-import { useRoute } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import { showToast } from 'vant'
 
 const route = useRoute()
+const router = useRouter()
 const buttonRef = ref<HTMLElement | null>(null)
 
 // 按钮位置状态
@@ -262,23 +263,13 @@ const handleClick = async () => {
       
       console.log('客服链接已生成:', customerServiceUrl)
       
-      // 移动端兼容性更好的跳转方式
-      const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent)
-      
-      if (isMobile) {
-        // 移动端直接跳转
-        console.log('检测到移动端，使用 location.href 跳转')
-        window.location.href = customerServiceUrl
-      } else {
-        // PC端尝试新窗口打开
-        console.log('检测到PC端，尝试新窗口打开')
-        const newWindow = window.open(customerServiceUrl, '_blank')
-        // 如果被拦截，则直接跳转
-        if (!newWindow || newWindow.closed || typeof newWindow.closed === 'undefined') {
-          console.log('新窗口被拦截，改用 location.href 跳转')
-          window.location.href = customerServiceUrl
+      // 跳转到客服页面（使用iframe嵌入）
+      router.push({
+        name: 'customerService',
+        query: {
+          url: encodeURIComponent(customerServiceUrl)
         }
-      }
+      })
     } else {
       console.error('接口返回数据格式错误:', result)
       throw new Error('获取客服密钥失败')

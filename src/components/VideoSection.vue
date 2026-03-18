@@ -17,17 +17,12 @@
       <div v-else>
         <VideoList :videos="videoData" />
 
-        <!-- 刷新中的加载状态 -->
-        <div v-if="isLoading && videoData.length > 0" class="refresh-loading">
-          <van-loading type="spinner" size="20" color="#ff9500" />
-          <span>正在换一批...</span>
-        </div>
-      </div>
-
-      <!-- 热门视频换一批按钮 -->
-      <div v-if="videoData.length > 0 && !isLoading" class="refresh-btn" @click="refreshVideos">
-        <van-icon name="replay" />
-        <span>换一批</span>
+        <VideoPagination
+          v-if="videoData.length > 0 && totalPages > 1"
+          :current-page="currentPage"
+          :total-pages="totalPages"
+          @page-change="handleHotPageChange"
+        />
       </div>
     </div>
 
@@ -50,23 +45,14 @@
 
       <div v-else>
         <VideoList :videos="latestVideoData" />
-
-        <!-- 最新视频刷新中的加载状态 -->
-        <div v-if="isRefreshingLatest && latestVideoData.length > 0" class="refresh-loading">
-          <van-loading type="spinner" size="20" color="#ff9500" />
-          <span>正在换一批...</span>
-        </div>
       </div>
 
-      <!-- 最新视频换一批按钮 -->
-      <div
-        v-if="latestVideoData.length > 0 && !isLoadingLatest && !isRefreshingLatest"
-        class="refresh-btn"
-        @click="refreshLatestVideos"
-      >
-        <van-icon name="replay" />
-        <span>换一批</span>
-      </div>
+      <VideoPagination
+        v-if="latestVideoData.length > 0 && latestTotalPages > 1"
+        :current-page="latestCurrentPage"
+        :total-pages="latestTotalPages"
+        @page-change="handleLatestPageChange"
+      />
     </div>
 
     <!-- 非首页标签的视频列表 -->
@@ -83,12 +69,6 @@
 
       <div v-else>
         <VideoList :videos="videoData" />
-
-        <!-- 加载中的状态 -->
-        <div v-if="isLoading && videoData.length > 0" class="refresh-loading">
-          <van-loading type="spinner" size="20" color="#ff9500" />
-          <span>正在加载...</span>
-        </div>
       </div>
 
       <!-- 非首页标签分页控件 -->
@@ -133,27 +113,29 @@ interface Props {
   isRefreshingLatest?: boolean
   currentPage: number
   totalPages: number
+  latestCurrentPage: number
+  latestTotalPages: number
 }
 
 interface Emits {
   (e: 'page-change', page: number): void
-  (e: 'refresh-videos'): void
-  (e: 'refresh-latest-videos'): void
+  (e: 'hot-page-change', page: number): void
+  (e: 'latest-page-change', page: number): void
 }
 
-const props = defineProps<Props>()
+defineProps<Props>()
 const emit = defineEmits<Emits>()
 
 const handlePageChange = (page: number) => {
   emit('page-change', page)
 }
 
-const refreshVideos = () => {
-  emit('refresh-videos')
+const handleHotPageChange = (page: number) => {
+  emit('hot-page-change', page)
 }
 
-const refreshLatestVideos = () => {
-  emit('refresh-latest-videos')
+const handleLatestPageChange = (page: number) => {
+  emit('latest-page-change', page)
 }
 </script>
 

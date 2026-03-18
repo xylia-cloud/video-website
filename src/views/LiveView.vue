@@ -10,10 +10,10 @@ import hd04 from '@/assets/img/hd-04.png'
 const router = useRouter()
 
 const activities = [
-  { id: '1', image: hd01, disabled: true },
-  { id: '2', image: hd02, disabled: true },
   { id: '3', image: hd03 },
   { id: '4', image: hd04 },
+    { id: '1', image: hd01, disabled: true },
+  { id: '2', image: hd02, disabled: true },
 ]
 
 const goToDetail = (item: { id: string; disabled?: boolean }) => {

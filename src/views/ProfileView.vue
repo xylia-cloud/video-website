@@ -719,23 +719,13 @@ const goToCustomerService = async () => {
       
       console.log('人工客服链接已生成:', customerServiceUrl)
       
-      // 移动端兼容性更好的跳转方式
-      const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent)
-      
-      if (isMobile) {
-        // 移动端直接跳转
-        console.log('检测到移动端，使用 location.href 跳转')
-        window.location.href = customerServiceUrl
-      } else {
-        // PC端尝试新窗口打开
-        console.log('检测到PC端，尝试新窗口打开')
-        const newWindow = window.open(customerServiceUrl, '_blank')
-        // 如果被拦截，则直接跳转
-        if (!newWindow || newWindow.closed || typeof newWindow.closed === 'undefined') {
-          console.log('新窗口被拦截，改用 location.href 跳转')
-          window.location.href = customerServiceUrl
+      // 跳转到客服页面（使用iframe嵌入）
+      router.push({
+        name: 'customerService',
+        query: {
+          url: encodeURIComponent(customerServiceUrl)
         }
-      }
+      })
     } else {
       console.error('接口返回数据格式错误:', result)
       throw new Error('获取客服密钥失败')
@@ -931,7 +921,7 @@ const confirmApplyAgent = async () => {
         <div class="record-icon">
           <img src="@/assets/img/icon-tzjl.svg" alt="投注记录" />
         </div>
-        <div class="record-name">游戏记录</div>
+        <div class="record-name">消费记录</div>
         <div class="record-arrow">
           <van-icon name="arrow" size="16" color="#ccc" />
         </div>
