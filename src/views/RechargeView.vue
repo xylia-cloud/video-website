@@ -12,6 +12,7 @@ import {
   setUserInfo,
 } from '@/api/fetch-api'
 import HeaderNav from '@/components/HeaderNav.vue'
+import BalanceInfoCard from '@/components/BalanceInfoCard.vue'
 
 // 接口类型定义
 interface PaymentChannel {
@@ -113,6 +114,12 @@ const handleAdClick = (ad: { id: number; name: string; icon: string; link: strin
 
 // 钻石余额
 const diamondBalance = ref(0)
+
+// 用户视频观看次数
+const userVideoNums = ref(0)
+
+// 用户VIP状态
+const isVip = ref(0)
 
 // 选项卡状态
 const activeTab = ref('game') // 'game' 或 'video'
@@ -351,19 +358,6 @@ const fetchRules = async (channelId: string) => {
       }
 
       console.log('充值规则数据:', result)
-      
-      // 🔥 自动滚动到底部，显示完整的充值金额
-      nextTick(() => {
-        setTimeout(() => {
-          const scrollContainer = document.querySelector('.scrollable-content')
-          if (scrollContainer) {
-            scrollContainer.scrollTo({
-              top: scrollContainer.scrollHeight,
-              behavior: 'smooth',
-            })
-          }
-        }, 300) // 延迟300ms确保DOM完全渲染
-      })
     }
   } catch (error) {
     console.error('获取充值规则错误:', error)
@@ -431,17 +425,6 @@ const selectPlatform = (platform: PaymentSubChannel | Record<string, unknown>) =
   rechargeAmount.value = ''
   isCustomAmount.value = false
   customAmount.value = ''
-
-  // 🔥 滚动到底部，方便用户看到金额选择
-  nextTick(() => {
-    const scrollContainer = document.querySelector('.scrollable-content')
-    if (scrollContainer) {
-      scrollContainer.scrollTo({
-        top: scrollContainer.scrollHeight,
-        behavior: 'smooth',
-      })
-    }
-  })
 }
 
 // 🔥 处理支付成功确认
@@ -918,6 +901,14 @@ const loadUserBalance = () => {
   if (userInfo && userInfo.coin !== undefined) {
     diamondBalance.value = userInfo.coin
   }
+  // 获取用户视频观看次数
+  if (userInfo && userInfo.video_nums !== undefined) {
+    userVideoNums.value = userInfo.video_nums
+  }
+  // 获取用户VIP状态
+  if (userInfo && userInfo.is_vip !== undefined) {
+    isVip.value = userInfo.is_vip
+  }
 }
 
 // 刷新用户余额（从服务器获取最新数据）
@@ -931,9 +922,13 @@ const refreshUserBalance = async () => {
         const updatedUserInfo = {
           ...currentUserInfo,
           coin: result.data.coin,
+          video_nums: result.data.video_nums || 0,
+          is_vip: result.data.is_vip !== undefined ? result.data.is_vip : 0,
         }
         setUserInfo(updatedUserInfo)
         diamondBalance.value = result.data.coin
+        userVideoNums.value = result.data.video_nums || 0
+        isVip.value = result.data.is_vip !== undefined ? result.data.is_vip : 0
       }
     }
   } catch (error) {
@@ -953,19 +948,6 @@ onMounted(async () => {
   await refreshUserBalance()
   // 获取支付渠道数据
   fetchPaymentChannels()
-  
-  // 🔥 页面加载完成后，延迟滚动到底部（作为备用方案）
-  nextTick(() => {
-    setTimeout(() => {
-      const scrollContainer = document.querySelector('.scrollable-content')
-      if (scrollContainer) {
-        scrollContainer.scrollTo({
-          top: scrollContainer.scrollHeight,
-          behavior: 'smooth',
-        })
-      }
-    }, 1000) // 延迟1秒，等待数据加载完成
-  })
   
   // 检查支付结果（从URL参数）
   checkPaymentResult()
@@ -1023,19 +1005,17 @@ const checkPaymentResult = () => {
 
     <!-- 固定顶部区域 -->
     <div class="fixed-top-section">
-      <!-- 钻石余额区域 -->
-      <div class="diamond-balance">
-        <div class="balance-content">
-          <img src="@/assets/img/icon-diamond.png" alt="钻石" class="diamond-icon-img" />
-          <div class="balance-info">
-            <div class="balance-label">钻石余额</div>
-            <div class="balance-amount">{{ diamondBalance }}</div>
-          </div>
-        </div>
+      <!-- 视频会员和账户余额卡片 -->
+      <div class="balance-card-wrapper">
+        <BalanceInfoCard 
+          :user-video-nums="userVideoNums" 
+          :is-vip="isVip" 
+          :balance="diamondBalance" 
+        />
       </div>
 
       <!-- 第一步：选择支付方式 -->
-      <div class="selection-section">
+      <div class="selection-section payment-method-section">
         <h3 class="section-title">
           <span class="step-number">1</span>
           选择支付方式
@@ -1049,7 +1029,7 @@ const checkPaymentResult = () => {
             v-for="method in paymentChannels"
             :key="method.id"
             class="selection-item"
-            :class="{ active: method.selected }"
+            :class="{ active: selectedPaymentMethod === method.id }"
             @click="selectPaymentMethod(method.id)"
           >
             <div class="item-content">
@@ -1062,7 +1042,7 @@ const checkPaymentResult = () => {
               </div>
               <div class="item-name">{{ method.name }}</div>
             </div>
-            <div v-if="method.selected" class="check-icon">
+            <div v-if="selectedPaymentMethod === method.id" class="check-icon">
               <van-icon name="success" size="10" color="#fff" />
             </div>
           </div>
@@ -1075,7 +1055,7 @@ const checkPaymentResult = () => {
             <div class="item-content">
               <div class="item-icon-container">
                 <img
-                  src="@/assets/img/icon-sd-recharge.svg"
+                  src="@/assets/img/icon-rgcz.png"
                   alt="手动充值"
                   class="item-icon"
                 />
@@ -1357,6 +1337,12 @@ const checkPaymentResult = () => {
   background-color: #111;
   border-bottom: 1px solid rgba(255, 255, 255, 0.1);
   margin-top: 110px;
+  padding: 0 16px;
+}
+
+/* 卡片包装器 */
+.balance-card-wrapper {
+  margin: 12px 0;
 }
 
 /* 可滚动内容区域 */
@@ -1450,7 +1436,12 @@ const checkPaymentResult = () => {
 
 /* 选择区域通用样式 */
 .selection-section {
-  padding: 10px 20px;
+  padding: 10px 16px;
+}
+
+/* 第一步支付方式选择区域 - 无左右padding */
+.payment-method-section {
+  padding: 10px 0;
 }
 
 .section-title {
@@ -1488,14 +1479,14 @@ const checkPaymentResult = () => {
 
 .selection-grid {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 4px;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 8px;
   grid-auto-rows: auto;
 }
 
-/* 确保支付方式选择保持3列 */
+/* 确保支付方式选择保持4列 */
 .selection-grid:not(.platform-grid):not(.amount-grid) {
-  grid-template-columns: repeat(3, 1fr) !important;
+  grid-template-columns: repeat(4, 1fr) !important;
 }
 
 .selection-grid.platform-grid,
@@ -1507,56 +1498,75 @@ const checkPaymentResult = () => {
 .selection-item {
   position: relative;
   display: flex;
+  flex-direction: column;
   align-items: center;
-  padding: 6px;
-  background-color: #222;
-  border-radius: 8px;
-  border: 1px solid #333;
+  justify-content: center;
+  padding: 16px 8px;
+  background-color: #2a2a2a;
+  border-radius: 12px;
+  border: 2px solid transparent;
   transition: all 0.3s ease;
   cursor: pointer;
+  min-height: 100px;
 }
 
 .selection-item:hover {
   border-color: #ff9500;
-  transform: translateY(-1px);
+  transform: translateY(-2px);
+  background-color: #333;
 }
 
 .selection-item.active {
-  background-color: rgba(255, 149, 0, 0.1);
-  border: 1px solid #ff9500;
+  background-color: rgba(255, 149, 0, 0.15);
+  border: 2px solid #ff9500;
   transform: translateY(-2px);
-  box-shadow: 0 4px 12px rgba(255, 149, 0, 0.2);
+  box-shadow: 0 4px 12px rgba(255, 149, 0, 0.3);
 }
 
-/* 支付方式选择 - 改为水平布局 */
+/* 支付方式选择 - 垂直居中布局 */
 .selection-grid:not(.platform-grid):not(.amount-grid) .selection-item {
-  flex-direction: row;
-  padding: 6px;
+  flex-direction: column;
+  padding: 16px 8px;
+  gap: 8px;
 }
 
 .selection-grid:not(.platform-grid):not(.amount-grid) .selection-item .item-content {
-  flex-direction: row !important;
-  gap: 6px;
+  flex-direction: column !important;
+  gap: 8px;
   align-items: center;
   flex: 1;
   display: flex;
+  width: 100%;
 }
 
 .selection-grid:not(.platform-grid):not(.amount-grid) .selection-item .item-icon-container {
-  width: 20px;
-  height: 20px;
+  width: 48px;
+  height: 48px;
   margin-bottom: 0;
   flex-shrink: 0;
   display: flex;
   align-items: center;
   justify-content: center;
+  background-color: transparent;
+  border-radius: 0;
+}
+
+.selection-grid:not(.platform-grid):not(.amount-grid) .selection-item .item-icon {
+  width: 48px;
+  height: 48px;
 }
 
 .selection-grid:not(.platform-grid):not(.amount-grid) .selection-item .item-name {
-  font-size: 12px;
-  text-align: left;
-  flex: 1;
+  font-size: 13px;
+  text-align: center;
+  flex: 0;
   margin: 0;
+  color: #ccc;
+  font-weight: 500;
+}
+
+.selection-grid:not(.platform-grid):not(.amount-grid) .selection-item.active .item-name {
+  color: #fff;
 }
 
 /* 平台选择 - 居中布局 */
@@ -1596,33 +1606,7 @@ const checkPaymentResult = () => {
 }
 
 .check-icon {
-  position: absolute;
-  bottom: 0;
-  right: 0;
-  width: 12px;
-  height: 12px;
-  animation: checkIn 0.3s ease;
-}
-
-.check-icon::before {
-  content: '';
-  position: absolute;
-  bottom: 0;
-  right: 0;
-  width: 0;
-  height: 0;
-  border-bottom: 16px solid #ff9500;
-  border-left: 16px solid transparent;
-  border-radius: 0 0 4px 0;
-}
-
-.check-icon .van-icon {
-  position: absolute;
-  bottom: 0px;
-  right: 0px;
-  font-size: 8px;
-  color: #fff;
-  z-index: 10;
+  display: none;
 }
 
 @keyframes checkIn {
@@ -1665,14 +1649,14 @@ const checkPaymentResult = () => {
   gap: 2px;
 }
 
-.amount-value {
+.amount-item .amount-value {
   font-size: 13px;
   font-weight: bold;
   color: #fff;
   margin-bottom: 2px;
 }
 
-.coin-value {
+.amount-item .coin-value {
   font-size: 11px;
   color: #ccc;
 }
@@ -2086,11 +2070,11 @@ const checkPaymentResult = () => {
     padding: 10px 0;
   }
 
-  .amount-value {
+  .amount-item .amount-value {
     font-size: 12px;
   }
 
-  .coin-value {
+  .amount-item .coin-value {
     font-size: 10px;
   }
 }

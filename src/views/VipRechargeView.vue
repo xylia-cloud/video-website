@@ -3,6 +3,7 @@ import { ref, onMounted, computed } from 'vue'
 import { useRouter } from 'vue-router'
 import { showToast, closeToast, Loading, Icon } from 'vant'
 import HeaderNav from '@/components/HeaderNav.vue'
+import BalanceInfoCard from '@/components/BalanceInfoCard.vue'
 import { getUserInfo, setUserInfo, type UserInfo, createAuthHeaders, fetchUserPoints } from '@/api/fetch-api'
 import { BASE_URL } from '@/utils/config'
 
@@ -446,21 +447,13 @@ onMounted(async () => {
 
         <!-- 主体内容 -->
         <div class="vip-container">
-            <!-- 会员信息展示 -->
-            <div class="member-info-section">
-                <div class="member-info-content">
-                    <div class="member-status">
-                        <span class="status-label">视频会员：</span>
-                        <span class="status-value"
-                            :class="{ 'vip-active': isVip === '1', 'vip-expired': isVip === '1' && vipEndtime && new Date(parseInt(vipEndtime) * 1000) <= new Date() }">{{
-                                vipStatusText }}</span>
-                    </div>
-                    <div class="member-balance">{{ userVideoNums }}</div>
-                    <div class="balance-label">观看次数</div>
-                </div>
-                <div class="member-icon">
-                    <img src="@/assets/img/icon-vip-active.png" alt="VIP" />
-                </div>
+            <!-- 视频会员和账户余额卡片 -->
+            <div class="balance-card-wrapper">
+                <BalanceInfoCard 
+                    :user-video-nums="userVideoNums" 
+                    :is-vip="isVip" 
+                    :balance="userBalance" 
+                />
             </div>
 
             <!-- 充值选项列表 -->
@@ -560,6 +553,11 @@ onMounted(async () => {
     padding: 120px 16px 100px;
 }
 
+/* 卡片包装器 */
+.balance-card-wrapper {
+    margin: 0 0 24px 0;
+}
+
 /* 🔥 导航选项卡 - 圆角按钮样式 */
 .nav-tabs {
     position: fixed;
@@ -608,7 +606,7 @@ onMounted(async () => {
     box-shadow: 0 2px 8px rgba(255, 149, 0, 0.3);
 }
 
-/* 会员信息展示 */
+/* 会员信息展示 - 保留旧样式以防需要 */
 .member-info-section {
     background: url('@/assets/img/bg-recharge.png') center/cover;
     border-radius: 12px;
