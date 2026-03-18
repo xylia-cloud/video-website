@@ -1,9 +1,10 @@
 <script setup lang="ts">
-import { ref, onMounted, computed } from 'vue'
+import { ref, onMounted, computed, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { showToast } from 'vant'
 import HeaderNav from '@/components/HeaderNav.vue'
 import { getUserInfo, isLoggedIn } from '@/api/fetch-api'
+import QRCode from 'qrcode'
 
 const router = useRouter()
 
@@ -12,6 +13,9 @@ interface UserInfo {
   rec_code?: string
 }
 const userInfo = ref<UserInfo | null>(null)
+
+// 二维码数据URL
+const qrCodeDataUrl = ref<string>('')
 
 // 获取用户信息
 const fetchUserInfo = () => {
@@ -32,6 +36,8 @@ const showSharePopup = ref(false)
 const handleShareItemClick = (type: string) => {
   if (type === 'link') {
     copyLink()
+  } else if (type === 'qr') {
+    saveQRCode()
   } else {
     showToast(`${type === 'image' ? '保存图片' : '保存二维码'}开发中`)
   }
@@ -60,6 +66,35 @@ const cleanInviteLink = computed(() => {
   const link = inviteLink.value.trim()
   return link.replace(/^[@#]+/, '')
 })
+
+// 生成二维码
+const generateQRCode = async (text: string) => {
+  try {
+    const dataUrl = await QRCode.toDataURL(text, {
+      width: 200,
+      margin: 1,
+      color: {
+        dark: '#000000',
+        light: '#FFFFFF'
+      },
+      errorCorrectionLevel: 'M'
+    })
+    qrCodeDataUrl.value = dataUrl
+  } catch (error) {
+    console.error('生成二维码失败:', error)
+    showToast({
+      message: '生成二维码失败',
+      duration: 2000,
+    })
+  }
+}
+
+// 监听邀请链接变化，重新生成二维码
+watch(cleanInviteLink, (newLink) => {
+  if (newLink) {
+    generateQRCode(newLink)
+  }
+}, { immediate: true })
 
 // 复制链接
 const copyLink = () => {
@@ -106,6 +141,39 @@ const copyLink = () => {
           })
         })
     }
+  }
+}
+
+// 保存二维码
+const saveQRCode = () => {
+  if (!qrCodeDataUrl.value) {
+    showToast({
+      message: '二维码还未生成',
+      duration: 2000,
+      icon: 'cross'
+    })
+    return
+  }
+  
+  try {
+    const link = document.createElement('a')
+    link.download = '邀请二维码.png'
+    link.href = qrCodeDataUrl.value
+    document.body.appendChild(link)
+    link.click()
+    document.body.removeChild(link)
+    showToast({
+      message: '二维码已保存',
+      duration: 2000,
+      icon: 'success'
+    })
+  } catch (error) {
+    console.error('保存二维码失败:', error)
+    showToast({
+      message: '保存失败，请重试',
+      duration: 2000,
+      icon: 'cross'
+    })
   }
 }
 
