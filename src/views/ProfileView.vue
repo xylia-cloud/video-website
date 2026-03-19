@@ -629,9 +629,9 @@ const goToAgentRecruitment = () => {
   router.push('/agent-recruitment')
 }
 
-// 跳转到创意素材库页面
+// 跳转到创意素材库页面（推广教程）
 const goToCreativeLibrary = () => {
-  showToast('创意素材库开发中')
+  router.push({ name: 'creativeLibrary' })
 }
 
 // 跳转到推广记录页面

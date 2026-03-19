@@ -91,6 +91,9 @@
 
     <!-- 视频播放弹窗 -->
     <div v-if="showVideoPlayer" class="video-overlay" @click="closeVideo">
+      <div class="back-button" @click="closeVideo">
+        <van-icon name="arrow-left" size="20" color="#fff" />
+      </div>
       <div class="video-window" @click.stop>
         <video
           ref="videoRef"
@@ -100,9 +103,6 @@
           playsinline
           :src="currentVideoUrl"
         ></video>
-        <div class="close-video" @click="closeVideo">
-          <van-icon name="cross" size="24" color="#fff" />
-        </div>
       </div>
     </div>
   </div>
@@ -267,7 +267,12 @@ const closeVideo = () => {
 }
 
 const handlePreviewImage = (url: string) => {
-  showImagePreview([url])
+  showImagePreview({
+    images: [url],
+    closeable: true,
+    closeIcon: 'arrow-left',
+    closeIconPosition: 'top-left',
+  })
 }
 
 const handleCopy = (text: string) => {
@@ -528,5 +533,44 @@ const handleDownload = (url: string) => {
   justify-content: center;
   background-color: rgba(255, 255, 255, 0.2);
   border-radius: 50%;
+}
+
+.back-button {
+  position: absolute;
+  top: 20px;
+  left: 20px;
+  width: 40px;
+  height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background-color: rgba(0, 0, 0, 0.6);
+  border-radius: 50%;
+  cursor: pointer;
+  z-index: 3001;
+  backdrop-filter: blur(10px);
+}
+
+.back-button:active {
+  background-color: rgba(0, 0, 0, 0.8);
+}
+
+/* 图片预览返回按钮样式 */
+:deep(.van-image-preview__close-icon) {
+  top: 20px;
+  left: 20px;
+  right: auto;
+  background-color: rgba(0, 0, 0, 0.6);
+  border-radius: 50%;
+  width: 40px;
+  height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  backdrop-filter: blur(10px);
+}
+
+:deep(.van-image-preview__close-icon .van-icon) {
+  font-size: 20px;
 }
 </style>

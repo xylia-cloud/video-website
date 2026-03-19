@@ -1032,6 +1032,14 @@ const checkPaymentResult = () => {
             :class="{ active: selectedPaymentMethod === method.id }"
             @click="selectPaymentMethod(method.id)"
           >
+            <!-- 推荐角标（仅支付宝显示） -->
+            <img 
+              v-if="method.id === '5' || method.type === '5' || method.name.includes('支付宝')" 
+              src="@/assets/img/icon-tuijian.webp"
+              alt="推荐"
+              class="recommend-badge"
+            />
+            
             <div class="item-content">
               <div class="item-icon-container">
                 <img
@@ -1325,18 +1333,19 @@ const checkPaymentResult = () => {
 .recharge-page {
   background-color: #111;
   color: #fff;
-  height: 100vh;
+  min-height: 100vh;
   display: flex;
   flex-direction: column;
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  padding-top: 46px;
 }
 
-/* 固定顶部区域 */
+/* 顶部区域 */
 .fixed-top-section {
   flex-shrink: 0;
   background-color: #111;
   border-bottom: 1px solid rgba(255, 255, 255, 0.1);
-  margin-top: 110px;
+  margin-top: 60px;
   padding: 0 16px;
 }
 
@@ -1348,11 +1357,11 @@ const checkPaymentResult = () => {
 /* 可滚动内容区域 */
 .scrollable-content {
   flex: 1;
-  overflow-y: auto;
-  padding-bottom: 80px;
+  overflow-y: visible;
+  padding-bottom: 20px;
 }
 
-/* 🔥 导航选项卡 - 圆角按钮样式 */
+/* 导航选项卡 - 圆角按钮样式 */
 .nav-tabs {
   position: fixed;
   top: 50px;
@@ -1480,7 +1489,7 @@ const checkPaymentResult = () => {
 .selection-grid {
   display: grid;
   grid-template-columns: repeat(4, 1fr);
-  gap: 8px;
+  gap: 6px;
   grid-auto-rows: auto;
 }
 
@@ -1501,40 +1510,48 @@ const checkPaymentResult = () => {
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  padding: 16px 8px;
-  background-color: #2a2a2a;
-  border-radius: 12px;
+  padding: 8px 8px;
+  background-color: #3a3a3f;
+  border-radius: 16px;
   border: 2px solid transparent;
   transition: all 0.3s ease;
   cursor: pointer;
-  min-height: 100px;
 }
 
 .selection-item:hover {
-  border-color: #ff9500;
   transform: translateY(-2px);
-  background-color: #333;
+  background-color: #45454a;
 }
 
 .selection-item.active {
-  background-color: rgba(255, 149, 0, 0.15);
+  background: linear-gradient(135deg, #ff9500 0%, #ff7700 100%);
   border: 2px solid #ff9500;
   transform: translateY(-2px);
-  box-shadow: 0 4px 12px rgba(255, 149, 0, 0.3);
+  box-shadow: 0 4px 12px rgba(255, 149, 0, 0.4);
+}
+
+/* 推荐角标 */
+.recommend-badge {
+  position: absolute;
+  top: -2px;
+  right: -5px;
+  width: 40px;
+  height: 40px;
+  object-fit: contain;
+  z-index: 10;
 }
 
 /* 支付方式选择 - 垂直居中布局 */
 .selection-grid:not(.platform-grid):not(.amount-grid) .selection-item {
   flex-direction: column;
-  padding: 16px 8px;
-  gap: 8px;
+  padding: 8px 8px;
+  gap: 10px;
 }
 
 .selection-grid:not(.platform-grid):not(.amount-grid) .selection-item .item-content {
   flex-direction: column !important;
-  gap: 8px;
+  gap: 4px;
   align-items: center;
-  flex: 1;
   display: flex;
   width: 100%;
 }
@@ -1552,8 +1569,8 @@ const checkPaymentResult = () => {
 }
 
 .selection-grid:not(.platform-grid):not(.amount-grid) .selection-item .item-icon {
-  width: 48px;
-  height: 48px;
+  width: 32px;
+  height: 32px;
 }
 
 .selection-grid:not(.platform-grid):not(.amount-grid) .selection-item .item-name {
@@ -1561,7 +1578,7 @@ const checkPaymentResult = () => {
   text-align: center;
   flex: 0;
   margin: 0;
-  color: #ccc;
+  color: #fff;
   font-weight: 500;
 }
 
@@ -1865,20 +1882,14 @@ const checkPaymentResult = () => {
   background-color: rgba(255, 255, 255, 0.02);
 }
 
-/* 确认充值按钮 - 悬浮底部 */
+/* 确认充值按钮 - 底部区域 */
 .confirm-section-fixed {
-  position: fixed;
+  position: relative;
   bottom: 0;
   left: 0;
   right: 0;
   padding: 12px 20px;
-  background: linear-gradient(
-    to top,
-    rgba(17, 17, 17, 0.95) 0%,
-    rgba(17, 17, 17, 0.9) 70%,
-    transparent 100%
-  );
-  backdrop-filter: blur(10px);
+  background-color: #111;
   z-index: 100;
   border-top: 1px solid rgba(255, 255, 255, 0.1);
 }
@@ -1886,11 +1897,11 @@ const checkPaymentResult = () => {
 /* 在大屏幕上与app容器宽度保持一致 */
 @media screen and (min-width: 768px) {
   .confirm-section-fixed {
-    width: var(--app-mobile-width);
+    width: 100%;
     max-width: 100%;
-    left: 50%;
-    right: auto;
-    transform: translateX(-50%);
+    left: 0;
+    right: 0;
+    transform: none;
   }
 }
 

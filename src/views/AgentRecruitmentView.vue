@@ -11,13 +11,13 @@
       <!-- 咨询客服区域 -->
       <div class="section contact-section">
         <div class="contact-card">
-          <div class="contact-item">
+          <div class="contact-item" @click="openTelegram('jiji8_cc')">
             <img src="@/assets/img/img-hyjh-02.webp" class="contact-icon" alt="Telegram" />
             <span class="contact-label">Telegram1</span>
             <div class="contact-btn">Telegram(点击联系)</div>
             <span class="contact-action">点击咨询</span>
           </div>
-          <div class="contact-item">
+          <div class="contact-item" @click="openTelegram('daduizhang168')">
             <img src="@/assets/img/img-hyjh-02.webp" class="contact-icon" alt="Telegram" />
             <span class="contact-label">Telegram2</span>
             <div class="contact-btn">Telegram(点击联系)</div>
@@ -40,6 +40,12 @@ const router = useRouter()
 
 const onBack = () => {
   router.back()
+}
+
+// 打开Telegram聊天
+const openTelegram = (username: string) => {
+  const telegramUrl = `https://t.me/${username}`
+  window.open(telegramUrl, '_blank')
 }
 </script>
 
@@ -95,6 +101,16 @@ const onBack = () => {
   align-items: center;
   gap: 10px;
   padding: 10px 0;
+  cursor: pointer;
+  transition: background-color 0.3s;
+}
+
+.contact-item:hover {
+  background-color: rgba(255, 149, 0, 0.1);
+}
+
+.contact-item:active {
+  background-color: rgba(255, 149, 0, 0.2);
 }
 
 .contact-item:not(:last-child) {
