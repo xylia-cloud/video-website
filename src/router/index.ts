@@ -42,6 +42,7 @@ import AgentRecruitmentView from '../views/AgentRecruitmentView.vue'
 import BonusDescriptionView from '../views/BonusDescriptionView.vue'
 import CreativeLibraryView from '../views/CreativeLibraryView.vue'
 import TutorialDetailView from '../views/TutorialDetailView.vue'
+import PaymentView from '../views/PaymentView.vue'
 
 const router = createRouter({
   history: createWebHashHistory(import.meta.env.BASE_URL),
@@ -156,6 +157,11 @@ const router = createRouter({
       path: '/recharge-callback',
       name: 'rechargeCallback',
       component: RechargeCallbackView,
+    },
+    {
+      path: '/payment',
+      name: 'payment',
+      component: PaymentView,
     },
     {
       path: '/customer-service',

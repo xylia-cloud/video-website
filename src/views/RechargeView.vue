@@ -1,6 +1,6 @@
 <script setup lang="ts">
 // 充值页面逻辑
-import { ref, onMounted, computed, nextTick, onActivated } from 'vue'
+import { ref, onMounted, computed, onActivated } from 'vue'
 import { showToast, showDialog } from 'vant'
 import { useRouter, useRoute } from 'vue-router'
 import {
@@ -427,10 +427,15 @@ const selectPlatform = (platform: PaymentSubChannel | Record<string, unknown>) =
   customAmount.value = ''
 }
 
+// 格式化平台名称，将 $ 替换为换行
+const formatPlatformName = (name: string) => {
+  return name.replace(/\$/g, '<br/>')
+}
+
 // 🔥 处理支付成功确认
-const handleConfirmSuccess = () => {
+const handleConfirmSuccess = async () => {
   showPaymentSuccessModal.value = false
-  // 可以刷新余额或跳转到其他页面
+  await refreshUserBalance()
   showToast({
     message: '充值成功',
     duration: 2000,
@@ -453,7 +458,7 @@ const goToManualRecharge = async () => {
 
     // 获取或生成浏览器指纹
     let browserId = localStorage.getItem('browserId')
-    
+
     if (!browserId) {
       // 生成简单的浏览器指纹
       const fingerprint = [
@@ -463,13 +468,13 @@ const goToManualRecharge = async () => {
         screen.width + 'x' + screen.height,
         new Date().getTimezoneOffset(),
         navigator.hardwareConcurrency || 'unknown',
-        navigator.platform
+        navigator.platform,
       ].join('|')
-      
+
       let hash = 0
       for (let i = 0; i < fingerprint.length; i++) {
         const char = fingerprint.charCodeAt(i)
-        hash = ((hash << 5) - hash) + char
+        hash = (hash << 5) - hash + char
         hash = hash & hash
       }
       browserId = Math.abs(hash).toString(36)
@@ -479,27 +484,27 @@ const goToManualRecharge = async () => {
     // 调用接口获取RSA密钥
     const formData = new URLSearchParams()
     formData.append('murmur', browserId)
-    
+
     const response = await fetch('https://help.186web.cc/admin/RSAEncrypt/gtRsP', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/x-www-form-urlencoded',
       },
-      body: formData.toString()
+      body: formData.toString(),
     })
-    
+
     const result = await response.json()
-    
+
     if (result && result.data) {
       const rsaPassWord = result.data
       const customerServiceUrl = `https://help186.xuhgki.cn/index/index/home?code=${rsaPassWord}`
-      
+
       // 跳转到客服页面（使用iframe嵌入）
       router.push({
         name: 'customerService',
         query: {
-          url: encodeURIComponent(customerServiceUrl)
-        }
+          url: encodeURIComponent(customerServiceUrl),
+        },
       })
     } else {
       throw new Error('获取客服密钥失败')
@@ -513,30 +518,24 @@ const goToManualRecharge = async () => {
   }
 }
 
-// 🔥 打开支付页面（兼容Safari）
+// 🔥 打开支付页面：优先站内iframe承载页（带返回按钮），外部打开作为兜底
 const openPaymentPage = (payUrl: string) => {
   if (!payUrl) return
 
   try {
-    // 检测是否为iOS Safari
-    const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent)
-    const isSafari = /Safari/.test(navigator.userAgent) && !/Chrome/.test(navigator.userAgent)
-
-    if (isIOS && isSafari) {
-      // iOS Safari: 使用location.href
-      window.location.href = payUrl
-    } else {
-      // 其他浏览器: 尝试使用window.open
-      const newWindow = window.open(payUrl, '_blank')
-      if (!newWindow || newWindow.closed || typeof newWindow.closed === 'undefined') {
-        // 如果window.open被阻止，降级使用location.href
-        window.location.href = payUrl
-      }
-    }
+    router.push({
+      name: 'payment',
+      query: {
+        url: encodeURIComponent(payUrl),
+      },
+    })
   } catch (error) {
-    console.error('打开支付页面失败:', error)
-    // 降级处理
-    window.location.href = payUrl
+    console.error('跳转站内支付页失败:', error)
+    // 兜底：外部打开
+    const newWindow = window.open(payUrl, '_blank')
+    if (!newWindow || newWindow.closed || typeof newWindow.closed === 'undefined') {
+      window.location.href = payUrl
+    }
   }
 }
 
@@ -882,16 +881,16 @@ const amountRangePlaceholder = computed(() => {
   if (amounts.length === 0) {
     return '请输入金额'
   }
-  
+
   // 获取所有金额并排序
-  const moneyValues = amounts.map(item => parseFloat(item.money)).filter(val => !isNaN(val))
+  const moneyValues = amounts.map((item) => parseFloat(item.money)).filter((val) => !isNaN(val))
   if (moneyValues.length === 0) {
     return '请输入金额'
   }
-  
+
   const minAmount = Math.min(...moneyValues)
   const maxAmount = Math.max(...moneyValues)
-  
+
   return `请输入金额 (${minAmount}-${maxAmount}元)`
 })
 
@@ -936,19 +935,24 @@ const refreshUserBalance = async () => {
   }
 }
 
+const handleCloseOrderSuccessModal = async () => {
+  showOrderSuccessModal.value = false
+  await refreshUserBalance()
+}
+
 onMounted(async () => {
   // 检查是否需要显示温馨提醒
   if (!checkTodayReminder()) {
     showReminderDialog.value = true
   }
-  
+
   // 获取用户钻石余额
   loadUserBalance()
   // 刷新最新余额
   await refreshUserBalance()
   // 获取支付渠道数据
   fetchPaymentChannels()
-  
+
   // 检查支付结果（从URL参数）
   checkPaymentResult()
 })
@@ -959,10 +963,11 @@ onActivated(() => {
 })
 
 // 检查支付结果
-const checkPaymentResult = () => {
+const checkPaymentResult = async () => {
   const paymentStatus = route.query.payment_status as string
-  
+
   if (paymentStatus === 'success') {
+    await refreshUserBalance()
     // 显示支付成功弹窗
     showPaymentSuccessModal.value = true
     // 清除URL参数
@@ -1007,10 +1012,10 @@ const checkPaymentResult = () => {
     <div class="fixed-top-section">
       <!-- 视频会员和账户余额卡片 -->
       <div class="balance-card-wrapper">
-        <BalanceInfoCard 
-          :user-video-nums="userVideoNums" 
-          :is-vip="isVip" 
-          :balance="diamondBalance" 
+        <BalanceInfoCard
+          :user-video-nums="userVideoNums"
+          :is-vip="isVip"
+          :balance="diamondBalance"
         />
       </div>
 
@@ -1033,13 +1038,13 @@ const checkPaymentResult = () => {
             @click="selectPaymentMethod(method.id)"
           >
             <!-- 推荐角标（仅支付宝显示） -->
-            <img 
-              v-if="method.id === '5' || method.type === '5' || method.name.includes('支付宝')" 
+            <img
+              v-if="method.id === '5' || method.type === '5' || method.name.includes('支付宝')"
               src="@/assets/img/icon-tuijian.webp"
               alt="推荐"
               class="recommend-badge"
             />
-            
+
             <div class="item-content">
               <div class="item-icon-container">
                 <img
@@ -1054,19 +1059,12 @@ const checkPaymentResult = () => {
               <van-icon name="success" size="10" color="#fff" />
             </div>
           </div>
-          
+
           <!-- 手动充值选项 -->
-          <div
-            class="selection-item manual-recharge-item"
-            @click="goToManualRecharge"
-          >
+          <div class="selection-item manual-recharge-item" @click="goToManualRecharge">
             <div class="item-content">
               <div class="item-icon-container">
-                <img
-                  src="@/assets/img/icon-rgcz.png"
-                  alt="手动充值"
-                  class="item-icon"
-                />
+                <img src="@/assets/img/icon-rgcz.png" alt="手动充值" class="item-icon" />
               </div>
               <div class="item-name">手动充值</div>
             </div>
@@ -1102,7 +1100,7 @@ const checkPaymentResult = () => {
             @click="selectPlatform(channel)"
           >
             <div class="platform-card-content">
-              <div class="platform-name">{{ channel.name }}</div>
+              <div class="platform-name" v-html="formatPlatformName(channel.name)"></div>
             </div>
             <div v-if="selectedSubChannel?.id === channel.id" class="check-icon">
               <van-icon name="success" size="10" color="#fff" />
@@ -1238,6 +1236,9 @@ const checkPaymentResult = () => {
     class="order-success-popup"
   >
     <div class="order-success-modal">
+      <div class="order-success-close" @click="handleCloseOrderSuccessModal">
+        <van-icon name="cross" size="20" color="#fff" />
+      </div>
       <div class="success-header">
         <h2 class="success-title">订单创建成功</h2>
       </div>
@@ -1308,22 +1309,24 @@ const checkPaymentResult = () => {
         </div>
         <h3 class="reminder-title">充值温馨提醒</h3>
       </div>
-      
+
       <div class="reminder-content">
         <div class="reminder-text">
-          <p class="highlight-text">充值时请务必通过游戏内进行充值，不要直接给历史账户私下转账，否则会导致金币延迟到账7日以上。</p>
-          <p class="normal-text">近期支付封控比较严重，建议使用<span class="emphasis">USDT</span>、<span class="emphasis">银行卡</span>或<span class="emphasis">数字人民币</span>充值。</p>
+          <p class="highlight-text">
+            充值时请务必通过游戏内进行充值，不要直接给历史账户私下转账，否则会导致金币延迟到账7日以上。
+          </p>
+          <p class="normal-text">
+            近期支付封控比较严重，建议使用<span class="emphasis">USDT</span>、<span class="emphasis"
+              >银行卡</span
+            >或<span class="emphasis">数字人民币</span>充值。
+          </p>
           <p class="normal-text">如遇充值问题，可找<span class="emphasis">客服线下充值</span>。</p>
         </div>
       </div>
 
       <div class="reminder-footer">
-        <button class="reminder-btn secondary" @click="closeReminder(true)">
-          今日不再提醒
-        </button>
-        <button class="reminder-btn primary" @click="closeReminder(false)">
-          我知道了
-        </button>
+        <button class="reminder-btn secondary" @click="closeReminder(true)">今日不再提醒</button>
+        <button class="reminder-btn primary" @click="closeReminder(false)">我知道了</button>
       </div>
     </div>
   </div>
@@ -2283,6 +2286,26 @@ const checkPaymentResult = () => {
   padding: 0;
   overflow: hidden;
   position: relative;
+}
+
+.order-success-close {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.35);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  cursor: pointer;
+  z-index: 2;
+}
+
+.order-success-close:active {
+  opacity: 0.85;
 }
 
 .success-header {

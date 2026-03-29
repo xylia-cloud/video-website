@@ -198,6 +198,10 @@ const videoSrc = ref('')
 // 定义视频播放状态
 const isVideoPlayed = ref(false) // 记录视频是否已经播放过
 
+const canShowDownload = computed(() => {
+  return isPlaying.value && !!videoSrc.value && !hasError.value
+})
+
 // 广告弹窗相关状态
 const showVideoAd = ref(false) // 是否显示视频广告弹窗
 
@@ -634,7 +638,12 @@ const handleRefreshBalance = async () => {
         icon: 'success',
       })
 
-      console.log('✅ 手动刷新完成 - 观看次数:', pointsResult.data.video_nums, '积分:', pointsResult.data.points)
+      console.log(
+        '✅ 手动刷新完成 - 观看次数:',
+        pointsResult.data.video_nums,
+        '积分:',
+        pointsResult.data.points,
+      )
     } else {
       showToast({
         message: pointsResult.msg || '刷新失败',
@@ -1238,7 +1247,12 @@ const getUserRealTimeInfo = async () => {
         vipEndtime.value = result.data.endtime || ''
       }
 
-      console.log('✅ 更新用户实时信息成功 - 积分:', result.data.points, '观看次数:', result.data.video_nums)
+      console.log(
+        '✅ 更新用户实时信息成功 - 积分:',
+        result.data.points,
+        '观看次数:',
+        result.data.video_nums,
+      )
       return result.data
     } else {
       console.error('获取用户实时信息失败:', result)
@@ -1368,9 +1382,9 @@ const continuePlay = async () => {
 
       // 2. 非VIP用户，先检查观看次数
       const currentVideoNums = userVideoNums.value || 0
-      
+
       console.log('🎬 观看次数检查 - 当前次数:', currentVideoNums, '需要次数: 1')
-      
+
       if (currentVideoNums >= 1) {
         // 观看次数足够，弹窗确认扣除次数
         console.log('✅ 观看次数充足，弹窗确认')
@@ -1400,7 +1414,7 @@ const continuePlay = async () => {
         latestUserInfo?.points !== undefined ? latestUserInfo.points : userPoints.value
 
       console.log('💰 积分检查 - 当前积分:', currentPoints, '需要积分:', pointsNeeded.value)
-      
+
       if (currentPoints < pointsNeeded.value) {
         console.log('❌ 积分不足，显示充值弹窗')
         // 显示充值选项弹窗
@@ -1471,6 +1485,22 @@ const startVideoPlayback = () => {
   setTimeout(() => {
     setupVideoSource(videoSrc.value)
   }, 100)
+}
+
+const handleDownloadVideo = () => {
+  if (!videoSrc.value) {
+    showToast('暂无可下载地址')
+    return
+  }
+
+  const a = document.createElement('a')
+  a.href = videoSrc.value
+  a.target = '_blank'
+  a.rel = 'noopener'
+  a.download = `${videoDetail.value?.vod_name || 'video'}`
+  document.body.appendChild(a)
+  a.click()
+  a.remove()
 }
 
 // 添加更新播放次数的方法
@@ -1950,7 +1980,8 @@ const shareVideo = () => {
       // 显示分享成功弹窗
       showDialog({
         title: '分享链接已复制',
-        message: '链接已复制到剪贴板，可以发送给好友了！\n\n温馨提示：分享成功后，如果观影次数未增加，可以点击"刷新"按钮来更新最新次数。',
+        message:
+          '链接已复制到剪贴板，可以发送给好友了！\n\n温馨提示：分享成功后，如果观影次数未增加，可以点击"刷新"按钮来更新最新次数。',
         confirmButtonText: '我知道了',
         confirmButtonColor: '#ff9500',
         className: 'dark-dialog',
@@ -1970,7 +2001,8 @@ const shareVideo = () => {
           // 显示分享成功弹窗
           showDialog({
             title: '分享链接已复制',
-            message: '链接已复制到剪贴板，可以发送给好友了！\n\n温馨提示：分享成功后，如果观影次数未增加，可以点击"刷新"按钮来更新最新次数。',
+            message:
+              '链接已复制到剪贴板，可以发送给好友了！\n\n温馨提示：分享成功后，如果观影次数未增加，可以点击"刷新"按钮来更新最新次数。',
             confirmButtonText: '我知道了',
             confirmButtonColor: '#ff9500',
             className: 'dark-dialog',
@@ -2343,7 +2375,7 @@ const performTouristLogin = async () => {
         message: '已获取游客信息',
         duration: 1000,
       })
-      
+
       // 游客登录成功后，重新获取用户信息
       await fetchUserInfo()
     } else {
@@ -2360,7 +2392,7 @@ const performTouristLogin = async () => {
 onMounted(async () => {
   // 首先执行游客登录（如果需要的话）
   await performTouristLogin()
-  
+
   // 尝试解析URL中的邀请码
   const urlInviteCode = parseUrlInviteCode()
   if (urlInviteCode) {
@@ -2593,10 +2625,7 @@ const handleAdClick = (ad: ListAd) => {
       <div class="charge-modal">
         <!-- 广告位 -->
         <a href="https://68.fo" target="_blank" class="charge-ad-banner">
-          <img 
-            src="@/assets/img/recharge-ad.webp" 
-            alt="充值广告"
-          />
+          <img src="@/assets/img/recharge-ad.webp" alt="充值广告" />
         </a>
 
         <div class="charge-content">
@@ -2720,6 +2749,7 @@ const handleAdClick = (ad: ListAd) => {
           <div class="video-top-banner">
             <div class="banner-text">365娱乐永久网址：68.fo 十年品牌 大额提现秒到账</div>
           </div>
+
           <div v-if="hasError" class="play-error">
             <Icon name="warning-o" size="50" color="#ff6b6b" />
             <div class="error-msg">{{ errorMessage || '视频播放失败' }}</div>
@@ -2792,9 +2822,9 @@ const handleAdClick = (ad: ListAd) => {
           <div class="watch-info-wrapper">
             <div class="watch-text" v-if="isLoggedIn()">{{ vipStatusDisplay }}</div>
             <div class="watch-text" v-else>登录后查看积分</div>
-            <button 
-              v-if="isLoggedIn()" 
-              class="balance-refresh-btn" 
+            <button
+              v-if="isLoggedIn()"
+              class="balance-refresh-btn"
               @click="handleRefreshBalance"
               :disabled="isRefreshing"
             >
@@ -2842,6 +2872,11 @@ const handleAdClick = (ad: ListAd) => {
           <div class="action-btn" @click="shareVideo">
             <Icon name="share-o" size="16" />
             <div class="action-text">分享</div>
+          </div>
+
+          <div v-if="canShowDownload" class="action-btn" @click="handleDownloadVideo">
+            <Icon name="down" size="16" />
+            <div class="action-text">下载</div>
           </div>
         </div>
       </div>
@@ -4272,4 +4307,3 @@ const handleAdClick = (ad: ListAd) => {
   opacity: 0.8 !important;
 }
 </style>
-

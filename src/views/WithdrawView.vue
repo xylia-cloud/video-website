@@ -244,6 +244,16 @@ const handleWithdraw = async () => {
   }
 
   try {
+    await showDialog({
+      title: '确认提现吗？',
+      message: `提现金额：${cashvote}元\n到账账号：${selectedAccount.value.name}\n${getAccountDisplayInfo(selectedAccount.value)}`,
+      className: 'withdraw-dark-dialog',
+      confirmButtonText: '确认提现',
+      cancelButtonText: '取消',
+      confirmButtonColor: '#ff9500',
+      showCancelButton: true,
+    })
+
     showLoadingToast({
       message: '提交中...',
       forbidClick: true,
@@ -259,10 +269,10 @@ const handleWithdraw = async () => {
     if (result.code === 1) {
       showSuccessModal.value = true
       withdrawAmount.value = ''
-      
+
       // 刷新用户收益信息（提现余额）
       await loadUserProfit()
-      
+
       // 刷新用户账户余额（如果提现会影响账户余额的话）
       // 如果提现只是从佣金提现，不影响游戏余额，可以注释掉下面这行
       await refreshUserBalance()
@@ -270,6 +280,9 @@ const handleWithdraw = async () => {
       showToast(result.msg || '提现申请失败')
     }
   } catch (error) {
+    if (error === 'cancel') {
+      return
+    }
     closeToast()
     console.error('提现失败:', error)
     showToast('提现申请失败')
@@ -471,7 +484,9 @@ onUnmounted(() => {
         <div class="tips-section">
           <div class="tips-title">温馨提示：</div>
           <div class="tips-content">
-            <div class="tip-item">1.提现服务时间为24小时：提交以后系统将在0-2小时以内打款，如超时请联系客服。</div>
+            <div class="tip-item">
+              1.提现服务时间为24小时：提交以后系统将在0-2小时以内打款，如超时请联系客服。
+            </div>
             <div class="tip-item">2.提现同账号每日累积提现上限总额为10000000元整；</div>
             <div class="tip-item">3.每次发起提现以后流水系统会自动清零流水；</div>
             <div class="tip-item">4. 提现需投注金额达到充值金额的400%，否则无法完成提现。</div>
@@ -943,5 +958,76 @@ onUnmounted(() => {
   padding: 12px;
   font-size: 16px;
   cursor: pointer;
+}
+</style>
+
+<style>
+.withdraw-dark-dialog.van-dialog {
+  background: #1a1a1a;
+  border: 1px solid #2e2e2e;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.55);
+}
+
+.withdraw-dark-dialog .van-dialog__header {
+  color: #fff;
+}
+
+.withdraw-dark-dialog .van-dialog__content {
+  color: #d0d0d0;
+}
+
+.withdraw-dark-dialog .van-dialog__message {
+  color: #d0d0d0;
+  white-space: pre-line;
+}
+
+.withdraw-dark-dialog .van-dialog__footer {
+  border-top: 1px solid #2e2e2e;
+}
+
+/* Vant hairline 线条（多用于边框/分割线） */
+.withdraw-dark-dialog.van-hairline--top::after,
+.withdraw-dark-dialog.van-hairline--bottom::after,
+.withdraw-dark-dialog.van-hairline--left::after,
+.withdraw-dark-dialog.van-hairline--right::after,
+.withdraw-dark-dialog.van-hairline--surround::after,
+.withdraw-dark-dialog .van-hairline--top::after,
+.withdraw-dark-dialog .van-hairline--bottom::after,
+.withdraw-dark-dialog .van-hairline--left::after,
+.withdraw-dark-dialog .van-hairline--right::after,
+.withdraw-dark-dialog .van-hairline--surround::after {
+  border-color: #2e2e2e !important;
+}
+
+/* footer 的细线有时来自伪元素 */
+.withdraw-dark-dialog .van-dialog__footer::after {
+  border-top-color: #2e2e2e !important;
+}
+
+/* 按钮之间的分割线（有些版本用 ::after 实现） */
+.withdraw-dark-dialog .van-dialog__cancel::after {
+  border-right-color: #2e2e2e !important;
+}
+
+.withdraw-dark-dialog .van-button {
+  background: transparent;
+}
+
+.withdraw-dark-dialog .van-dialog__cancel {
+  color: #bdbdbd;
+}
+
+.withdraw-dark-dialog .van-dialog__confirm {
+  color: #ff9500;
+}
+
+.withdraw-dark-dialog .van-dialog__confirm,
+.withdraw-dark-dialog .van-dialog__cancel {
+  border: none;
+}
+
+.withdraw-dark-dialog .van-dialog__confirm:active,
+.withdraw-dark-dialog .van-dialog__cancel:active {
+  opacity: 0.8;
 }
 </style>
