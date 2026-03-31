@@ -33,6 +33,8 @@
 <script setup lang="ts">
 import { ref, onMounted, onBeforeUnmount } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
+import { showDialog, showToast } from 'vant'
+import { fetchUserPoints, getUserInfo, setUserInfo } from '@/api/fetch-api'
 
 const route = useRoute()
 const router = useRouter()
@@ -41,12 +43,80 @@ const payUrl = ref('')
 const isLoading = ref(true)
 const hasError = ref(false)
 const paymentIframe = ref<HTMLIFrameElement | null>(null)
+const showConfirm = ref(false)
 
 let loadingTimeout: ReturnType<typeof setTimeout> | null = null
 
 const goBack = () => {
-  // 直接返回到充值页面，避免第三方页面历史记录导致的多次返回问题
-  router.replace('/recharge')
+  // 如果需要显示确认弹窗，则显示
+  if (showConfirm.value) {
+    showRechargeConfirmDialog()
+  } else {
+    // 直接返回到充值页面
+    router.replace('/recharge')
+  }
+}
+
+// 刷新用户余额 - 使用 User.GetPoints 接口
+const refreshUserBalance = async () => {
+  try {
+    showToast({
+      message: '正在刷新余额...',
+      duration: 1000,
+    })
+
+    const result = await fetchUserPoints()
+    
+    if (result && result.code === 1 && result.data) {
+      const currentUserInfo = getUserInfo()
+      if (currentUserInfo) {
+        const updatedUserInfo = {
+          ...currentUserInfo,
+          coin: parseFloat(result.data.coin || '0'),
+          user_points: parseFloat(result.data.points || '0'),
+          video_nums: result.data.video_nums || 0,
+          is_vip: result.data.is_vip !== undefined ? result.data.is_vip : 0,
+        }
+        setUserInfo(updatedUserInfo)
+        
+        showToast({
+          message: '余额已更新',
+          duration: 1500,
+        })
+      }
+    } else {
+      showToast({
+        message: result?.msg || '刷新余额失败',
+        duration: 2000,
+      })
+    }
+  } catch (error) {
+    console.error('刷新用户余额失败:', error)
+    showToast({
+      message: '刷新余额失败，请稍后重试',
+      duration: 2000,
+    })
+  }
+}
+
+// 显示充值完成确认弹窗
+const showRechargeConfirmDialog = () => {
+  showDialog({
+    title: '充值确认',
+    message: '您是否已完成充值？',
+    showCancelButton: true,
+    confirmButtonText: '充值完成',
+    cancelButtonText: '取消',
+    confirmButtonColor: '#ff9500',
+  })
+    .then(async () => {
+      // 用户点击"充值完成"
+      await refreshUserBalance()
+      router.replace('/recharge')
+    })
+    .catch(() => {
+      // 用户点击"取消"，不做任何操作，留在当前页面
+    })
 }
 
 const handleIframeLoad = () => {
@@ -62,6 +132,9 @@ onMounted(() => {
   }
 
   payUrl.value = decodeURIComponent(urlFromQuery)
+  
+  // 检查是否需要显示充值确认弹窗
+  showConfirm.value = route.query.showConfirm === 'true'
 
   loadingTimeout = setTimeout(() => {
     if (isLoading.value) {

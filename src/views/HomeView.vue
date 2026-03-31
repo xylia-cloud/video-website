@@ -8,7 +8,7 @@ import AdBanner from '@/components/AdBanner.vue'
 import VideoSection from '@/components/VideoSection.vue'
 import LoadingStates from '@/components/LoadingStates.vue'
 import BottomTabbar from '@/components/BottomTabbar.vue'
-import HomeEntryPopup from '@/components/HomeEntryPopup.vue'
+import DomainPopup from '@/components/DomainPopup.vue'
 import { ref, onMounted, onBeforeUnmount, computed, onActivated } from 'vue'
 import { getRecommendVideos } from '@/api/video'
 import {
@@ -181,52 +181,11 @@ const searchKeyword = ref('')
 const currentBannerIndex = ref(0)
 
 // 首页首次打开弹窗
-const showHomeEntryPopup = ref(false)
+const showDomainPopup = ref(false)
 
-const closeHomeEntryPopup = () => {
-  showHomeEntryPopup.value = false
-  sessionStorage.setItem('homeEntryPopupShown', 'true')
-}
-
-// 跳转到合营计划页面
-const goToAgentRecruitment = () => {
-  showHomeEntryPopup.value = false
-  sessionStorage.setItem('homeEntryPopupShown', 'true')
-  router.push({ name: 'agentRecruitment' })
-}
-
-const copyTelegramId = async () => {
-  const text = '@daduizhang168'
-
-  sessionStorage.setItem('homeEntryPopupShown', 'true')
-
-  try {
-    if (navigator.clipboard && window.isSecureContext) {
-      await navigator.clipboard.writeText(text)
-    } else {
-      const textarea = document.createElement('textarea')
-      textarea.value = text
-      textarea.setAttribute('readonly', 'true')
-      textarea.style.position = 'fixed'
-      textarea.style.opacity = '0'
-      document.body.appendChild(textarea)
-      textarea.select()
-      document.execCommand('copy')
-      document.body.removeChild(textarea)
-    }
-
-    showToast({
-      message: '已复制',
-      duration: 1200,
-    })
-  } catch {
-    showToast({
-      message: '复制失败',
-      duration: 2000,
-    })
-
-    closeHomeEntryPopup()
-  }
+const closeDomainPopup = () => {
+  showDomainPopup.value = false
+  sessionStorage.setItem('domainPopupShown', 'true')
 }
 
 // 计算属性：判断当前是否为第一个标签
@@ -1249,9 +1208,9 @@ const handlePageUnload = () => {
 // 组件挂载时获取数据
 onMounted(async () => {
   const initialRouteName = sessionStorage.getItem('initialRouteName')
-  const hasShownPopup = sessionStorage.getItem('homeEntryPopupShown')
+  const hasShownPopup = sessionStorage.getItem('domainPopupShown')
   if (initialRouteName === 'home' && !hasShownPopup) {
-    showHomeEntryPopup.value = true
+    showDomainPopup.value = true
   }
 
   // 添加页面关闭或刷新的事件监听
@@ -1610,12 +1569,7 @@ const performTouristLogin = async () => {
 
 <template>
   <div class="home">
-    <HomeEntryPopup
-      :show="showHomeEntryPopup"
-      @close="closeHomeEntryPopup"
-      @left="goToAgentRecruitment"
-      @right="copyTelegramId"
-    />
+    <DomainPopup v-model:show="showDomainPopup" />
 
     <!-- 加载状态组件 -->
     <LoadingStates

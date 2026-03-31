@@ -8,7 +8,7 @@ import {
   fetchChargeRules,
   createChargeOrder,
   getUserInfo,
-  fetchUserDatas,
+  fetchUserPoints,
   setUserInfo,
 } from '@/api/fetch-api'
 import HeaderNav from '@/components/HeaderNav.vue'
@@ -527,6 +527,7 @@ const openPaymentPage = (payUrl: string) => {
       name: 'payment',
       query: {
         url: encodeURIComponent(payUrl),
+        showConfirm: 'true', // 添加标记，表示需要显示充值确认弹窗
       },
     })
   } catch (error) {
@@ -913,19 +914,20 @@ const loadUserBalance = () => {
 // 刷新用户余额（从服务器获取最新数据）
 const refreshUserBalance = async () => {
   try {
-    const result = await fetchUserDatas({})
+    const result = await fetchUserPoints()
     if (result && result.code === 1 && result.data) {
       // 更新本地用户信息
       const currentUserInfo = getUserInfo()
-      if (currentUserInfo && result.data.coin !== undefined) {
+      if (currentUserInfo) {
         const updatedUserInfo = {
           ...currentUserInfo,
-          coin: result.data.coin,
+          coin: parseFloat(result.data.coin || '0'),
+          user_points: parseFloat(result.data.points || '0'),
           video_nums: result.data.video_nums || 0,
           is_vip: result.data.is_vip !== undefined ? result.data.is_vip : 0,
         }
         setUserInfo(updatedUserInfo)
-        diamondBalance.value = result.data.coin
+        diamondBalance.value = parseFloat(result.data.coin || '0')
         userVideoNums.value = result.data.video_nums || 0
         isVip.value = result.data.is_vip !== undefined ? result.data.is_vip : 0
       }
