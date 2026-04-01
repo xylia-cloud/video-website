@@ -3,6 +3,7 @@
     <div class="payment-top-bar">
       <div class="back-btn" @click="goBack">
         <van-icon name="arrow-left" size="20" color="#111" />
+        <span class="back-text">返回游戏</span>
       </div>
       <div class="title">支付</div>
       <div class="right-actions"></div>
@@ -115,7 +116,8 @@ const showRechargeConfirmDialog = () => {
       router.replace('/recharge')
     })
     .catch(() => {
-      // 用户点击"取消"，不做任何操作，留在当前页面
+      // 用户点击"取消"，直接返回到充值页面
+      router.replace('/recharge')
     })
 }
 
@@ -180,11 +182,16 @@ onBeforeUnmount(() => {
 }
 
 .back-btn {
-  width: 40px;
-  height: 40px;
   display: flex;
   align-items: center;
   justify-content: center;
+  gap: 4px;
+}
+
+.back-text {
+  color: #111;
+  font-size: 14px;
+  font-weight: 500;
 }
 
 .title {

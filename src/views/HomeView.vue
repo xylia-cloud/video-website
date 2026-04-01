@@ -182,11 +182,7 @@ const currentBannerIndex = ref(0)
 
 // 首页首次打开弹窗
 const showDomainPopup = ref(false)
-
-const closeDomainPopup = () => {
-  showDomainPopup.value = false
-  sessionStorage.setItem('domainPopupShown', 'true')
-}
+const DOMAIN_POPUP_SHOWN_KEY = 'domainPopupShownInSession'
 
 // 计算属性：判断当前是否为第一个标签
 const isFirstTabActive = computed(() => {
@@ -1202,15 +1198,16 @@ const handlePageUnload = () => {
 
   // 在页面关闭或刷新时清除会话状态
   sessionStorage.removeItem('pageSessionActive')
-  // 不清除弹窗状态，保持关闭状态直到会话结束
+  // 不清除域名弹窗会话标记：同一次打开网站内仅弹一次
 }
 
 // 组件挂载时获取数据
 onMounted(async () => {
   const initialRouteName = sessionStorage.getItem('initialRouteName')
-  const hasShownPopup = sessionStorage.getItem('domainPopupShown')
+  const hasShownPopup = sessionStorage.getItem(DOMAIN_POPUP_SHOWN_KEY)
   if (initialRouteName === 'home' && !hasShownPopup) {
     showDomainPopup.value = true
+    sessionStorage.setItem(DOMAIN_POPUP_SHOWN_KEY, 'true')
   }
 
   // 添加页面关闭或刷新的事件监听
@@ -1427,7 +1424,7 @@ onActivated(() => {
 
   // 所有标签都使用翻页模式，无需滚动监听
 
-  // 从详情页返回时不再检查弹窗状态，保持关闭状态
+  // 从详情页返回时不处理弹窗状态
 })
 
 // 组件卸载时移除滚动事件监听
@@ -1441,7 +1438,7 @@ onBeforeUnmount(() => {
   // 移除页面关闭或刷新的事件监听
   window.removeEventListener('beforeunload', handlePageUnload)
 
-  // 不清除弹窗状态，保持关闭状态直到会话结束
+  // 不清除域名弹窗会话标记：同一次打开网站内仅弹一次
 })
 
 // 保存会话数据到sessionStorage

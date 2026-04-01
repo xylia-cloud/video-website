@@ -160,8 +160,8 @@ const downloadApp = () => {
 }
 
 .domain-popup-card {
-  width: min(92vw, 420px);
-  border-radius: 14px;
+  width: min(90vw, 388px);
+  border-radius: 12px;
   background:
     linear-gradient(#0d0c0b, #0d0c0b) padding-box,
     linear-gradient(180deg, #553713 0%, #f0e5a3 50%, #553713 100%) border-box;
@@ -173,15 +173,15 @@ const downloadApp = () => {
 
 .domain-popup-close {
   position: absolute;
-  top: 8px;
-  right: 10px;
-  width: 40px;
-  height: 40px;
+  top: 6px;
+  right: 8px;
+  width: 34px;
+  height: 34px;
   border: none;
   background: transparent;
   color: rgba(255, 255, 255, 0.9);
-  font-size: 34px;
-  line-height: 40px;
+  font-size: 28px;
+  line-height: 34px;
   cursor: pointer;
   z-index: 10;
 }
@@ -196,27 +196,25 @@ const downloadApp = () => {
   width: 100%;
   display: block;
   height: auto;
-  min-height: 180px;
+  min-height: 112px;
   object-fit: cover;
 }
 
 .domain-popup-body {
-  padding: 14px 14px 0;
+  padding: 10px 12px 0;
 }
 
 .domain-list {
-  max-height: 320px;
-  overflow-y: auto;
   margin-bottom: 0;
 }
 
 .domain-item {
   display: flex;
   align-items: center;
-  padding: 8px 10px;
+  padding: 7px 10px;
   background: rgba(255, 255, 255, 0.05);
   border-radius: 20px;
-  margin-bottom: 6px;
+  margin-bottom: 5px;
   transition: all 0.3s;
 }
 
@@ -225,7 +223,7 @@ const downloadApp = () => {
 }
 
 .domain-item-wrapper {
-  margin-bottom: 6px;
+  margin-bottom: 5px;
 }
 
 .primary-wrapper {
@@ -245,12 +243,12 @@ const downloadApp = () => {
   background-position: center;
   background-repeat: no-repeat;
   border-radius: 8px;
-  padding: 6px;
+  padding: 5px;
   overflow: hidden;
 }
 
 .secondary-domains .domain-item {
-  margin-bottom: 6px;
+  margin-bottom: 5px;
 }
 
 .secondary-domains .domain-item:last-child {
@@ -289,30 +287,30 @@ const downloadApp = () => {
 }
 
 .domain-icon {
-  width: 28px;
-  height: 28px;
-  margin-right: 8px;
+  width: 24px;
+  height: 24px;
+  margin-right: 6px;
   display: flex;
   align-items: center;
   justify-content: center;
 }
 
 .icon-placeholder {
-  width: 28px;
-  height: 28px;
+  width: 24px;
+  height: 24px;
   border-radius: 50%;
   background: linear-gradient(135deg, #ff9500 0%, #ff6b00 100%);
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 11px;
+  font-size: 10px;
   font-weight: bold;
   color: #fff;
 }
 
 .icon-logo {
-  width: 28px;
-  height: 28px;
+  width: 24px;
+  height: 24px;
   border-radius: 50%;
   object-fit: cover;
 }
@@ -320,16 +318,16 @@ const downloadApp = () => {
 .domain-text {
   flex: 1;
   color: #ff9500;
-  font-size: 13px;
+  font-size: 12px;
   font-weight: 500;
 }
 
 .copy-btn {
-  padding: 4px 12px;
+  padding: 3px 10px;
   background: #ff9500;
   color: #000;
   border-radius: 20px;
-  font-size: 11px;
+  font-size: 10px;
   font-weight: 600;
   cursor: pointer;
   border: none;
@@ -344,17 +342,17 @@ const downloadApp = () => {
 .domain-popup-actions {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 14px;
-  margin-top: 16px;
-  padding: 0 14px 14px;
+  gap: 10px;
+  margin-top: 10px;
+  padding: 0 12px 10px;
 }
 
 .domain-popup-btn {
-  height: 44px;
+  height: 38px;
   border-radius: 8px;
   border: none;
   color: #fff;
-  font-size: 16px;
+  font-size: 14px;
   font-weight: 700;
   cursor: pointer;
   transition: all 0.3s;
@@ -371,24 +369,5 @@ const downloadApp = () => {
 
 .domain-popup-btn-right {
   background: #1fb954;
-}
-
-/* 滚动条样式 */
-.domain-list::-webkit-scrollbar {
-  width: 4px;
-}
-
-.domain-list::-webkit-scrollbar-track {
-  background: rgba(255, 255, 255, 0.05);
-  border-radius: 2px;
-}
-
-.domain-list::-webkit-scrollbar-thumb {
-  background: rgba(255, 149, 0, 0.5);
-  border-radius: 2px;
-}
-
-.domain-list::-webkit-scrollbar-thumb:hover {
-  background: rgba(255, 149, 0, 0.7);
 }
 </style>
