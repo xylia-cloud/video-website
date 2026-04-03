@@ -679,16 +679,16 @@ const goToCustomerService = async () => {
       message: '正在跳转客服...',
       duration: 1000,
     })
-    const customerServiceUrl = await generateCustomerServiceUrl()
+    const customerServiceUrl = generateCustomerServiceUrl()
     console.log('人工客服链接已生成:', customerServiceUrl)
 
-    // 跳转到客服页面（使用iframe嵌入）
-    router.push({
-      name: 'customerService',
-      query: {
-        url: customerServiceUrl,
-      },
-    })
+    const newWindow = window.open(customerServiceUrl, '_blank', 'noopener,noreferrer')
+    if (!newWindow) {
+      showToast({
+        message: '请允许弹窗后重试',
+        duration: 2000,
+      })
+    }
   } catch (error) {
     console.error('跳转客服失败:', error)
     showToast({

@@ -11,6 +11,7 @@ import {
 import { useRouter, useRoute } from 'vue-router'
 import { showToast } from 'vant'
 import BottomTabbar from '@/components/BottomTabbar.vue'
+import { generateCustomerServiceUrl } from '@/utils/rsa'
 
 // 顶级游戏分类接口
 interface TopGameCategory {
@@ -766,7 +767,16 @@ const handleManualRefreshBalance = async () => {
 }
 
 const goToCustomerService = () => {
-  router.push('/customer-service')
+  try {
+    const customerServiceUrl = generateCustomerServiceUrl()
+    const newWindow = window.open(customerServiceUrl, '_blank', 'noopener,noreferrer')
+    if (!newWindow) {
+      showToast('请允许弹窗后重试')
+    }
+  } catch (error) {
+    console.error('跳转客服失败:', error)
+    showToast('客服功能暂时不可用，请稍后重试')
+  }
 }
 
 // 跳转到登录页面

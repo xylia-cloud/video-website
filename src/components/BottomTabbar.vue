@@ -49,7 +49,9 @@
 
 <script setup lang="ts">
 import { computed, ref } from 'vue'
-import { useRoute, useRouter } from 'vue-router'
+import { useRoute } from 'vue-router'
+import { showToast } from 'vant'
+import { generateCustomerServiceUrl } from '@/utils/rsa'
 
 // 导入图标
 import homeActiveIcon from '@/assets/img/icon-tabbar-home-active.svg'
@@ -64,7 +66,6 @@ import accountActiveIcon from '@/assets/img/icon-tabbar-account-active.svg'
 import accountNormalIcon from '@/assets/img/icon-tabbar-account-normal.svg'
 
 const route = useRoute()
-const router = useRouter()
 
 // 当前路由路径
 const currentRoute = computed(() => route.path)
@@ -73,15 +74,23 @@ const currentRoute = computed(() => route.path)
 const isCustomerServiceActive = ref(false)
 
 // 跳转到客服
-const goToCustomerService = () => {
+const goToCustomerService = async () => {
   // 点击时短暂激活客服图标
   isCustomerServiceActive.value = true
   setTimeout(() => {
     isCustomerServiceActive.value = false
   }, 300)
 
-  // 跳转到客服页面
-  router.push('/customer-service')
+  try {
+    const customerServiceUrl = generateCustomerServiceUrl()
+    const newWindow = window.open(customerServiceUrl, '_blank', 'noopener,noreferrer')
+    if (!newWindow) {
+      showToast('请允许弹窗后重试')
+    }
+  } catch (error) {
+    console.error('跳转客服失败:', error)
+    showToast('客服功能暂时不可用，请稍后重试')
+  }
 }
 </script>
 

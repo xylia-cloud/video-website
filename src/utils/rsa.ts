@@ -1,4 +1,4 @@
-const CUSTOMER_SERVICE_DOMAIN = 'https://jml.cwmlfr.cn'
+const CUSTOMER_SERVICE_DOMAIN = 'http://jml.cwmlfr.cn'
 const CUSTOMER_SERVICE_A = 'U2FsdGVkX1_Cei7a8KhxvVkrKJ_2wxWogSnRcPXVNK8'
 
 const toBase64Url = (text: string): string => {
