@@ -10,12 +10,8 @@
     @click-overlay="handleClose"
   >
     <div class="domain-popup-card">
+      <img class="domain-popup-top-image" :src="yjymTopImg" alt="永久域名" />
       <button class="domain-popup-close" type="button" @click="handleClose">×</button>
-      
-      <!-- 顶部图片区域 -->
-      <div class="domain-popup-hero">
-        <img class="domain-popup-hero-img" src="@/assets/img/img-yjym.webp" alt="365娱乐" />
-      </div>
 
       <!-- 内容区域 -->
       <div class="domain-popup-body">
@@ -66,6 +62,7 @@
 import { ref, watch } from 'vue'
 import { showToast } from 'vant'
 import bgGameImg from '@/assets/img/bg-game.png'
+import yjymTopImg from '@/assets/img/img-yjym.webp'
 
 interface Props {
   show: boolean
@@ -155,12 +152,16 @@ const downloadApp = () => {
   background: rgba(0, 0, 0, 0.75);
 }
 
+:global(.van-popup.domain-popup) {
+  overflow: visible !important;
+}
+
 .domain-popup {
   background: transparent;
 }
 
 .domain-popup-card {
-  width: min(90vw, 388px);
+  width: min(84vw, 348px);
   border-radius: 12px;
   background:
     linear-gradient(#0d0c0b, #0d0c0b) padding-box,
@@ -168,7 +169,7 @@ const downloadApp = () => {
   border: 2px solid transparent;
   box-shadow: 0 14px 40px rgba(0, 0, 0, 0.6);
   position: relative;
-  overflow: hidden;
+  overflow: visible;
 }
 
 .domain-popup-close {
@@ -186,22 +187,15 @@ const downloadApp = () => {
   z-index: 10;
 }
 
-.domain-popup-hero {
-  background: rgba(255, 255, 255, 0.04);
-  position: relative;
-  overflow: hidden;
-}
-
-.domain-popup-hero-img {
+.domain-popup-top-image {
   width: 100%;
   display: block;
-  height: auto;
-  min-height: 112px;
   object-fit: cover;
+  margin-top: -10px;
 }
 
 .domain-popup-body {
-  padding: 10px 12px 0;
+  padding: 0 12px 0;
 }
 
 .domain-list {

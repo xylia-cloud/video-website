@@ -13,6 +13,7 @@ import {
 } from '@/api/fetch-api'
 import HeaderNav from '@/components/HeaderNav.vue'
 import BalanceInfoCard from '@/components/BalanceInfoCard.vue'
+import { generateCustomerServiceUrl } from '@/utils/rsa'
 
 // 接口类型定义
 interface PaymentChannel {
@@ -456,59 +457,15 @@ const goToManualRecharge = async () => {
       duration: 1000,
     })
 
-    // 获取或生成浏览器指纹
-    let browserId = localStorage.getItem('browserId')
+    const customerServiceUrl = await generateCustomerServiceUrl()
 
-    if (!browserId) {
-      // 生成简单的浏览器指纹
-      const fingerprint = [
-        navigator.userAgent,
-        navigator.language,
-        screen.colorDepth,
-        screen.width + 'x' + screen.height,
-        new Date().getTimezoneOffset(),
-        navigator.hardwareConcurrency || 'unknown',
-        navigator.platform,
-      ].join('|')
-
-      let hash = 0
-      for (let i = 0; i < fingerprint.length; i++) {
-        const char = fingerprint.charCodeAt(i)
-        hash = (hash << 5) - hash + char
-        hash = hash & hash
-      }
-      browserId = Math.abs(hash).toString(36)
-      localStorage.setItem('browserId', browserId)
-    }
-
-    // 调用接口获取RSA密钥
-    const formData = new URLSearchParams()
-    formData.append('murmur', browserId)
-
-    const response = await fetch('https://help.186web.cc/admin/RSAEncrypt/gtRsP', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/x-www-form-urlencoded',
+    // 跳转到客服页面（使用iframe嵌入）
+    router.push({
+      name: 'customerService',
+      query: {
+        url: customerServiceUrl,
       },
-      body: formData.toString(),
     })
-
-    const result = await response.json()
-
-    if (result && result.data) {
-      const rsaPassWord = result.data
-      const customerServiceUrl = `https://help186.xuhgki.cn/index/index/home?code=${rsaPassWord}`
-
-      // 跳转到客服页面（使用iframe嵌入）
-      router.push({
-        name: 'customerService',
-        query: {
-          url: encodeURIComponent(customerServiceUrl),
-        },
-      })
-    } else {
-      throw new Error('获取客服密钥失败')
-    }
   } catch (error) {
     console.error('跳转客服失败:', error)
     showToast({
@@ -937,6 +894,14 @@ const refreshUserBalance = async () => {
   }
 }
 
+const handleManualRefreshBalance = async () => {
+  await refreshUserBalance()
+  showToast({
+    message: '余额已刷新',
+    duration: 1500,
+  })
+}
+
 const handleCloseOrderSuccessModal = async () => {
   showOrderSuccessModal.value = false
   await refreshUserBalance()
@@ -1019,6 +984,12 @@ const checkPaymentResult = async () => {
           :is-vip="isVip"
           :balance="diamondBalance"
         />
+      </div>
+      <div class="balance-tip-line">
+        如长时间未到账，请点击此处
+        <span class="tip-link" @click="handleManualRefreshBalance">手动刷新余额</span>
+        或
+        <span class="tip-link" @click="goToManualRecharge">联系客服</span>
       </div>
 
       <!-- 第一步：选择支付方式 -->
@@ -1357,6 +1328,33 @@ const checkPaymentResult = async () => {
 /* 卡片包装器 */
 .balance-card-wrapper {
   margin: 12px 0;
+}
+
+.balance-tip-line {
+  margin: -2px 0 12px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  border: 1px solid rgba(255, 149, 0, 0.28);
+  background: linear-gradient(135deg, rgba(255, 149, 0, 0.14), rgba(255, 149, 0, 0.04));
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.18);
+  font-size: 12px;
+  line-height: 1.7;
+  color: #e8dccf;
+  text-align: center;
+}
+
+.tip-link {
+  color: #ffb84d;
+  font-weight: 600;
+  cursor: pointer;
+  text-decoration: none;
+  border-bottom: 1px dashed rgba(255, 184, 77, 0.7);
+  transition: color 0.2s ease, border-color 0.2s ease;
+}
+
+.tip-link:hover {
+  color: #ffd18a;
+  border-bottom-color: rgba(255, 209, 138, 0.9);
 }
 
 /* 可滚动内容区域 */

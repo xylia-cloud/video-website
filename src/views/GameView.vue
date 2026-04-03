@@ -760,6 +760,15 @@ const goToGameRecord = () => {
   router.push('/game-record')
 }
 
+const handleManualRefreshBalance = async () => {
+  await fetchUserBalance()
+  showToast('余额已刷新')
+}
+
+const goToCustomerService = () => {
+  router.push('/customer-service')
+}
+
 // 跳转到登录页面
 const goToLogin = () => {
   router.push('/login')
@@ -873,9 +882,15 @@ onMounted(() => {
         </div>
       </div>
     </div>
+    <div v-if="isUserLoggedIn" class="balance-tip-line">
+      如长时间未到账，请点击此处
+      <span class="tip-link" @click="handleManualRefreshBalance">手动刷新余额</span>
+      或
+      <span class="tip-link" @click="goToCustomerService">联系客服</span>
+    </div>
 
     <!-- 未登录状态 - 显示登录提示 -->
-    <div v-else class="login-prompt-section">
+    <div v-if="!isUserLoggedIn" class="login-prompt-section">
       <!-- 登录提示信息 -->
       <div class="login-prompt-content">
         <div class="login-icon">
@@ -1230,6 +1245,33 @@ onMounted(() => {
   justify-content: space-between;
   padding: 10px 15px;
   border-radius: 8px;
+}
+
+.balance-tip-line {
+  margin: -2px 12px 12px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  border: 1px solid rgba(255, 149, 0, 0.28);
+  background: linear-gradient(135deg, rgba(255, 149, 0, 0.14), rgba(255, 149, 0, 0.04));
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.18);
+  font-size: 12px;
+  line-height: 1.7;
+  color: #e8dccf;
+  text-align: center;
+}
+
+.tip-link {
+  color: #ffb84d;
+  font-weight: 600;
+  cursor: pointer;
+  text-decoration: none;
+  border-bottom: 1px dashed rgba(255, 184, 77, 0.7);
+  transition: color 0.2s ease, border-color 0.2s ease;
+}
+
+.tip-link:hover {
+  color: #ffd18a;
+  border-bottom-color: rgba(255, 209, 138, 0.9);
 }
 
 /* 用户信息和余额容器 */

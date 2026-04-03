@@ -15,6 +15,7 @@ import {
   type NoticeGroup,
 } from '@/api/fetch-api'
 import { BASE_URL } from '@/utils/config'
+import { generateCustomerServiceUrl } from '@/utils/rsa'
 import QRCode from 'qrcode'
 import BottomTabbar from '@/components/BottomTabbar.vue'
 
@@ -678,73 +679,16 @@ const goToCustomerService = async () => {
       message: '正在跳转客服...',
       duration: 1000,
     })
+    const customerServiceUrl = await generateCustomerServiceUrl()
+    console.log('人工客服链接已生成:', customerServiceUrl)
 
-    // 获取或生成浏览器指纹
-    let browserId = localStorage.getItem('browserId')
-
-    if (!browserId) {
-      console.log('生成新的浏览器指纹')
-      // 生成简单的浏览器指纹（基于navigator信息）
-      const fingerprint = [
-        navigator.userAgent,
-        navigator.language,
-        screen.colorDepth,
-        screen.width + 'x' + screen.height,
-        new Date().getTimezoneOffset(),
-        navigator.hardwareConcurrency || 'unknown',
-        navigator.platform,
-      ].join('|')
-
-      // 简单hash函数
-      let hash = 0
-      for (let i = 0; i < fingerprint.length; i++) {
-        const char = fingerprint.charCodeAt(i)
-        hash = (hash << 5) - hash + char
-        hash = hash & hash
-      }
-      browserId = Math.abs(hash).toString(36)
-      localStorage.setItem('browserId', browserId)
-      console.log('新浏览器指纹已生成:', browserId)
-    } else {
-      console.log('使用已存在的浏览器指纹:', browserId)
-    }
-
-    console.log('准备调用RSA接口，浏览器指纹:', browserId)
-
-    // 调用接口获取RSA密钥 - 使用表单格式
-    const formData = new URLSearchParams()
-    formData.append('murmur', browserId)
-
-    const response = await fetch('https://help.186web.cc/admin/RSAEncrypt/gtRsP', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/x-www-form-urlencoded',
+    // 跳转到客服页面（使用iframe嵌入）
+    router.push({
+      name: 'customerService',
+      query: {
+        url: customerServiceUrl,
       },
-      body: formData.toString(),
     })
-
-    console.log('接口响应状态:', response.status)
-
-    const result = await response.json()
-    console.log('接口返回结果:', result)
-
-    if (result && result.data) {
-      const rsaPassWord = result.data
-      const customerServiceUrl = `https://help186.xuhgki.cn/index/index/home?code=${rsaPassWord}`
-
-      console.log('人工客服链接已生成:', customerServiceUrl)
-
-      // 跳转到客服页面（使用iframe嵌入）
-      router.push({
-        name: 'customerService',
-        query: {
-          url: encodeURIComponent(customerServiceUrl),
-        },
-      })
-    } else {
-      console.error('接口返回数据格式错误:', result)
-      throw new Error('获取客服密钥失败')
-    }
   } catch (error) {
     console.error('跳转客服失败:', error)
     showToast({

@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue';
-import { Icon, Loading, Tabs, Tab } from 'vant';
+import { Icon, Loading, Tabs, Tab, showToast } from 'vant';
 import { useRouter } from 'vue-router';
 import { fetchVideoChargeLog, fetchGameChargeLog } from '@/api/fetch-api';
 
@@ -227,6 +227,44 @@ const getGameStatusClass = (statusCn: string) => {
   return 'failed'; // 失败、已取消等
 };
 
+// 复制订单号
+const copyOrderNo = async (orderNo: string) => {
+  if (!orderNo) {
+    showToast({
+      message: '订单号为空',
+      duration: 1500,
+    });
+    return;
+  }
+
+  try {
+    if (navigator.clipboard && window.isSecureContext) {
+      await navigator.clipboard.writeText(orderNo);
+    } else {
+      const textArea = document.createElement('textarea');
+      textArea.value = orderNo;
+      textArea.setAttribute('readonly', 'true');
+      textArea.style.position = 'fixed';
+      textArea.style.left = '-999999px';
+      document.body.appendChild(textArea);
+      textArea.select();
+      document.execCommand('copy');
+      document.body.removeChild(textArea);
+    }
+
+    showToast({
+      message: '订单号已复制',
+      duration: 1500,
+    });
+  } catch (error) {
+    console.error('复制订单号失败:', error);
+    showToast({
+      message: '复制失败，请重试',
+      duration: 2000,
+    });
+  }
+};
+
 onMounted(() => {
   // 默认加载视频充值记录
   fetchVideoRecords();
@@ -282,7 +320,17 @@ onBeforeUnmount(() => {
           <div v-else class="records-list">
             <div class="record-item" v-for="record in videoRecords" :key="record.order_id">
               <div class="record-header">
-                <div class="record-title">订单号：{{ record.order_code }}</div>
+                <div class="record-title">
+                  <span class="record-title-text">订单号：{{ record.order_code }}</span>
+                  <button
+                    class="copy-order-btn"
+                    type="button"
+                    @click="copyOrderNo(record.order_code)"
+                    aria-label="复制视频充值订单号"
+                  >
+                    <Icon name="copy-o" size="16" />
+                  </button>
+                </div>
                 <div class="record-status" :class="getStatusClass(record.order_status)">
                   {{ record.order_status_cn }}
                 </div>
@@ -350,7 +398,17 @@ onBeforeUnmount(() => {
           <div v-else class="records-list">
             <div class="record-item" v-for="record in gameRecords" :key="record.id">
               <div class="record-header">
-                <div class="record-title">订单号：{{ record.orderno }}</div>
+                <div class="record-title">
+                  <span class="record-title-text">订单号：{{ record.orderno }}</span>
+                  <button
+                    class="copy-order-btn"
+                    type="button"
+                    @click="copyOrderNo(record.orderno)"
+                    aria-label="复制游戏充值订单号"
+                  >
+                    <Icon name="copy-o" size="16" />
+                  </button>
+                </div>
                 <div class="record-status" :class="getGameStatusClass(record.status_cn)">
                   {{ record.status_cn }}
                 </div>
@@ -489,8 +547,30 @@ onBeforeUnmount(() => {
   color: #999;
   flex: 1;
   overflow: hidden;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.record-title-text {
+  overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.copy-order-btn {
+  border: none;
+  background: transparent;
+  color: #ff9500;
+  padding: 0;
+  width: 20px;
+  height: 20px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  cursor: pointer;
 }
 
 .record-status {

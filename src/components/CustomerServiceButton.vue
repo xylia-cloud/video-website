@@ -17,6 +17,7 @@
 import { computed, ref, onMounted, onUnmounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { showToast } from 'vant'
+import { generateCustomerServiceUrl } from '@/utils/rsa'
 
 const route = useRoute()
 const router = useRouter()
@@ -35,8 +36,8 @@ const hasMoved = ref(false) // 标记是否发生了拖动
 
 // 判断是否应该显示客服按钮
 const shouldShowButton = computed(() => {
-  // 在游戏播放页面隐藏客服按钮
-  return route.path !== '/game-play'
+  // 在游戏播放页和客服页隐藏客服按钮
+  return route.path !== '/game-play' && route.path !== '/customer-service'
 })
 
 // 计算按钮样式
@@ -201,79 +202,21 @@ const handleClick = async () => {
   console.log('客服按钮被点击')
   
   try {
-    console.log('开始处理客服跳转')
-    
     showToast({
       message: '正在跳转客服...',
       duration: 1000,
     })
 
-    // 获取或生成浏览器指纹
-    let browserId = localStorage.getItem('browserId')
-    
-    if (!browserId) {
-      console.log('生成新的浏览器指纹')
-      // 生成简单的浏览器指纹（基于navigator信息）
-      const fingerprint = [
-        navigator.userAgent,
-        navigator.language,
-        screen.colorDepth,
-        screen.width + 'x' + screen.height,
-        new Date().getTimezoneOffset(),
-        navigator.hardwareConcurrency || 'unknown',
-        navigator.platform
-      ].join('|')
-      
-      // 简单hash函数
-      let hash = 0
-      for (let i = 0; i < fingerprint.length; i++) {
-        const char = fingerprint.charCodeAt(i)
-        hash = ((hash << 5) - hash) + char
-        hash = hash & hash
-      }
-      browserId = Math.abs(hash).toString(36)
-      localStorage.setItem('browserId', browserId)
-      console.log('新浏览器指纹已生成:', browserId)
-    } else {
-      console.log('使用已存在的浏览器指纹:', browserId)
-    }
+    const customerServiceUrl = await generateCustomerServiceUrl()
+    console.log('客服链接已生成:', customerServiceUrl)
 
-    console.log('准备调用RSA接口，浏览器指纹:', browserId)
-
-    // 调用接口获取RSA密钥 - 使用表单格式
-    const formData = new URLSearchParams()
-    formData.append('murmur', browserId)
-    
-    const response = await fetch('https://help.186web.cc/admin/RSAEncrypt/gtRsP', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/x-www-form-urlencoded',
+    // 跳转到客服页面（使用iframe嵌入）
+    router.push({
+      name: 'customerService',
+      query: {
+        url: customerServiceUrl,
       },
-      body: formData.toString()
     })
-
-    console.log('接口响应状态:', response.status)
-    
-    const result = await response.json()
-    console.log('接口返回结果:', result)
-    
-    if (result && result.data) {
-      const rsaPassWord = result.data
-      const customerServiceUrl = `https://help186.xuhgki.cn/index/index/home?code=${rsaPassWord}`
-      
-      console.log('客服链接已生成:', customerServiceUrl)
-      
-      // 跳转到客服页面（使用iframe嵌入）
-      router.push({
-        name: 'customerService',
-        query: {
-          url: encodeURIComponent(customerServiceUrl)
-        }
-      })
-    } else {
-      console.error('接口返回数据格式错误:', result)
-      throw new Error('获取客服密钥失败')
-    }
   } catch (error) {
     console.error('跳转客服失败，详细错误:', error)
     showToast({
