@@ -958,7 +958,7 @@ const confirmApplyAgent = async () => {
     </div>
 
     <!-- u9000u51fau767bu5f55u6309u94ae -->
-    <div class="logout-button" @click="handleLogout">退出登录</div>
+    <div class="logout-button" @click="handleLogout">退出登录/切换账号</div>
 
     <!-- 底部导航 -->
     <BottomTabbar />
