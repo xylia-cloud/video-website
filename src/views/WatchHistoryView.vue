@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue';
 import { useRouter } from 'vue-router';
-import { fetchUserLogList } from '@/api/fetch-api';
+import { fetchUserLogList, checkApiAuthError } from '@/api/fetch-api';
 import { BASE_URL } from '@/utils/config';
 import { Icon as VanIcon, showToast, showLoadingToast, closeToast } from 'vant';
 import HeaderNav from '@/components/HeaderNav.vue';
@@ -22,6 +22,14 @@ interface VideoItem {
 
 // 看片足迹数据
 const watchHistoryData = ref<VideoItem[]>([]);
+
+const isLoginRequiredResult = (result: any): boolean => {
+    if (!result) return false;
+    if (checkApiAuthError(result)) return true;
+    if (result.code === 1002) return true;
+    const msg = String(result.msg || result.message || '');
+    return msg.includes('请先登录') || msg.includes('重新登录');
+};
 
 // 获取看片足迹数据
 const fetchWatchHistoryData = async () => {
@@ -57,7 +65,7 @@ const fetchWatchHistoryData = async () => {
             });
 
             isEmpty.value = false;
-        } else if (result && result.code === 1002) {
+        } else if (isLoginRequiredResult(result)) {
             // 未登录
             console.log('用户未登录，跳转到登录页面');
             showToast('请先登录再查看足迹');

@@ -1,18 +1,20 @@
 <script setup lang="ts">
 import { RouterView } from 'vue-router'
 import { onMounted } from 'vue'
-import { isLoggedIn, isTokenExpired, forceLogin } from '@/api/fetch-api'
+import { isLoggedIn, isTokenExpired, syncTokenExpiryWatcher } from '@/api/fetch-api'
 import TopLoading from '@/components/TopLoading.vue'
 import CustomerServiceButton from '@/components/CustomerServiceButton.vue'
+import GlobalAuthModal from '@/components/GlobalAuthModal.vue'
 
-// 应用启动时检查TOKEN状态（仅记录，不强制登录）
+// 应用启动时同步登录过期监听
 onMounted(() => {
   console.log('应用启动，检查TOKEN状态...')
+  syncTokenExpiryWatcher()
 
-  // 延迟检查，仅用于日志记录，不强制用户登录
+  // 延迟打印当前登录状态，方便排查过期问题
   setTimeout(() => {
     if (isTokenExpired()) {
-      console.log('检测到TOKEN已过期，但允许用户继续浏览')
+      console.log('检测到TOKEN已过期，已由全局过期监听接管')
     } else if (isLoggedIn()) {
       console.log('TOKEN有效，用户已登录')
     } else {
@@ -26,6 +28,7 @@ onMounted(() => {
   <div class="app-container">
     <TopLoading />
     <RouterView />
+    <GlobalAuthModal />
     <CustomerServiceButton />
   </div>
 </template>

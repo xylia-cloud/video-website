@@ -4,7 +4,14 @@ import { useRouter } from 'vue-router'
 import { showToast, closeToast, Loading, Icon } from 'vant'
 import HeaderNav from '@/components/HeaderNav.vue'
 import BalanceInfoCard from '@/components/BalanceInfoCard.vue'
-import { getUserInfo, setUserInfo, type UserInfo, createAuthHeaders, fetchUserPoints } from '@/api/fetch-api'
+import {
+    getUserInfo,
+    setUserInfo,
+    type UserInfo,
+    createAuthHeaders,
+    fetchUserPoints,
+    checkApiAuthError,
+} from '@/api/fetch-api'
 import { BASE_URL } from '@/utils/config'
 
 const router = useRouter()
@@ -36,6 +43,14 @@ const selectedChargeOption = ref<{ price: number, type: number, desc: string } |
 
 // 充值完成弹窗状态
 const showChargeCompleteDialog = ref(false)
+
+const isLoginRequiredResult = (result: any): boolean => {
+    if (!result) return false
+    if (checkApiAuthError(result)) return true
+    if (result.code === 1002) return true
+    const msg = String(result.msg || result.message || '')
+    return msg.includes('请先登录') || msg.includes('重新登录')
+}
 
 // VIP状态显示计算属性
 const vipStatusText = computed(() => {
@@ -269,7 +284,7 @@ const confirmCharge = async () => {
                 fetchUserInfo()
             }
 
-        } else if (result.code === 0 && result.msg === '请先登录') {
+        } else if (isLoginRequiredResult(result)) {
             // 需要登录
             showToast({
                 message: '请先登录后再充值',

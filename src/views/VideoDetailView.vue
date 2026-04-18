@@ -17,6 +17,7 @@ import {
   createAuthHeaders,
   fetchUserPoints,
   touristLogin,
+  checkApiAuthError,
 } from '@/api/fetch-api'
 import type { VideoDetail } from '@/api/fetch-api'
 import { BASE_URL } from '@/utils/config'
@@ -218,6 +219,14 @@ const isCollected = ref(false) // 是否已收藏
 
 // 推荐视频状态变量
 const isRefreshingRecommends = ref(false)
+
+const isLoginRequiredResult = (result: any): boolean => {
+  if (!result) return false
+  if (checkApiAuthError(result)) return true
+  if (result.code === 1002) return true
+  const msg = String(result.msg || result.message || '')
+  return msg.includes('请先登录') || msg.includes('重新登录')
+}
 
 // 添加一个专门用于解析URL中的邀请码的方法
 const parseUrlInviteCode = () => {
@@ -812,7 +821,7 @@ const confirmCharge = async () => {
 
         // 可以在这里添加其他成功后的逻辑，比如重新检查积分并播放视频
       }
-    } else if (result.code === 0 && result.msg === '请先登录') {
+    } else if (isLoginRequiredResult(result)) {
       // 需要登录
       showToast({
         message: '请先登录后再充值',
@@ -1178,9 +1187,6 @@ const handleVideoPlay = () => {
     isVideoPlayed.value = true
     updatePlayCount()
 
-    // 记录播放历史
-    recordWatchHistory()
-
     // 如果是付费视频且之前未观看，则更新用户信息
     if (isNeedPay.value && pointsNeeded.value > 0) {
       console.log('付费视频播放开始，将在播放后更新用户积分和观看次数信息')
@@ -1457,9 +1463,12 @@ const continuePlay = async () => {
 }
 
 // 扣除积分并播放视频
-const deductPointsAndPlay = () => {
+const deductPointsAndPlay = async () => {
   // 直接播放视频，由后端处理扣费
-  startVideoPlayback()
+  const played = await startVideoPlayback()
+  if (!played) {
+    return
+  }
 
   // 记录视频已经播放，用于防止重复扣费
   isWatched.value = true
@@ -1473,7 +1482,13 @@ const deductPointsAndPlay = () => {
 }
 
 // 开始视频播放的统一方法
-const startVideoPlayback = () => {
+const startVideoPlayback = async (): Promise<boolean> => {
+  // 播放前先做一次登录有效性校验，避免接口返回700后仍继续播放
+  const canPlay = await recordWatchHistory()
+  if (!canPlay) {
+    return false
+  }
+
   // 直接播放视频，不隐藏其他内容
   console.log('开始播放视频:', videoSrc.value)
   // 重置错误状态
@@ -1485,6 +1500,8 @@ const startVideoPlayback = () => {
   setTimeout(() => {
     setupVideoSource(videoSrc.value)
   }, 100)
+
+  return true
 }
 
 const handleDownloadVideo = () => {
@@ -1532,8 +1549,8 @@ const updatePlayCount = async () => {
 }
 
 // 记录播放历史
-const recordWatchHistory = async () => {
-  if (!videoDetail.value || !videoDetail.value.vod_id) return
+const recordWatchHistory = async (): Promise<boolean> => {
+  if (!videoDetail.value || !videoDetail.value.vod_id) return true
 
   try {
     const params = {
@@ -1549,12 +1566,29 @@ const recordWatchHistory = async () => {
 
     if (result && result.code === 1) {
       console.log('播放历史记录成功')
+      return true
+    } else if (isLoginRequiredResult(result)) {
+      showAuthenticationModal('login')
+      return false
     } else {
       console.error('播放历史记录失败:', result?.msg || '未知错误')
+      return true
     }
-  } catch (error) {
+  } catch (error: any) {
     console.error('记录播放历史失败:', error)
-    // 静默失败，不影响用户体验
+
+    const message = String(error?.message || '')
+    if (
+      message.includes('请先登录') ||
+      message.includes('认证失败') ||
+      message.includes('重新登录')
+    ) {
+      showAuthenticationModal('login')
+      return false
+    }
+
+    // 非认证错误不阻断播放，避免网络波动影响体验
+    return true
   }
 }
 
@@ -1584,7 +1618,7 @@ const fetchVideoDetailData = async () => {
     console.log('视频详情数据:', result)
 
     // 检查是否需要登录
-    if (result.code === 0 && result.msg === '请先登录') {
+    if (isLoginRequiredResult(result)) {
       showDialog({
         title: '需要登录',
         message: '观看视频需要登录，是否前往登录？',
@@ -2197,8 +2231,7 @@ const handleCollect = async () => {
         className: isCollected.value ? 'custom-toast-success' : 'custom-toast-info',
         icon: isCollected.value ? 'success' : 'info',
       })
-    } else if (result && result.code === 1002) {
-      // 假设1002是需要登录的错误码
+    } else if (isLoginRequiredResult(result)) {
       showDialog({
         title: '提示',
         message: '收藏功能需要登录，是否前往登录？',

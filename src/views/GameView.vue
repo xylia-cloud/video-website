@@ -4,14 +4,11 @@ import { NEW_API_BASE_URL } from '@/utils/config'
 import {
   getUserInfo,
   isLoggedIn,
-  fetchNotices,
   fetchUserPoints,
-  type NoticeGroup,
 } from '@/api/fetch-api'
 import { useRouter, useRoute } from 'vue-router'
 import { showToast } from 'vant'
 import BottomTabbar from '@/components/BottomTabbar.vue'
-import { generateCustomerServiceUrl } from '@/utils/rsa'
 
 // 顶级游戏分类接口
 interface TopGameCategory {
@@ -97,6 +94,7 @@ const isGlobalLoading = ref(false)
 // 用户余额数据
 const userBalance = ref(0)
 const gameBalance = ref(0)
+const isRefreshingBalance = ref(false)
 
 // 用户信息计算属性
 const displayUserName = computed(() => {
@@ -120,43 +118,6 @@ const displayUserId = computed(() => {
 // 用户登录状态
 const isUserLoggedIn = ref(false)
 
-// 公告相关状态
-const announcementText = ref('')
-const isLoadingNotice = ref(false)
-const hasNoticeError = ref(false)
-
-// 获取充值公告数据
-const fetchRechargeNotice = async () => {
-  isLoadingNotice.value = true
-  hasNoticeError.value = false
-
-  try {
-    const result = await fetchNotices()
-    console.log('获取公告数据:', result)
-
-    if (result && result.code === 1 && result.data) {
-      // 查找充值公告分组
-      const rechargeGroup = result.data.find((group: NoticeGroup) => group.name === '充值公告')
-
-      if (rechargeGroup && rechargeGroup.list && rechargeGroup.list.length > 0) {
-        // 获取第一条充值公告的内容
-        const firstNotice = rechargeGroup.list[0]
-        announcementText.value = firstNotice.content
-      } else {
-        announcementText.value = '暂无充值公告'
-      }
-    } else {
-      hasNoticeError.value = true
-      announcementText.value = '公告加载失败'
-    }
-  } catch (error) {
-    console.error('获取充值公告失败:', error)
-    hasNoticeError.value = true
-    announcementText.value = '公告加载失败'
-  } finally {
-    isLoadingNotice.value = false
-  }
-}
 
 // 防重复请求标记
 const isTopCategoriesLoading = ref(false)
@@ -762,21 +723,17 @@ const goToGameRecord = () => {
 }
 
 const handleManualRefreshBalance = async () => {
-  await fetchUserBalance()
-  showToast('余额已刷新')
-}
-
-const goToCustomerService = () => {
-  try {
-    const customerServiceUrl = generateCustomerServiceUrl()
-    const newWindow = window.open(customerServiceUrl, '_blank', 'noopener,noreferrer')
-    if (!newWindow) {
-      showToast('请允许弹窗后重试')
-    }
-  } catch (error) {
-    console.error('跳转客服失败:', error)
-    showToast('客服功能暂时不可用，请稍后重试')
+  if (isRefreshingBalance.value) {
+    return
   }
+
+  isRefreshingBalance.value = true
+  try {
+    await fetchUserBalance()
+  } finally {
+    isRefreshingBalance.value = false
+  }
+  showToast('余额已刷新')
 }
 
 // 跳转到登录页面
@@ -828,8 +785,6 @@ onMounted(() => {
   fetchTopCategories()
   // 获取用户余额
   fetchUserBalance()
-  // 获取充值公告
-  fetchRechargeNotice()
   // 顶级分类数据加载后会自动加载一级分类列表
 })
 </script>
@@ -839,16 +794,6 @@ onMounted(() => {
     <!-- 全屏加载状态 -->
     <div v-if="isGlobalLoading" class="global-loading">
       <div class="custom-spinner"></div>
-    </div>
-
-    <!-- 公告版块 -->
-    <div class="announcement-section">
-      <div class="announcement-icon">
-        <img src="@/assets/img/icon-notice.svg" alt="" />
-      </div>
-      <div class="announcement-content">
-        <div class="announcement-text">{{ announcementText }}</div>
-      </div>
     </div>
 
     <!-- 充值版块 -->
@@ -868,6 +813,13 @@ onMounted(() => {
           <div class="balance-item">
             <span class="balance-label">账户余额：</span>
             <span class="balance-value">{{ userBalance.toFixed(2) }}</span>
+            <van-icon
+              name="replay"
+              size="14"
+              class="balance-refresh-icon"
+              :class="{ spinning: isRefreshingBalance }"
+              @click="handleManualRefreshBalance"
+            />
           </div>
           <div class="balance-item">
             <span class="balance-label">游戏余额：</span>
@@ -892,13 +844,6 @@ onMounted(() => {
         </div>
       </div>
     </div>
-    <div v-if="isUserLoggedIn" class="balance-tip-line">
-      如长时间未到账，请点击此处
-      <span class="tip-link" @click="handleManualRefreshBalance">手动刷新余额</span>
-      或
-      <span class="tip-link" @click="goToCustomerService">联系客服</span>
-    </div>
-
     <!-- 未登录状态 - 显示登录提示 -->
     <div v-if="!isUserLoggedIn" class="login-prompt-section">
       <!-- 登录提示信息 -->
@@ -1163,87 +1108,6 @@ onMounted(() => {
   }
 }
 
-/* 公告版块样式 */
-.announcement-section {
-  background: #2c2c2c;
-  margin: 12px 12px 0 12px;
-  padding: 12px 16px;
-  border-radius: 8px;
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  overflow: hidden;
-  min-height: 48px;
-}
-
-.announcement-icon {
-  color: #ffffff;
-  flex-shrink: 0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 20px;
-  height: 20px;
-}
-
-.announcement-content {
-  flex: 1;
-  overflow: hidden;
-  position: relative;
-  height: 20px;
-}
-
-.announcement-text {
-  color: #ffffff;
-  font-size: 14px;
-  line-height: 1.4;
-  white-space: nowrap;
-  position: absolute;
-  top: 0;
-  left: 0;
-  width: max-content;
-  animation: scrollText 20s linear infinite;
-}
-
-@keyframes scrollText {
-  0% {
-    transform: translateX(100%);
-  }
-
-  100% {
-    transform: translateX(-100%);
-  }
-}
-
-/* 三个点装饰 */
-.dots-decoration {
-  position: absolute;
-  top: 12px;
-  left: 15px;
-  display: flex;
-  gap: 6px;
-  z-index: 1;
-}
-
-.dots-decoration .dot {
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  display: inline-block;
-}
-
-.dots-decoration .dot:first-child {
-  background-color: #ff9500;
-}
-
-.dots-decoration .dot:nth-child(2) {
-  background-color: #ffffff;
-}
-
-.dots-decoration .dot:last-child {
-  background-color: #ffffff;
-}
-
 /* 充值版块样式 */
 .recharge-section {
   background: #2c2c2c url('@/assets/img/bg-game.png') no-repeat center center;
@@ -1255,33 +1119,6 @@ onMounted(() => {
   justify-content: space-between;
   padding: 10px 15px;
   border-radius: 8px;
-}
-
-.balance-tip-line {
-  margin: -2px 12px 12px;
-  padding: 10px 12px;
-  border-radius: 10px;
-  border: 1px solid rgba(255, 149, 0, 0.28);
-  background: linear-gradient(135deg, rgba(255, 149, 0, 0.14), rgba(255, 149, 0, 0.04));
-  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.18);
-  font-size: 12px;
-  line-height: 1.7;
-  color: #e8dccf;
-  text-align: center;
-}
-
-.tip-link {
-  color: #ffb84d;
-  font-weight: 600;
-  cursor: pointer;
-  text-decoration: none;
-  border-bottom: 1px dashed rgba(255, 184, 77, 0.7);
-  transition: color 0.2s ease, border-color 0.2s ease;
-}
-
-.tip-link:hover {
-  color: #ffd18a;
-  border-bottom-color: rgba(255, 209, 138, 0.9);
 }
 
 /* 用户信息和余额容器 */
@@ -1346,6 +1183,15 @@ onMounted(() => {
   font-size: 16px;
   font-weight: bold;
   color: #ffffff;
+}
+
+.balance-refresh-icon {
+  color: rgba(255, 255, 255, 0.85);
+  cursor: pointer;
+}
+
+.balance-refresh-icon.spinning {
+  animation: spin 0.8s linear infinite;
 }
 
 /* 右侧操作区域 */

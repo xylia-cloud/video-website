@@ -6,9 +6,17 @@ interface Props {
   userVideoNums: number
   isVip: number | string
   balance: number
+  showRefreshIcon?: boolean
+  refreshLoading?: boolean
 }
 
-const props = defineProps<Props>()
+const props = withDefaults(defineProps<Props>(), {
+  showRefreshIcon: false,
+  refreshLoading: false,
+})
+const emit = defineEmits<{
+  (e: 'refresh-balance'): void
+}>()
 
 // 计算 VIP 状态（兼容数字和字符串）
 const isVipActive = computed(() => {
@@ -40,7 +48,24 @@ const isVipActive = computed(() => {
     </div>
 
     <div class="balance-right">
-      <div class="balance-title">账户余额</div>
+      <div class="balance-title-row">
+        <button
+          v-if="showRefreshIcon"
+          type="button"
+          class="balance-refresh-btn"
+          :disabled="refreshLoading"
+          aria-label="刷新余额"
+          @click="emit('refresh-balance')"
+        >
+          <van-icon
+            name="replay"
+            size="14"
+            class="balance-refresh-icon"
+            :class="{ spinning: refreshLoading }"
+          />
+        </button>
+        <div class="balance-title">账户余额</div>
+      </div>
       <div class="balance-amount">
         <span class="balance-amount-value">{{ balance.toFixed(2) }}</span>
         <span class="balance-amount-unit">金币</span>
@@ -151,6 +176,45 @@ const isVipActive = computed(() => {
   font-size: 15px;
   font-weight: bold;
   color: #fff;
+}
+
+.balance-title-row {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 6px;
+}
+
+.balance-refresh-btn {
+  border: 0;
+  background: transparent;
+  padding: 0;
+  margin: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+}
+
+.balance-refresh-btn:disabled {
+  cursor: default;
+}
+
+.balance-refresh-icon {
+  color: rgba(255, 255, 255, 0.85);
+}
+
+.balance-refresh-icon.spinning {
+  animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
 }
 
 .balance-amount {

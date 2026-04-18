@@ -121,6 +121,7 @@ const userVideoNums = ref(0)
 
 // 用户VIP状态
 const isVip = ref(0)
+const isRefreshingBalance = ref(false)
 
 // 选项卡状态
 const activeTab = ref('game') // 'game' 或 'video'
@@ -870,6 +871,11 @@ const loadUserBalance = () => {
 
 // 刷新用户余额（从服务器获取最新数据）
 const refreshUserBalance = async () => {
+  if (isRefreshingBalance.value) {
+    return
+  }
+
+  isRefreshingBalance.value = true
   try {
     const result = await fetchUserPoints()
     if (result && result.code === 1 && result.data) {
@@ -891,6 +897,8 @@ const refreshUserBalance = async () => {
     }
   } catch (error) {
     console.error('刷新用户余额失败:', error)
+  } finally {
+    isRefreshingBalance.value = false
   }
 }
 
@@ -983,13 +991,10 @@ const checkPaymentResult = async () => {
           :user-video-nums="userVideoNums"
           :is-vip="isVip"
           :balance="diamondBalance"
+          :show-refresh-icon="true"
+          :refresh-loading="isRefreshingBalance"
+          @refresh-balance="handleManualRefreshBalance"
         />
-      </div>
-      <div class="balance-tip-line">
-        如长时间未到账，请点击此处
-        <span class="tip-link" @click="handleManualRefreshBalance">手动刷新余额</span>
-        或
-        <span class="tip-link" @click="goToManualRecharge">联系客服</span>
       </div>
 
       <!-- 第一步：选择支付方式 -->
@@ -1328,33 +1333,6 @@ const checkPaymentResult = async () => {
 /* 卡片包装器 */
 .balance-card-wrapper {
   margin: 12px 0;
-}
-
-.balance-tip-line {
-  margin: -2px 0 12px;
-  padding: 10px 12px;
-  border-radius: 10px;
-  border: 1px solid rgba(255, 149, 0, 0.28);
-  background: linear-gradient(135deg, rgba(255, 149, 0, 0.14), rgba(255, 149, 0, 0.04));
-  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.18);
-  font-size: 12px;
-  line-height: 1.7;
-  color: #e8dccf;
-  text-align: center;
-}
-
-.tip-link {
-  color: #ffb84d;
-  font-weight: 600;
-  cursor: pointer;
-  text-decoration: none;
-  border-bottom: 1px dashed rgba(255, 184, 77, 0.7);
-  transition: color 0.2s ease, border-color 0.2s ease;
-}
-
-.tip-link:hover {
-  color: #ffd18a;
-  border-bottom-color: rgba(255, 209, 138, 0.9);
 }
 
 /* 可滚动内容区域 */

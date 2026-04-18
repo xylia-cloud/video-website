@@ -616,6 +616,64 @@ const TOKEN_EXPIRE_KEY = 'token_expire_time'
 // TOKEN过期时间（12小时，以毫秒为单位）
 const TOKEN_EXPIRE_DURATION = 12 * 60 * 60 * 1000 // 12小时
 
+let tokenExpiryTimer: ReturnType<typeof setTimeout> | null = null
+
+const clearTokenExpiryTimer = () => {
+  if (tokenExpiryTimer) {
+    clearTimeout(tokenExpiryTimer)
+    tokenExpiryTimer = null
+  }
+}
+
+export const openGlobalAuthModal = (
+  tab: 'login' | 'register' = 'login',
+  message: string = '登录状态已失效，请重新登录',
+) => {
+  if (typeof window === 'undefined') {
+    return
+  }
+
+  window.dispatchEvent(
+    new CustomEvent('open-global-auth-modal', {
+      detail: {
+        tab,
+        message,
+      },
+    }),
+  )
+}
+
+export const syncTokenExpiryWatcher = () => {
+  if (typeof window === 'undefined') {
+    return
+  }
+
+  clearTokenExpiryTimer()
+
+  const token = getToken()
+  const expireTimeStr = localStorage.getItem(TOKEN_EXPIRE_KEY)
+  if (!token || !expireTimeStr) {
+    return
+  }
+
+  const expireTime = parseInt(expireTimeStr, 10)
+  if (Number.isNaN(expireTime)) {
+    return
+  }
+
+  const delay = expireTime - Date.now()
+  if (delay <= 0) {
+    console.log('TOKEN到期监听检测到已过期，立即触发重新登录')
+    forceLogin()
+    return
+  }
+
+  tokenExpiryTimer = setTimeout(() => {
+    console.log('TOKEN到期监听触发，自动要求重新登录')
+    forceLogin()
+  }, delay)
+}
+
 // 设置用户信息到本地存储
 export const setUserInfo = (userInfo: UserInfo) => {
   const expireTime = Date.now() + TOKEN_EXPIRE_DURATION
@@ -629,6 +687,7 @@ export const setUserInfo = (userInfo: UserInfo) => {
   localStorage.setItem(USER_INFO_KEY, JSON.stringify(userInfo))
   localStorage.setItem(TOKEN_KEY, userInfo.token)
   localStorage.setItem(TOKEN_EXPIRE_KEY, expireTime.toString())
+  syncTokenExpiryWatcher()
 
   console.log(`TOKEN已保存，将在${new Date(expireTime).toLocaleString()}过期`)
 }
@@ -763,6 +822,7 @@ export const getTokenExpireTimeString = (): string => {
 // 清除用户登录信息和所有缓存
 export const clearUserInfo = () => {
   console.log('🗑️ clearUserInfo 被调用，调用堆栈:', new Error().stack)
+  clearTokenExpiryTimer()
   localStorage.removeItem(USER_INFO_KEY)
   localStorage.removeItem(TOKEN_KEY)
   localStorage.removeItem(TOKEN_EXPIRE_KEY)
@@ -831,31 +891,9 @@ export const checkLoginRequired = (): boolean => {
 
 // 强制用户重新登录
 export const forceLogin = () => {
-  console.log('TOKEN已过期，强制重新登录')
-
-  // 获取当前路径
-  const currentPath = window.location.hash.replace('#', '')
-
-  // 如果当前已经在登录页面或者注册页面，则只清除缓存，不跳转
-  if (
-    currentPath === '/login' ||
-    currentPath === '/register' ||
-    currentPath.startsWith('/login') ||
-    currentPath.startsWith('/register')
-  ) {
-    console.log('当前在登录/注册页面，只清除缓存')
-    clearAllCache()
-    return
-  }
-
-  // 清除所有缓存
+  console.log('TOKEN已过期，打开全局登录弹窗')
   clearAllCache()
-
-  // 跳转到登录页面
-  const loginUrl = `/login?redirect=${encodeURIComponent(currentPath)}`
-
-  // 使用原生跳转到登录页面
-  window.location.href = `${window.location.origin}${window.location.pathname}#${loginUrl}`
+  openGlobalAuthModal('login', '登录已过期，请重新登录')
 }
 
 // 友好地提示用户登录（不强制跳转）
