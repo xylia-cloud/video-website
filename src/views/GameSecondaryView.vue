@@ -232,13 +232,57 @@ const handleTabChange = (tab: 'all' | 'favorite') => {
 }
 
 // 进入游戏接口
+type GameLaunchMode = 'url' | 'html'
+
+interface EnterGameResponseData {
+  launchMode?: GameLaunchMode
+  purl?: string
+  html?: string
+  [key: string]: unknown
+}
+
+const isHtmlResponse = (raw: string) => {
+  const trimmed = raw.trimStart().toLowerCase()
+  return (
+    trimmed.startsWith('<!doctype html') ||
+    trimmed.startsWith('<html') ||
+    trimmed.includes('<body')
+  )
+}
+
+const extractLaunchHtml = (payload: Record<string, unknown> | null | undefined) => {
+  if (!payload) return ''
+
+  const htmlKeys = ['html', 'html_code', 'htmlCode', 'content']
+  for (const key of htmlKeys) {
+    const value = payload[key]
+    if (typeof value === 'string' && isHtmlResponse(value)) {
+      return value
+    }
+  }
+  return ''
+}
+
+const extractLaunchUrl = (payload: Record<string, unknown> | null | undefined) => {
+  if (!payload) return ''
+
+  const urlKeys = ['purl', 'url', 'launch_url', 'launchUrl']
+  for (const key of urlKeys) {
+    const value = payload[key]
+    if (typeof value === 'string' && value.trim()) {
+      return value
+    }
+  }
+  return ''
+}
+
 const enterGame = async (params: {
   uid: number
   token: string
   biaoshi: string
   type: string
   code: string
-}) => {
+}): Promise<{ code: number; data: EnterGameResponseData | null; msg: string }> => {
   console.log('调用进入游戏接口，参数:', params)
 
   // 构建查询参数
@@ -261,7 +305,7 @@ const enterGame = async (params: {
       method: 'POST',
       headers: {
         'Content-Type': 'application/x-www-form-urlencoded',
-        Accept: 'application/json',
+        Accept: 'application/json, text/html, */*',
       },
       body: formData.toString(),
     })
@@ -270,15 +314,54 @@ const enterGame = async (params: {
       throw new Error(`HTTP error! Status: ${response.status}`)
     }
 
-    const result = await response.json()
+    const contentType = (response.headers.get('content-type') || '').toLowerCase()
+    const rawResponse = await response.text()
+
+    // PG直连会返回整段HTML代码，前端直接透传到游戏页执行
+    if (contentType.includes('text/html') || isHtmlResponse(rawResponse)) {
+      return {
+        code: 1,
+        data: {
+          launchMode: 'html',
+          html: rawResponse,
+        },
+        msg: '进入游戏成功',
+      }
+    }
+
+    let result: any
+    try {
+      result = JSON.parse(rawResponse)
+    } catch {
+      throw new Error('进入游戏接口返回格式异常')
+    }
+
     console.log('进入游戏接口返回:', result)
 
     // 处理接口返回结果
     if (result && result.ret === 200 && result.data) {
       if (result.data.code === 0) {
+        const info = (result.data.info || {}) as Record<string, unknown>
+        const launchHtml = extractLaunchHtml(info)
+
+        if (launchHtml) {
+          return {
+            code: 1,
+            data: {
+              ...info,
+              launchMode: 'html',
+              html: launchHtml,
+            },
+            msg: result.data.msg || '进入游戏成功',
+          }
+        }
+
         return {
           code: 1,
-          data: result.data.info || {},
+          data: {
+            ...info,
+            launchMode: 'url',
+          },
           msg: result.data.msg || '进入游戏成功',
         }
       } else {
@@ -649,25 +732,38 @@ const handleGameClick = async (game: Game) => {
       console.log('进入游戏成功:', result)
       showToast(`成功进入游戏: ${game.name}`)
 
-      // 处理游戏链接跳转 - 跳转到游戏页面组件
-      if (result.data && result.data.purl) {
-        const gameUrl = result.data.purl
-        console.log('🔗 准备跳转到游戏页面:', gameUrl)
+      const returnPath = route.fullPath
+      const launchHtml =
+        result.data?.launchMode === 'html' && typeof result.data.html === 'string'
+          ? result.data.html
+          : ''
+      const launchUrl = extractLaunchUrl(result.data || {})
 
-        // 获取当前路由路径作为返回路径
-        const returnPath = route.fullPath
+      if (launchHtml) {
+        const htmlKey = `game_html_${Date.now()}_${Math.random().toString(36).slice(2, 10)}`
+        sessionStorage.setItem(htmlKey, launchHtml)
 
-        // 跳转到游戏页面组件
         router.push({
           name: 'game-play',
           query: {
-            url: gameUrl,
-            returnPath: returnPath,
+            mode: 'html',
+            htmlKey,
+            returnPath,
+          },
+        })
+      } else if (launchUrl) {
+        console.log('🔗 准备跳转到游戏页面:', launchUrl)
+        router.push({
+          name: 'game-play',
+          query: {
+            mode: 'url',
+            url: launchUrl,
+            returnPath,
           },
         })
       } else {
-        console.warn('返回数据中没有找到游戏链接 (purl)')
-        showToast('游戏启动成功，但未获取到游戏链接')
+        console.warn('返回数据中没有找到游戏链接或HTML')
+        showToast('游戏启动成功，但未获取到游戏内容')
       }
     } else {
       // 进入游戏失败

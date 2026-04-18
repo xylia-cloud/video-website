@@ -1,13 +1,16 @@
 <script setup lang="ts">
 import { ref, onMounted, onUnmounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { Icon, showDialog } from 'vant'
+import { Icon, showDialog, showToast } from 'vant'
 
 const route = useRoute()
 const router = useRouter()
 
-// 从路由参数获取游戏URL
+// 从路由参数获取游戏启动数据
+const gameMode = ref(((route.query.mode as string) || 'url').toLowerCase())
 const gameUrl = ref((route.query.url as string) || '')
+const gameHtml = ref('')
+const htmlStorageKey = ref((route.query.htmlKey as string) || '')
 const returnPath = ref((route.query.returnPath as string) || '/game')
 
 // 悬浮按钮位置 - 默认在左上角
@@ -146,6 +149,18 @@ onMounted(() => {
   document.addEventListener('touchmove', onDrag)
   window.addEventListener('resize', handleResize)
 
+  if (gameMode.value === 'html') {
+    const cachedHtml = htmlStorageKey.value ? sessionStorage.getItem(htmlStorageKey.value) : ''
+    if (!cachedHtml) {
+      console.error('PG游戏HTML不存在或已失效')
+      showToast('游戏内容已失效，请重新进入')
+      router.push('/game')
+      return
+    }
+    gameHtml.value = cachedHtml
+    return
+  }
+
   if (!gameUrl.value) {
     console.error('游戏URL不存在')
     router.push('/game')
@@ -157,6 +172,11 @@ onUnmounted(() => {
   document.removeEventListener('mousemove', onDrag)
   document.removeEventListener('touchmove', onDrag)
   window.removeEventListener('resize', handleResize)
+
+  // 清理一次性HTML缓存，防止占用过多sessionStorage
+  if (htmlStorageKey.value) {
+    sessionStorage.removeItem(htmlStorageKey.value)
+  }
 })
 </script>
 
@@ -164,10 +184,20 @@ onUnmounted(() => {
   <div class="game-play-page">
     <!-- 游戏iframe -->
     <iframe
-      v-if="gameUrl"
+      v-if="gameMode === 'html' && gameHtml"
+      :srcdoc="gameHtml"
+      class="game-iframe"
+      frameborder="0"
+      allow="web-share *; clipboard-write *; screen-wake-lock *; fullscreen *"
+      allowfullscreen
+    ></iframe>
+
+    <iframe
+      v-else-if="gameUrl"
       :src="gameUrl"
       class="game-iframe"
       frameborder="0"
+      allow="web-share *; clipboard-write *; screen-wake-lock *; fullscreen *"
       allowfullscreen
     ></iframe>
 
