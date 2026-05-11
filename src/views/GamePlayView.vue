@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, onMounted, onUnmounted } from 'vue'
+import { ref, onMounted, onUnmounted, nextTick } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { Icon, showDialog, showToast } from 'vant'
 
@@ -12,6 +12,94 @@ const gameUrl = ref((route.query.url as string) || '')
 const gameHtml = ref('')
 const htmlStorageKey = ref((route.query.htmlKey as string) || '')
 const returnPath = ref((route.query.returnPath as string) || '/game')
+const htmlIframeRef = ref<HTMLIFrameElement | null>(null)
+const GAME_HALL_COLLECT_FLAG = 'game_hall_collect_on_return'
+
+const isHtmlLike = (raw: string) => {
+  const trimmed = (raw || '').trimStart().toLowerCase()
+  return (
+    trimmed.startsWith('<!doctype html') ||
+    trimmed.startsWith('<html') ||
+    trimmed.includes('<body')
+  )
+}
+
+const bindPgExitInterceptor = (doc: Document) => {
+  const isExitButton = (target: EventTarget | null) => {
+    if (!(target instanceof Element)) return false
+
+    const buttonEl = target.closest('#ca-button-0, .custom_alert .button')
+    if (!buttonEl) return false
+
+    const text = (buttonEl.textContent || '').trim()
+    return text.includes('退出') || text.toLowerCase().includes('exit')
+  }
+
+  const forceBackToList = (event: Event) => {
+    if (!isExitButton(event.target)) return
+
+    // 抢占PG失败弹窗“退出”按钮，避免在iframe内跳回列表页
+    event.preventDefault()
+    event.stopPropagation()
+    if ('stopImmediatePropagation' in event) {
+      event.stopImmediatePropagation()
+    }
+    sessionStorage.setItem(GAME_HALL_COLLECT_FLAG, '1')
+    router.replace(returnPath.value || '/game')
+  }
+
+  doc.addEventListener('click', forceBackToList, true)
+  doc.addEventListener('touchend', forceBackToList, true)
+  doc.addEventListener('mouseup', forceBackToList, true)
+}
+
+const renderHtmlToIframe = async (html: string) => {
+  const targetReturnPath = returnPath.value || '/game'
+  const fallbackUrl = `${window.location.origin}/#${targetReturnPath}`
+  const fallbackUrlEncoded = encodeURIComponent(fallbackUrl)
+
+  // PG返回页里的“失败后确认跳转地址”通常在 f= 参数中。
+  // 强制改写成当前站点的列表返回地址，避免在iframe内加载其他域的列表页。
+  const normalizedHtml = html
+    .replace(/([?&]f=)(https%3A%2F%2F[^&"'\\s]+)/gi, `$1${fallbackUrlEncoded}`)
+    .replace(/([?&]f=)(http%3A%2F%2F[^&"'\\s]+)/gi, `$1${fallbackUrlEncoded}`)
+    .replace(/([?&]f=)(https?:\/\/[^&"'\\s]+)/gi, `$1${fallbackUrl}`)
+
+  await nextTick()
+  const iframe = htmlIframeRef.value
+  if (!iframe) return
+
+  const doc = iframe.contentDocument || iframe.contentWindow?.document
+  if (!doc) return
+
+  doc.open()
+  doc.write(normalizedHtml)
+  doc.close()
+  bindPgExitInterceptor(doc)
+}
+
+const handleHtmlIframeLoad = () => {
+  if (gameMode.value !== 'html') return
+
+  const iframe = htmlIframeRef.value
+  if (!iframe) return
+
+  try {
+    const childWindow = iframe.contentWindow
+    if (!childWindow) return
+
+    const href = childWindow.location.href || ''
+    const hash = childWindow.location.hash || ''
+
+    // PG失败页点击“确定”后可能把游戏列表页加载进iframe；
+    // 检测到回到本域的#/game时，直接让外层页面返回列表页。
+    if (href.startsWith(window.location.origin) && hash.startsWith('#/game')) {
+      router.replace(returnPath.value || '/game')
+    }
+  } catch {
+    // 跨域页面无法读取location，忽略即可
+  }
+}
 
 // 悬浮按钮位置 - 默认在左上角
 const buttonPosition = ref({
@@ -118,6 +206,7 @@ const handleBackClick = () => {
   })
     .then(() => {
       // 用户点击确定
+      sessionStorage.setItem(GAME_HALL_COLLECT_FLAG, '1')
       router.push(returnPath.value)
     })
     .catch(() => {
@@ -158,6 +247,15 @@ onMounted(() => {
       return
     }
     gameHtml.value = cachedHtml
+    renderHtmlToIframe(cachedHtml)
+    return
+  }
+
+  // 兜底：历史参数可能把HTML放在url字段中，直接按HTML渲染
+  if (gameUrl.value && isHtmlLike(gameUrl.value)) {
+    gameMode.value = 'html'
+    gameHtml.value = gameUrl.value
+    renderHtmlToIframe(gameUrl.value)
     return
   }
 
@@ -185,11 +283,13 @@ onUnmounted(() => {
     <!-- 游戏iframe -->
     <iframe
       v-if="gameMode === 'html' && gameHtml"
-      :srcdoc="gameHtml"
+      ref="htmlIframeRef"
+      src="about:blank"
       class="game-iframe"
       frameborder="0"
       allow="web-share *; clipboard-write *; screen-wake-lock *; fullscreen *"
       allowfullscreen
+      @load="handleHtmlIframeLoad"
     ></iframe>
 
     <iframe

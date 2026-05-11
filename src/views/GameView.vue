@@ -5,6 +5,8 @@ import {
   getUserInfo,
   isLoggedIn,
   fetchUserPoints,
+  clearAllCache,
+  checkApiAuthError,
 } from '@/api/fetch-api'
 import { useRouter, useRoute } from 'vue-router'
 import { showToast } from 'vant'
@@ -95,6 +97,9 @@ const isGlobalLoading = ref(false)
 const userBalance = ref(0)
 const gameBalance = ref(0)
 const isRefreshingBalance = ref(false)
+const hasTriedBalanceCollect = ref(false)
+const GAME_HALL_COLLECT_FLAG = 'game_hall_collect_on_return'
+const collectHintText = ref('')
 
 // 用户信息计算属性
 const displayUserName = computed(() => {
@@ -447,7 +452,7 @@ const fetchGamesForSubCategory = async (
       method: 'POST',
       headers: {
         'Content-Type': 'application/x-www-form-urlencoded',
-        Accept: 'application/json',
+        Accept: 'application/json, text/html, */*',
       },
     })
 
@@ -620,6 +625,25 @@ const showGameDialog = ref(false)
 const currentGame = ref<Game | null>(null)
 const currentGameUrl = ref('')
 
+const isHtmlResponse = (raw: string) => {
+  const trimmed = raw.trimStart().toLowerCase()
+  return (
+    trimmed.startsWith('<!doctype html') ||
+    trimmed.startsWith('<html') ||
+    trimmed.includes('<body')
+  )
+}
+
+const isLikelyJsonResponse = (raw: string, contentType: string) => {
+  const trimmed = raw.trimStart()
+  return (
+    contentType.includes('application/json') ||
+    contentType.includes('text/json') ||
+    trimmed.startsWith('{') ||
+    trimmed.startsWith('[')
+  )
+}
+
 // 显示游戏确认弹窗
 const showGameConfirmDialog = (game: Game, gameUrl: string) => {
   currentGame.value = game
@@ -630,9 +654,20 @@ const showGameConfirmDialog = (game: Game, gameUrl: string) => {
 // 确认开始游戏
 const confirmStartGame = () => {
   if (currentGameUrl.value) {
-    const newWindow = window.open(currentGameUrl.value, '_blank', 'noopener,noreferrer')
-    if (!newWindow) {
-      showToast('无法打开游戏窗口，请检查浏览器设置')
+    if (isHtmlResponse(currentGameUrl.value)) {
+      const newWindow = window.open('', '_blank')
+      if (!newWindow) {
+        showToast('无法打开游戏窗口，请检查浏览器设置')
+      } else {
+        newWindow.document.open()
+        newWindow.document.write(currentGameUrl.value)
+        newWindow.document.close()
+      }
+    } else {
+      const newWindow = window.open(currentGameUrl.value, '_blank', 'noopener,noreferrer')
+      if (!newWindow) {
+        showToast('无法打开游戏窗口，请检查浏览器设置')
+      }
     }
   }
   showGameDialog.value = false
@@ -671,7 +706,7 @@ const enterGame = async (
       method: 'POST',
       headers: {
         'Content-Type': 'application/x-www-form-urlencoded',
-        Accept: 'application/json',
+        Accept: 'application/json, text/html, */*',
       },
     })
 
@@ -679,7 +714,26 @@ const enterGame = async (
       throw new Error(`HTTP error! Status: ${response.status}`)
     }
 
-    const result = await response.json()
+    const contentType = (response.headers.get('content-type') || '').toLowerCase()
+    const rawResponse = await response.text()
+
+    let result: any = null
+    if (isLikelyJsonResponse(rawResponse, contentType)) {
+      try {
+        result = JSON.parse(rawResponse)
+      } catch {
+        result = null
+      }
+    }
+
+    if (!result && (contentType.includes('text/html') || isHtmlResponse(rawResponse))) {
+      showGameConfirmDialog(game, rawResponse)
+      return
+    }
+
+    if (!result) {
+      throw new Error('进入游戏接口返回格式异常')
+    }
     console.log('进入游戏结果:', result)
 
     if (result && result.ret === 200 && result.data && result.data.code === 0) {
@@ -728,9 +782,12 @@ const handleManualRefreshBalance = async () => {
   }
 
   isRefreshingBalance.value = true
+  collectHintText.value = '资金归集中，请稍等...'
   try {
+    await collectGameBalanceIfNeeded({ force: true })
     await fetchUserBalance()
   } finally {
+    collectHintText.value = ''
     isRefreshingBalance.value = false
   }
   showToast('余额已刷新')
@@ -779,12 +836,131 @@ const fetchUserBalance = async () => {
   }
 }
 
+const collectGameBalanceIfNeeded = async (options?: { force?: boolean; silent?: boolean }) => {
+  const force = Boolean(options?.force)
+  const silent = Boolean(options?.silent)
+  if (!force && hasTriedBalanceCollect.value) return
+  if (!isUserLoggedIn.value) return
+
+  // 默认策略：用户已登录且余额为0时，进入游戏大厅触发一次余额归集
+  if (!force && Number(userBalance.value) !== 0) return
+
+  const userInfo = getUserInfo()
+  if (!userInfo || !userInfo.token) return
+
+  const uid = userInfo.user_id || userInfo.id
+  if (!uid) return
+
+  if (!force) {
+    hasTriedBalanceCollect.value = true
+  }
+
+  try {
+    const queryParams = new URLSearchParams({
+      service: 'gameapi.trans',
+    })
+
+    const formData = new URLSearchParams({
+      uid: String(uid),
+      token: String(userInfo.token),
+    })
+
+    const response = await fetch(`${NEW_API_BASE_URL}/?${queryParams.toString()}`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/x-www-form-urlencoded',
+        Accept: 'application/json, text/plain, */*',
+      },
+      body: formData.toString(),
+    })
+
+    if (!response.ok) {
+      throw new Error(`HTTP error! Status: ${response.status}`)
+    }
+
+    const result = await response.json()
+    console.log('余额归集结果(gameapi.trans):', result)
+
+    const code = Number(result?.data?.code ?? -1)
+    const msg = String(result?.data?.msg || result?.msg || '')
+
+    // 登录失效处理
+    if (checkApiAuthError(result) || code === 700) {
+      if (msg) {
+        showToast({
+          message: msg,
+          duration: 2500,
+          position: 'middle',
+        })
+      }
+      clearAllCache()
+      router.push('/login')
+      return
+    }
+
+    // 业务提示（例如 code=1005: 游戏中余额为0，无法下分）
+    if (!silent && msg && code !== 0) {
+      showToast({
+        message: msg,
+        duration: 2500,
+        position: 'middle',
+      })
+    }
+
+    // 无论是否归集成功，都尝试刷新一次余额展示
+    await fetchUserBalance()
+  } catch (error) {
+    console.error('余额归集请求失败:', error)
+  }
+}
+
+const wait = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms))
+
+const autoCollectAndPollAfterGameReturn = async () => {
+  const shouldCollect = sessionStorage.getItem(GAME_HALL_COLLECT_FLAG) === '1'
+  if (!shouldCollect) return
+
+  sessionStorage.removeItem(GAME_HALL_COLLECT_FLAG)
+
+  if (!isUserLoggedIn.value) return
+
+  const startBalance = Number(userBalance.value)
+  const maxRounds = 15 // 约30秒
+  const intervalMs = 2000
+
+  isRefreshingBalance.value = true
+  collectHintText.value = '资金归集中，请稍等...'
+  try {
+    for (let i = 0; i < maxRounds; i += 1) {
+      await collectGameBalanceIfNeeded({ force: true, silent: true })
+      await fetchUserBalance()
+
+      // 余额变动或已大于0即可认为归集到账
+      if (Number(userBalance.value) > 0 || Number(userBalance.value) !== startBalance) {
+        return
+      }
+
+      if (i < maxRounds - 1) {
+        await wait(intervalMs)
+      }
+    }
+
+    // 超时后不弹窗，保持页面提示即可，避免打扰用户
+  } finally {
+    collectHintText.value = ''
+    isRefreshingBalance.value = false
+  }
+}
+
 // 组件挂载时获取数据
 onMounted(() => {
   // 获取顶级分类数据
   fetchTopCategories()
-  // 获取用户余额
-  fetchUserBalance()
+  // 获取用户余额后按需触发余额归集
+  fetchUserBalance().then(() => {
+    collectGameBalanceIfNeeded()
+    autoCollectAndPollAfterGameReturn()
+  })
   // 顶级分类数据加载后会自动加载一级分类列表
 })
 </script>
@@ -825,6 +1001,7 @@ onMounted(() => {
             <span class="balance-label">游戏余额：</span>
             <span class="balance-value">{{ gameBalance.toFixed(2) }}</span>
           </div>
+          <div v-if="collectHintText" class="balance-collect-hint">{{ collectHintText }}</div>
         </div>
       </div>
 
@@ -1171,6 +1348,12 @@ onMounted(() => {
   display: flex;
   align-items: center;
   gap: 6px;
+}
+
+.balance-collect-hint {
+  font-size: 12px;
+  color: #ffde7a;
+  line-height: 1.3;
 }
 
 .balance-label {

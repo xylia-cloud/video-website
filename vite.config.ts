@@ -1,9 +1,14 @@
 import { fileURLToPath, URL } from 'node:url'
+import dns from 'node:dns'
+import https from 'node:https'
 
 import { defineConfig } from 'vite'
 import vue from '@vitejs/plugin-vue'
 import vueJsx from '@vitejs/plugin-vue-jsx'
 import vueDevTools from 'vite-plugin-vue-devtools'
+
+// 某些网络环境下 Node 优先解析到不可用的 IPv6，导致代理 TLS 握手 ECONNRESET
+dns.setDefaultResultOrder('ipv4first')
 
 // https://vite.dev/config/
 export default defineConfig({
@@ -68,10 +73,14 @@ export default defineConfig({
       },
       // 配置跨域代理 - 用户接口（livevideo）
       '/livevideo/': {
-        target: 'https://live.88tv.co/appapi/',
+        target: 'https://jiji8.cc/livevideo/',
         changeOrigin: true,
         rewrite: (path) => path.replace(/^\/livevideo\//, '/'),
         secure: false,
+        agent: new https.Agent({
+          keepAlive: true,
+          family: 4,
+        }),
         timeout: 30000,
         proxyTimeout: 30000,
         followRedirects: true,

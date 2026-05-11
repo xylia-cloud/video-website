@@ -12,7 +12,7 @@ const goBack = () => {
 
 // 应用信息
 const appInfo = ref({
-  name: '影视网站',
+  name: '365娱乐',
   version: 'v1.0.0',
   description: '专业的影视娱乐平台，为用户提供高质量的视频内容和游戏娱乐服务。',
   features: [

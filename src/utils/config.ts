@@ -54,7 +54,7 @@ export const VIDEO_CATEGORIES = {
 
 // 其他配置
 export const APP_CONFIG = {
-  name: '影视网站',
+  name: '365娱乐',
   version: '1.0.0',
-  copyright: `© ${new Date().getFullYear()} 影视网站. All Rights Reserved.`,
+  copyright: `© ${new Date().getFullYear()} 365娱乐. All Rights Reserved.`,
 }

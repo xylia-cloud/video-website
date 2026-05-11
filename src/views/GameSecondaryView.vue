@@ -250,10 +250,20 @@ const isHtmlResponse = (raw: string) => {
   )
 }
 
+const isLikelyJsonResponse = (raw: string, contentType: string) => {
+  const trimmed = raw.trimStart()
+  return (
+    contentType.includes('application/json') ||
+    contentType.includes('text/json') ||
+    trimmed.startsWith('{') ||
+    trimmed.startsWith('[')
+  )
+}
+
 const extractLaunchHtml = (payload: Record<string, unknown> | null | undefined) => {
   if (!payload) return ''
 
-  const htmlKeys = ['html', 'html_code', 'htmlCode', 'content']
+  const htmlKeys = ['html', 'html_code', 'htmlCode', 'content', 'purl']
   for (const key of htmlKeys) {
     const value = payload[key]
     if (typeof value === 'string' && isHtmlResponse(value)) {
@@ -317,8 +327,17 @@ const enterGame = async (params: {
     const contentType = (response.headers.get('content-type') || '').toLowerCase()
     const rawResponse = await response.text()
 
-    // PG直连会返回整段HTML代码，前端直接透传到游戏页执行
-    if (contentType.includes('text/html') || isHtmlResponse(rawResponse)) {
+    let result: any = null
+    if (isLikelyJsonResponse(rawResponse, contentType)) {
+      try {
+        result = JSON.parse(rawResponse)
+      } catch {
+        result = null
+      }
+    }
+
+    // PG直连纯HTML响应：后端直接透传HTML，不是JSON
+    if (!result && (contentType.includes('text/html') || isHtmlResponse(rawResponse))) {
       return {
         code: 1,
         data: {
@@ -329,10 +348,7 @@ const enterGame = async (params: {
       }
     }
 
-    let result: any
-    try {
-      result = JSON.parse(rawResponse)
-    } catch {
+    if (!result) {
       throw new Error('进入游戏接口返回格式异常')
     }
 
