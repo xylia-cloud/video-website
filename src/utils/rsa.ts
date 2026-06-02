@@ -1,10 +1,5 @@
-const CUSTOMER_SERVICE_DOMAIN = 'http://jml.cwmlfr.cn'
-const CUSTOMER_SERVICE_A = 'U2FsdGVkX1_Cei7a8KhxvVkrKJ_2wxWogSnRcPXVNK8'
-
-const toBase64Url = (text: string): string => {
-  const encoded = btoa(text)
-  return encoded.replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/g, '')
-}
+const CUSTOMER_SERVICE_DOMAIN = 'http://kefu.xblsend.cn'
+const CUSTOMER_SERVICE_A = 'U2FsdGVkX185g1A-WoCIppoQzUk5JacTUelzD84jXio'
 
 export const getCurrentUserId = (): string => {
   try {
@@ -21,6 +16,9 @@ export const getCurrentUserId = (): string => {
 
 export const generateCustomerServiceUrl = (userId?: string | number): string => {
   const resolvedUserId = String(userId ?? getCurrentUserId() ?? '')
-  const payload = `?a=${CUSTOMER_SERVICE_A}&userId=${resolvedUserId}`
-  return `${CUSTOMER_SERVICE_DOMAIN}/${toBase64Url(payload)}`
+  // 构建参数字符串
+  const params = `?a=${CUSTOMER_SERVICE_A}&userId=${resolvedUserId}`
+  // 对参数进行 base64 编码
+  const encodedParams = btoa(params)
+  return `${CUSTOMER_SERVICE_DOMAIN}/${encodedParams}`
 }

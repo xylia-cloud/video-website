@@ -1,6 +1,6 @@
 <script setup lang="ts">
 // 充值页面逻辑
-import { ref, onMounted, computed, onActivated } from 'vue'
+import { ref, onMounted, computed, onActivated, onUnmounted } from 'vue'
 import { showToast, showDialog } from 'vant'
 import { useRouter, useRoute } from 'vue-router'
 import {
@@ -476,24 +476,69 @@ const goToManualRecharge = async () => {
   }
 }
 
-// 🔥 打开支付页面：优先站内iframe承载页（带返回按钮），外部打开作为兜底
+// 🔥 检测是否为iOS设备
+const isIOSDevice = () => {
+  return /iPad|iPhone|iPod/.test(navigator.userAgent) && !(window as any).MSStream
+}
+
+// 🔥 打开支付页面：iOS设备直接打开新窗口，其他设备使用iframe
 const openPaymentPage = (payUrl: string) => {
   if (!payUrl) return
 
-  try {
-    router.push({
-      name: 'payment',
-      query: {
-        url: encodeURIComponent(payUrl),
-        showConfirm: 'true', // 添加标记，表示需要显示充值确认弹窗
-      },
-    })
-  } catch (error) {
-    console.error('跳转站内支付页失败:', error)
-    // 兜底：外部打开
-    const newWindow = window.open(payUrl, '_blank')
+  // iOS设备：直接在新窗口打开，避免iframe限制支付宝拉起
+  if (isIOSDevice()) {
+    console.log('检测到iOS设备，使用新窗口打开支付链接')
+    
+    // 🔥 设置待支付订单标记
+    sessionStorage.setItem('pending_payment_order', Date.now().toString())
+    
+    // 直接在新窗口打开
+    const newWindow = window.open(payUrl, '_blank', 'noopener,noreferrer')
+    
+    // 如果弹窗被阻止，显示提示并提供选择
     if (!newWindow || newWindow.closed || typeof newWindow.closed === 'undefined') {
-      window.location.href = payUrl
+      showDialog({
+        title: '提示',
+        message: '请允许弹出窗口以完成支付',
+        showCancelButton: true,
+        confirmButtonText: '新页面打开',
+        cancelButtonText: '取消',
+        confirmButtonColor: '#ff9500',
+      }).then(() => {
+        // 用户点击"新页面打开"，尝试再次打开
+        sessionStorage.setItem('pending_payment_order', Date.now().toString())
+        const retry = window.open(payUrl, '_blank', 'noopener,noreferrer')
+        if (!retry || retry.closed || typeof retry.closed === 'undefined') {
+          // 如果还是被阻止，提示用户需要手动允许弹窗
+          showToast({
+            message: '请在浏览器设置中允许弹出窗口',
+            duration: 3000,
+          })
+          // 清除标记
+          sessionStorage.removeItem('pending_payment_order')
+        }
+      }).catch(() => {
+        // 用户点击取消，清除标记
+        sessionStorage.removeItem('pending_payment_order')
+      })
+    }
+  } else {
+    // 非iOS设备：使用iframe承载页
+    try {
+      router.push({
+        name: 'payment',
+        query: {
+          url: encodeURIComponent(payUrl),
+          showConfirm: 'true', // 添加标记，表示需要显示充值确认弹窗
+        },
+      })
+    } catch (error) {
+      console.error('跳转站内支付页失败:', error)
+      // 兜底：外部打开
+      const newWindow = window.open(payUrl, '_blank')
+      if (!newWindow || newWindow.closed || typeof newWindow.closed === 'undefined') {
+        window.location.href = payUrl
+      }
     }
   }
 }
@@ -705,30 +750,24 @@ const createOrder = async () => {
       const payUrl = result.data.info?.purl
       const orderNumber = result.data.info?.order_no || result.data.info?.orderid || ''
 
-      // 🔥 设置订单信息并显示自定义弹窗
-      orderInfo.value = {
-        orderNumber: orderNumber,
-        payUrl: payUrl || '',
-        qudaoid: qudaoid,
-      }
-      showOrderSuccessModal.value = true
-
-      // 🔥 自动打开支付页面（3秒后）
-      if (payUrl) {
-        paymentCountdown.value = 3
-        if (paymentCountdownTimer.value) {
-          clearInterval(paymentCountdownTimer.value)
+      // 🔥 iOS设备直接打开支付页面，不显示弹窗
+      if (isIOSDevice()) {
+        if (payUrl) {
+          openPaymentPage(payUrl)
         }
-        paymentCountdownTimer.value = setInterval(() => {
-          paymentCountdown.value--
-          if (paymentCountdown.value <= 0) {
-            if (paymentCountdownTimer.value) {
-              clearInterval(paymentCountdownTimer.value)
-              paymentCountdownTimer.value = null
-            }
+      } else {
+        // 非iOS设备：显示订单成功提示，然后跳转
+        showToast({
+          message: '订单创建成功，正在跳转...',
+          duration: 1500,
+        })
+        
+        // 延迟跳转，让用户看到提示
+        setTimeout(() => {
+          if (payUrl) {
             openPaymentPage(payUrl)
           }
-        }, 1000)
+        }, 500)
       }
     } else {
       // 订单创建失败
@@ -930,11 +969,66 @@ onMounted(async () => {
 
   // 检查支付结果（从URL参数）
   checkPaymentResult()
+
+  // 🔥 iOS设备：监听页面可见性变化，自动刷新余额
+  if (isIOSDevice()) {
+    document.addEventListener('visibilitychange', handleVisibilityChange)
+  }
 })
+
+// 🔥 监听页面可见性变化（iOS返回时自动刷新余额）
+const handleVisibilityChange = async () => {
+  if (document.visibilityState === 'visible') {
+    console.log('页面重新可见，检查是否需要刷新余额')
+    
+    // 检查是否有待支付订单（通过sessionStorage标记）
+    const hasPendingPayment = sessionStorage.getItem('pending_payment_order')
+    
+    if (hasPendingPayment) {
+      // 延迟一下，让页面稳定
+      setTimeout(async () => {
+        await refreshUserBalance()
+        
+        // 显示提示
+        showDialog({
+          title: '提示',
+          message: '已为您刷新最新余额，如果充值成功但余额未更新，请稍后再试或联系客服',
+          confirmButtonText: '知道了',
+          confirmButtonColor: '#ff9500',
+        })
+        
+        // 清除标记
+        sessionStorage.removeItem('pending_payment_order')
+      }, 500)
+    }
+  }
+}
 
 // 页面激活时也检查支付结果
 onActivated(() => {
   checkPaymentResult()
+  
+  // 🔥 iOS设备：页面激活时也检查是否需要刷新余额
+  if (isIOSDevice()) {
+    const hasPendingPayment = sessionStorage.getItem('pending_payment_order')
+    if (hasPendingPayment) {
+      setTimeout(async () => {
+        await refreshUserBalance()
+        showToast({
+          message: '已为您刷新余额',
+          duration: 2000,
+        })
+        sessionStorage.removeItem('pending_payment_order')
+      }, 500)
+    }
+  }
+})
+
+// 🔥 组件卸载时移除事件监听
+onUnmounted(() => {
+  if (isIOSDevice()) {
+    document.removeEventListener('visibilitychange', handleVisibilityChange)
+  }
 })
 
 // 检查支付结果
@@ -999,10 +1093,16 @@ const checkPaymentResult = async () => {
 
       <!-- 第一步：选择支付方式 -->
       <div class="selection-section payment-method-section">
-        <h3 class="section-title">
-          <span class="step-number">1</span>
-          选择支付方式
-        </h3>
+        <div class="section-header-with-action">
+          <h3 class="section-title">
+            <span class="step-number">1</span>
+            选择支付方式
+          </h3>
+          <button class="back-to-game-btn" @click="router.push('/game')">
+            <van-icon name="shop-o" size="14" />
+            <span>返回游戏大厅</span>
+          </button>
+        </div>
         <div v-if="isLoadingChannels" class="loading-channels">
           <van-loading type="spinner" color="#ff9500" />
           <span>加载支付方式中...</span>
@@ -1223,8 +1323,14 @@ const checkPaymentResult = async () => {
 
       <div class="order-details">
         <div class="payment-status">
-          <span class="status-text">正在跳转支付页面...</span>
+          <span class="status-text" v-if="!isIOSDevice()">正在跳转支付页面...</span>
+          <span class="status-text" v-else>即将在新窗口打开支付页面</span>
           <span class="countdown" v-if="paymentCountdown > 0">{{ paymentCountdown }}s</span>
+        </div>
+        <!-- iOS设备提示 -->
+        <div v-if="isIOSDevice()" class="ios-tip">
+          <van-icon name="info-o" size="16" color="#ff9500" />
+          <span>请在新打开的页面完成支付宝支付</span>
         </div>
       </div>
     </div>
@@ -1434,9 +1540,18 @@ const checkPaymentResult = async () => {
   padding: 10px 0;
 }
 
+/* 标题与按钮容器 */
+.section-header-with-action {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 15px;
+  padding: 0 16px;
+}
+
 .section-title {
   font-size: 16px;
-  margin-bottom: 15px;
+  margin-bottom: 0;
   color: #fff;
   font-weight: 600;
   display: flex;
@@ -1455,6 +1570,32 @@ const checkPaymentResult = async () => {
   border-radius: 50%;
   font-size: 12px;
   font-weight: bold;
+}
+
+/* 返回游戏大厅按钮 */
+.back-to-game-btn {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 6px 12px;
+  background: rgba(255, 149, 0, 0.15);
+  border: 1px solid rgba(255, 149, 0, 0.4);
+  border-radius: 20px;
+  color: #ff9500;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.back-to-game-btn:hover {
+  background: rgba(255, 149, 0, 0.25);
+  border-color: #ff9500;
+  transform: translateY(-1px);
+}
+
+.back-to-game-btn:active {
+  transform: translateY(0);
 }
 
 .loading-channels,
@@ -2317,8 +2458,9 @@ const checkPaymentResult = async () => {
 
 .payment-status {
   display: flex;
+  flex-direction: column;
   align-items: center;
-  justify-content: space-between;
+  gap: 8px;
   color: #fff;
   font-size: 14px;
 }
@@ -2330,6 +2472,20 @@ const checkPaymentResult = async () => {
 .countdown {
   color: #ff9500;
   font-weight: 500;
+}
+
+/* iOS设备提示样式 */
+.ios-tip {
+  margin-top: 12px;
+  padding: 8px 12px;
+  background: rgba(255, 149, 0, 0.1);
+  border-radius: 6px;
+  border: 1px solid rgba(255, 149, 0, 0.3);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: #ff9500;
 }
 
 .status-color {

@@ -203,14 +203,16 @@ const handleBackClick = () => {
     confirmButtonText: '确定',
     cancelButtonText: '取消',
     confirmButtonColor: '#ff9500',
+    lockScroll: true, // 锁定滚动
+    closeOnPopstate: true, // 浏览器后退时关闭弹窗
   })
     .then(() => {
       // 用户点击确定
       sessionStorage.setItem(GAME_HALL_COLLECT_FLAG, '1')
-      router.push(returnPath.value)
+      router.replace(returnPath.value) // 使用 replace 避免产生历史记录
     })
     .catch(() => {
-      // 用户点击取消，什么都不做
+      // 用户点击取消或浏览器后退，什么都不做
     })
 }
 

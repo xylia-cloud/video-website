@@ -898,14 +898,7 @@ const collectGameBalanceIfNeeded = async (options?: { force?: boolean; silent?: 
       return
     }
 
-    // 业务提示（例如 code=1005: 游戏中余额为0，无法下分）
-    if (!silent && msg && code !== 0) {
-      showToast({
-        message: msg,
-        duration: 2500,
-        position: 'middle',
-      })
-    }
+    // 业务提示已移除 - 不再显示toast
 
     // 无论是否归集成功，都尝试刷新一次余额展示
     await fetchUserBalance()
