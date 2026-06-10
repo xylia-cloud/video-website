@@ -204,7 +204,7 @@
 import { ref, onMounted, onBeforeUnmount, onActivated, onDeactivated, computed } from 'vue'
 import { useRouter } from 'vue-router'
 import { showToast, showLoadingToast, closeToast, showDialog } from 'vant'
-import { updateUserInfo, getUserInfo, isLoggedIn, updateUserPortrait } from '@/api/fetch-api'
+import { updateUserInfo, getUserInfo, isLoggedIn, updateUserPortrait, userLogout } from '@/api/fetch-api'
 import { BASE_URL } from '@/utils/config'
 
 const router = useRouter()
@@ -672,14 +672,38 @@ const changePassword = async () => {
       loading.value = false
       closeToast()
 
-      // 显示成功弹窗
+      // 关闭密码弹窗
+      pwdPopupVisible.value = false
+
+      // 🔥 显示成功弹窗并提示即将退出登录
       showDialog({
         title: '提示',
-        message: '密码修改成功',
+        message: '密码修改成功，为了您的账号安全，请重新登录',
         confirmButtonText: '确定',
         confirmButtonColor: '#ff9500',
+        closeOnClickOverlay: false,
+      }).then(async () => {
+        // 用户点击确定后，执行退出登录
+        showLoadingToast({
+          message: '正在退出...',
+          forbidClick: true,
+          duration: 0,
+        })
+        
+        try {
+          await userLogout()
+          closeToast()
+          
+          // 跳转到登录页面
+          router.replace('/login')
+        } catch (error) {
+          console.error('退出登录失败:', error)
+          closeToast()
+          // 即使退出失败，也跳转到登录页
+          router.replace('/login')
+        }
       })
-      pwdPopupVisible.value = false
+      
       return // 成功时直接返回，不执行finally
     } else {
       showDialog({
