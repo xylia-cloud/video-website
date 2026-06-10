@@ -203,6 +203,32 @@
         </div>
       </div>
     </van-popup>
+
+    <!-- 密码修改成功提示弹窗 -->
+    <van-popup
+      v-model:show="showPasswordSuccessPopup"
+      :close-on-click-overlay="false"
+      round
+    >
+      <div class="password-success-popup">
+        <div class="success-icon">
+          <van-icon name="success" size="48" color="#52c41a" />
+        </div>
+        <div class="success-title">密码修改成功</div>
+        <div class="account-info-box">
+          <div class="account-label">当前账号：</div>
+          <div class="account-value-row">
+            <span class="account-value">{{ displayUsername }}</span>
+            <button class="copy-btn" @click="copyUsername">
+              <van-icon name="notes-o" size="16" />
+              <span>复制</span>
+            </button>
+          </div>
+        </div>
+        <div class="success-message">为了您的账号安全，请重新登录</div>
+        <button class="success-confirm-btn" @click="handleLogoutAfterPasswordChange">确定</button>
+      </div>
+    </van-popup>
   </div>
 </template>
 
@@ -230,6 +256,9 @@ const oldPwd = ref('')
 const newPwd = ref('')
 const repeatPwd = ref('')
 const pwdValidationMsg = ref('') // 密码验证提示信息
+
+// 密码修改成功弹窗
+const showPasswordSuccessPopup = ref(false)
 
 // 性别选择相关
 const sexPopupVisible = ref(false)
@@ -332,6 +361,61 @@ const confirmBirthday = () => {
   const formattedBirthday = `${tempYear.value}-${tempMonth.value.toString().padStart(2, '0')}-${tempDay.value.toString().padStart(2, '0')}`
   birthday.value = formattedBirthday
   birthdayPopupVisible.value = false
+}
+
+// 🔥 复制用户名
+const copyUsername = async () => {
+  try {
+    await navigator.clipboard.writeText(displayUsername.value)
+    showToast({
+      message: '账号已复制',
+      duration: 1500,
+    })
+  } catch (error) {
+    console.error('复制失败:', error)
+    // 降级处理：尝试使用旧版API
+    try {
+      const textArea = document.createElement('textarea')
+      textArea.value = displayUsername.value
+      document.body.appendChild(textArea)
+      textArea.select()
+      document.execCommand('copy')
+      document.body.removeChild(textArea)
+      showToast({
+        message: '账号已复制',
+        duration: 1500,
+      })
+    } catch {
+      showToast({
+        message: '复制失败，请手动复制',
+        duration: 1500,
+      })
+    }
+  }
+}
+
+// 🔥 密码修改成功后处理退出登录
+const handleLogoutAfterPasswordChange = async () => {
+  showPasswordSuccessPopup.value = false
+  
+  showLoadingToast({
+    message: '正在退出...',
+    forbidClick: true,
+    duration: 0,
+  })
+  
+  try {
+    await userLogout()
+    closeToast()
+    
+    // 跳转到登录页面
+    router.replace('/login')
+  } catch (error) {
+    console.error('退出登录失败:', error)
+    closeToast()
+    // 即使退出失败，也跳转到登录页
+    router.replace('/login')
+  }
 }
 
 // 将文件转换为base64
@@ -690,34 +774,8 @@ const changePassword = async () => {
       // 关闭密码弹窗
       pwdPopupVisible.value = false
 
-      // 🔥 显示成功弹窗并提示即将退出登录，包含当前账号信息
-      showDialog({
-        title: '提示',
-        message: `账号【${displayUsername.value}】密码修改成功\n\n为了您的账号安全，请重新登录`,
-        confirmButtonText: '确定',
-        confirmButtonColor: '#ff9500',
-        closeOnClickOverlay: false,
-      }).then(async () => {
-        // 用户点击确定后，执行退出登录
-        showLoadingToast({
-          message: '正在退出...',
-          forbidClick: true,
-          duration: 0,
-        })
-        
-        try {
-          await userLogout()
-          closeToast()
-          
-          // 跳转到登录页面
-          router.replace('/login')
-        } catch (error) {
-          console.error('退出登录失败:', error)
-          closeToast()
-          // 即使退出失败，也跳转到登录页
-          router.replace('/login')
-        }
-      })
+      // 🔥 显示自定义成功弹窗（带复制按钮）
+      showPasswordSuccessPopup.value = true
       
       return // 成功时直接返回，不执行finally
     } else {
@@ -1215,5 +1273,108 @@ onBeforeUnmount(() => {
 .birthday-confirm {
   background-color: #ff9500;
   color: #fff;
+}
+
+/* 密码修改成功弹窗样式 */
+.password-success-popup {
+  background-color: #1a1a1a;
+  border-radius: 16px;
+  padding: 30px 20px;
+  width: 320px;
+  text-align: center;
+}
+
+.success-icon {
+  margin-bottom: 20px;
+}
+
+.success-title {
+  font-size: 20px;
+  font-weight: 600;
+  color: #fff;
+  margin-bottom: 20px;
+}
+
+.account-info-box {
+  background-color: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 8px;
+  padding: 15px;
+  margin-bottom: 20px;
+}
+
+.account-label {
+  font-size: 13px;
+  color: #999;
+  margin-bottom: 10px;
+  text-align: left;
+}
+
+.account-value-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.account-value {
+  flex: 1;
+  font-size: 16px;
+  color: #fff;
+  font-weight: 500;
+  text-align: left;
+  word-break: break-all;
+}
+
+.copy-btn {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 6px 12px;
+  background-color: rgba(255, 149, 0, 0.15);
+  border: 1px solid rgba(255, 149, 0, 0.4);
+  border-radius: 6px;
+  color: #ff9500;
+  font-size: 13px;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  white-space: nowrap;
+}
+
+.copy-btn:hover {
+  background-color: rgba(255, 149, 0, 0.25);
+  border-color: #ff9500;
+}
+
+.copy-btn:active {
+  transform: scale(0.95);
+}
+
+.success-message {
+  font-size: 14px;
+  color: #999;
+  line-height: 1.6;
+  margin-bottom: 25px;
+}
+
+.success-confirm-btn {
+  width: 100%;
+  padding: 12px;
+  background-color: #ff9500;
+  color: #fff;
+  border: none;
+  border-radius: 8px;
+  font-size: 16px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.success-confirm-btn:hover {
+  background-color: #ff8500;
+}
+
+.success-confirm-btn:active {
+  transform: scale(0.98);
 }
 </style>
