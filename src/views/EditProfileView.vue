@@ -95,6 +95,12 @@
           </div>
         </div>
         <div class="popup-content">
+          <!-- 当前用户名显示 -->
+          <div class="current-username-display">
+            <span class="username-label">当前账号：</span>
+            <span class="username-value">{{ userId || '未设置' }}</span>
+          </div>
+          
           <!-- 游客默认密码提示 -->
           <div class="guest-pwd-tip" v-if="isGuest">
             <van-icon name="info-o" size="14" color="#ff9500" />
@@ -1023,6 +1029,27 @@ onBeforeUnmount(() => {
   flex: 1;
   display: flex;
   flex-direction: column;
+}
+
+/* 当前用户名显示 */
+.current-username-display {
+  padding: 12px 15px;
+  margin-bottom: 15px;
+  background-color: rgba(255, 255, 255, 0.05);
+  border-radius: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.username-label {
+  font-size: 13px;
+  color: #999;
+  margin-right: 8px;
+}
+
+.username-value {
+  font-size: 15px;
+  color: #fff;
+  font-weight: 500;
 }
 
 .guest-pwd-tip {
