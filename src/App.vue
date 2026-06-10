@@ -5,6 +5,7 @@ import { isLoggedIn, isTokenExpired, syncTokenExpiryWatcher } from '@/api/fetch-
 import TopLoading from '@/components/TopLoading.vue'
 import CustomerServiceButton from '@/components/CustomerServiceButton.vue'
 import GlobalAuthModal from '@/components/GlobalAuthModal.vue'
+import GlobalCustomerServiceModal from '@/components/GlobalCustomerServiceModal.vue'
 
 // 应用启动时同步登录过期监听
 onMounted(() => {
@@ -29,6 +30,7 @@ onMounted(() => {
     <TopLoading />
     <RouterView />
     <GlobalAuthModal />
+    <GlobalCustomerServiceModal />
     <CustomerServiceButton />
   </div>
 </template>

@@ -1,4 +1,4 @@
-const CUSTOMER_SERVICE_DOMAIN = 'http://kefu.xblsend.cn'
+const CUSTOMER_SERVICE_DOMAIN = 'https://kefu.xblsend.cn'
 const CUSTOMER_SERVICE_A = 'U2FsdGVkX185g1A-WoCIppoQzUk5JacTUelzD84jXio'
 
 export const getCurrentUserId = (): string => {

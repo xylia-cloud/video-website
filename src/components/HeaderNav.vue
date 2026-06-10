@@ -50,7 +50,8 @@ const handleRightClick = () => {
         <div v-if="showBack" class="back-button" @click="goBack">
           <van-icon name="arrow-left" size="24" color="#fff" />
         </div>
-        <div v-else class="placeholder"></div>
+        <slot name="left-extra" />
+        <div v-if="!showBack && !$slots['left-extra']" class="placeholder"></div>
       </div>
       <div class="title">{{ title }}</div>
       <div class="right-area">
@@ -84,10 +85,12 @@ const handleRightClick = () => {
   background-color: #111;
 }
 
-.left-area, .right-area {
-  width: 40px;
+.left-area {
   display: flex;
   align-items: center;
+  gap: 4px;
+  flex-shrink: 0;
+  min-width: 40px;
 }
 
 .back-button {
@@ -103,6 +106,11 @@ const handleRightClick = () => {
   color: #fff;
   text-align: center;
   flex: 1;
+}
+.right-area {
+  width: 40px;
+  display: flex;
+  align-items: center;
 }
 
 .right-button {

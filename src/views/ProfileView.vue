@@ -15,7 +15,7 @@ import {
   type NoticeGroup,
 } from '@/api/fetch-api'
 import { BASE_URL } from '@/utils/config'
-import { generateCustomerServiceUrl } from '@/utils/rsa'
+import { openCustomerServiceModal } from '@/utils/customerService'
 import QRCode from 'qrcode'
 import BottomTabbar from '@/components/BottomTabbar.vue'
 
@@ -673,29 +673,8 @@ const goToAccountCredential = async () => {
   showCredential.value = true
 }
 
-const goToCustomerService = async () => {
-  try {
-    showToast({
-      message: '正在跳转客服...',
-      duration: 1000,
-    })
-    const customerServiceUrl = generateCustomerServiceUrl()
-    console.log('人工客服链接已生成:', customerServiceUrl)
-
-    const newWindow = window.open(customerServiceUrl, '_blank', 'noopener,noreferrer')
-    if (!newWindow) {
-      showToast({
-        message: '请允许弹窗后重试',
-        duration: 2000,
-      })
-    }
-  } catch (error) {
-    console.error('跳转客服失败:', error)
-    showToast({
-      message: '客服功能暂时不可用，请稍后重试',
-      duration: 2000,
-    })
-  }
+const goToCustomerService = () => {
+  openCustomerServiceModal()
 }
 
 // 关闭申请代理弹窗

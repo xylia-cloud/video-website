@@ -50,8 +50,7 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
 import { useRoute } from 'vue-router'
-import { showToast } from 'vant'
-import { generateCustomerServiceUrl } from '@/utils/rsa'
+import { openCustomerServiceModal } from '@/utils/customerService'
 
 // 导入图标
 import homeActiveIcon from '@/assets/img/icon-tabbar-home-active.svg'
@@ -73,24 +72,14 @@ const currentRoute = computed(() => route.path)
 // 客服按钮是否激活（客服没有对应的路由，所以需要单独控制）
 const isCustomerServiceActive = ref(false)
 
-// 跳转到客服
-const goToCustomerService = async () => {
-  // 点击时短暂激活客服图标
+// 打开客服弹窗
+const goToCustomerService = () => {
   isCustomerServiceActive.value = true
   setTimeout(() => {
     isCustomerServiceActive.value = false
   }, 300)
 
-  try {
-    const customerServiceUrl = generateCustomerServiceUrl()
-    const newWindow = window.open(customerServiceUrl, '_blank', 'noopener,noreferrer')
-    if (!newWindow) {
-      showToast('请允许弹窗后重试')
-    }
-  } catch (error) {
-    console.error('跳转客服失败:', error)
-    showToast('客服功能暂时不可用，请稍后重试')
-  }
+  openCustomerServiceModal()
 }
 </script>
 

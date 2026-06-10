@@ -656,6 +656,12 @@ const changePassword = async () => {
     })
 
     if (result && result.code === 1) {
+      // 🔥 修改密码成功后，如果是游客用户，将本地存储的用户改为非游客用户
+      if (isGuest.value) {
+        localStorage.setItem('isGuest', 'false')
+        console.log('✅ 密码修改成功，将用户状态改为非游客用户 (isGuest=false)')
+      }
+      
       // 先关闭加载提示
       loading.value = false
       closeToast()

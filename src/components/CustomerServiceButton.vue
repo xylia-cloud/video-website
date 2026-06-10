@@ -15,12 +15,10 @@
 
 <script setup lang="ts">
 import { computed, ref, onMounted, onUnmounted } from 'vue'
-import { useRoute, useRouter } from 'vue-router'
-import { showToast } from 'vant'
-import { generateCustomerServiceUrl } from '@/utils/rsa'
+import { useRoute } from 'vue-router'
+import { isCustomerServiceModalOpen, openCustomerServiceModal } from '@/utils/customerService'
 
 const route = useRoute()
-const router = useRouter()
 const buttonRef = ref<HTMLElement | null>(null)
 
 // 按钮位置状态
@@ -34,10 +32,8 @@ const isDragging = ref(false)
 const dragStart = ref({ x: 0, y: 0 })
 const hasMoved = ref(false) // 标记是否发生了拖动
 
-// 判断是否应该显示客服按钮
 const shouldShowButton = computed(() => {
-  // 在游戏播放页和客服页隐藏客服按钮
-  return route.path !== '/game-play' && route.path !== '/customer-service'
+  return route.path !== '/game-play' && !isCustomerServiceModalOpen.value
 })
 
 // 计算按钮样式
@@ -198,32 +194,8 @@ onUnmounted(() => {
   document.removeEventListener('mouseup', handleMouseUp)
 })
 
-const handleClick = async () => {
-  console.log('客服按钮被点击')
-  
-  try {
-    showToast({
-      message: '正在跳转客服...',
-      duration: 1000,
-    })
-
-    const customerServiceUrl = generateCustomerServiceUrl()
-    console.log('客服链接已生成:', customerServiceUrl)
-
-    const newWindow = window.open(customerServiceUrl, '_blank', 'noopener,noreferrer')
-    if (!newWindow) {
-      showToast({
-        message: '请允许弹窗后重试',
-        duration: 2000,
-      })
-    }
-  } catch (error) {
-    console.error('跳转客服失败，详细错误:', error)
-    showToast({
-      message: '客服功能暂时不可用，请稍后重试',
-      duration: 2000,
-    })
-  }
+const handleClick = () => {
+  openCustomerServiceModal()
 }
 </script>
 

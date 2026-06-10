@@ -1459,6 +1459,13 @@ export const updateUserInfo = async (params: {
     queryParams.append('pass', params.user_pwd1!)
     queryParams.append('pass2', params.user_pwd2!)
 
+    // 🔥 如果本地存储 isGuest 为 true（游客用户），则添加 isyouke=1 参数
+    const isGuestUser = localStorage.getItem('isGuest') === 'true'
+    if (isGuestUser) {
+      queryParams.append('isyouke', '1')
+      console.log('🎯 检测到游客用户修改密码，添加 isyouke=1 查询参数')
+    }
+
     // 获取基础请求头
     const headers = {
       Accept: 'application/json, text/plain, */*',

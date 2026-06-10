@@ -13,7 +13,7 @@ import {
 } from '@/api/fetch-api'
 import HeaderNav from '@/components/HeaderNav.vue'
 import BalanceInfoCard from '@/components/BalanceInfoCard.vue'
-import { generateCustomerServiceUrl } from '@/utils/rsa'
+import { openCustomerServiceModal } from '@/utils/customerService'
 
 // 接口类型定义
 interface PaymentChannel {
@@ -450,30 +450,9 @@ const handleReturnToRecharge = () => {
   // 关闭弹窗，用户可以重新选择充值
 }
 
-// 🔥 跳转到手动充值（客服）
-const goToManualRecharge = async () => {
-  try {
-    showToast({
-      message: '正在跳转客服...',
-      duration: 1000,
-    })
-
-    const customerServiceUrl = generateCustomerServiceUrl()
-
-    const newWindow = window.open(customerServiceUrl, '_blank', 'noopener,noreferrer')
-    if (!newWindow) {
-      showToast({
-        message: '请允许弹窗后重试',
-        duration: 2000,
-      })
-    }
-  } catch (error) {
-    console.error('跳转客服失败:', error)
-    showToast({
-      message: '客服功能暂时不可用，请稍后重试',
-      duration: 2000,
-    })
-  }
+// 🔥 打开客服弹窗（手动充值）
+const goToManualRecharge = () => {
+  openCustomerServiceModal()
 }
 
 // 🔥 检测是否为iOS设备
@@ -1053,7 +1032,13 @@ const checkPaymentResult = async () => {
 <template>
   <div class="recharge-page">
     <!-- 头部导航 -->
-    <HeaderNav title="充值中心" />
+    <HeaderNav title="充值中心">
+      <template #left-extra>
+        <button type="button" class="back-to-game-btn" @click="router.push('/game')">
+          返回游戏
+        </button>
+      </template>
+    </HeaderNav>
 
     <!-- 选项卡切换 -->
     <div class="nav-tabs">
@@ -1098,10 +1083,6 @@ const checkPaymentResult = async () => {
             <span class="step-number">1</span>
             选择支付方式
           </h3>
-          <button class="back-to-game-btn" @click="router.push('/game')">
-            <van-icon name="shop-o" size="14" />
-            <span>返回游戏大厅</span>
-          </button>
         </div>
         <div v-if="isLoadingChannels" class="loading-channels">
           <van-loading type="spinner" color="#ff9500" />
@@ -1540,13 +1521,38 @@ const checkPaymentResult = async () => {
   padding: 10px 0;
 }
 
-/* 标题与按钮容器 */
+/* 标题容器 */
 .section-header-with-action {
   display: flex;
   align-items: center;
-  justify-content: space-between;
   margin-bottom: 15px;
   padding: 0 16px;
+}
+
+/* 返回游戏（头部左上角，位于返回按钮右侧） */
+.back-to-game-btn {
+  display: flex;
+  align-items: center;
+  padding: 4px 10px;
+  background: rgba(255, 149, 0, 0.15);
+  border: 1px solid rgba(255, 149, 0, 0.4);
+  border-radius: 14px;
+  color: #ff9500;
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  white-space: nowrap;
+  line-height: 1;
+}
+
+.back-to-game-btn:hover {
+  background: rgba(255, 149, 0, 0.25);
+  border-color: #ff9500;
+}
+
+.back-to-game-btn:active {
+  opacity: 0.85;
 }
 
 .section-title {
@@ -1570,32 +1576,6 @@ const checkPaymentResult = async () => {
   border-radius: 50%;
   font-size: 12px;
   font-weight: bold;
-}
-
-/* 返回游戏大厅按钮 */
-.back-to-game-btn {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-  padding: 6px 12px;
-  background: rgba(255, 149, 0, 0.15);
-  border: 1px solid rgba(255, 149, 0, 0.4);
-  border-radius: 20px;
-  color: #ff9500;
-  font-size: 13px;
-  font-weight: 500;
-  cursor: pointer;
-  transition: all 0.3s ease;
-}
-
-.back-to-game-btn:hover {
-  background: rgba(255, 149, 0, 0.25);
-  border-color: #ff9500;
-  transform: translateY(-1px);
-}
-
-.back-to-game-btn:active {
-  transform: translateY(0);
 }
 
 .loading-channels,
