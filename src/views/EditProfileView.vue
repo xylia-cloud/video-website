@@ -690,10 +690,10 @@ const changePassword = async () => {
       // 关闭密码弹窗
       pwdPopupVisible.value = false
 
-      // 🔥 显示成功弹窗并提示即将退出登录
+      // 🔥 显示成功弹窗并提示即将退出登录，包含当前账号信息
       showDialog({
         title: '提示',
-        message: '密码修改成功，为了您的账号安全，请重新登录',
+        message: `账号【${displayUsername.value}】密码修改成功\n\n为了您的账号安全，请重新登录`,
         confirmButtonText: '确定',
         confirmButtonColor: '#ff9500',
         closeOnClickOverlay: false,
