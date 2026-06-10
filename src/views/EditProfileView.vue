@@ -662,6 +662,12 @@ const changePassword = async () => {
         console.log('✅ 密码修改成功，将用户状态改为非游客用户 (isGuest=false)')
       }
       
+      // 🔥 清空密码字段
+      oldPwd.value = ''
+      newPwd.value = ''
+      repeatPwd.value = ''
+      pwdValidationMsg.value = ''
+      
       // 先关闭加载提示
       loading.value = false
       closeToast()
