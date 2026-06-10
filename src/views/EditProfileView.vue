@@ -98,7 +98,7 @@
           <!-- 当前用户名显示 -->
           <div class="current-username-display">
             <span class="username-label">当前账号：</span>
-            <span class="username-value">{{ userId || '未设置' }}</span>
+            <span class="username-value">{{ displayUsername }}</span>
           </div>
           
           <!-- 游客默认密码提示 -->
@@ -248,6 +248,15 @@ const isGuest = computed(() => {
     isGuest: guestFlag === 'true',
   })
   return guestFlag === 'true'
+})
+
+// 计算属性：显示的用户名（用于密码弹窗）
+const displayUsername = computed(() => {
+  const userInfo = getUserInfo()
+  if (!userInfo) return '未设置'
+  
+  // 优先显示 user_name，其次 user_id，最后 user_nick_name
+  return String(userInfo.user_name || userInfo.user_id || userInfo.user_nick_name || '未设置')
 })
 
 // 计算属性：获取 localStorage 中的 isGuest 值（用于调试）
@@ -763,7 +772,7 @@ const loadUserInfo = () => {
 
     // 根据用户类型处理信息
     if (isGuestUser) {
-      // 游客：设置空值
+      // 游客：设置空值（账号输入框为空，允许用户输入）
       userId.value = ''
       nickname.value = ''
     } else {
