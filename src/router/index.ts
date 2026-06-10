@@ -194,6 +194,11 @@ const router = createRouter({
       component: EditProfileView,
     },
     {
+      path: '/change-password',
+      name: 'changePassword',
+      component: () => import('../views/ChangePasswordView.vue'),
+    },
+    {
       path: '/share-friends',
       name: 'shareFriends',
       component: ShareFriendsView,

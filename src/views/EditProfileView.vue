@@ -65,7 +65,7 @@
       </div>
 
       <!-- 登录密码 -->
-      <div class="form-item" @click="showChangePwdPopup">
+      <div class="form-item" @click="goToChangePassword">
         <div class="item-label">登录密码：</div>
         <div class="item-value">
           修改登录密码
@@ -329,6 +329,11 @@ const getSexText = (sexValue: number) => {
     default:
       return '保密'
   }
+}
+
+// 跳转到修改密码页面
+const goToChangePassword = () => {
+  router.push('/change-password')
 }
 
 // 显示性别选择器
