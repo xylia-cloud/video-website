@@ -63,16 +63,57 @@
           <van-icon name="arrow" size="20" color="#ccc" />
         </div>
       </div>
+    </div>
 
-      <!-- 登录密码 -->
-      <div class="form-item" @click="goToChangePassword">
-        <div class="item-label">登录密码：</div>
-        <div class="item-value">
-          修改登录密码
-          <span v-if="isGuest" class="pwd-init-tip">(初始密码：12345678)</span>
+    <!-- 修改密码区域 -->
+    <div class="password-section">
+      <h3 class="section-title-simple">修改登录密码（选填）</h3>
+      
+      <!-- 游客默认密码提示 -->
+      <div class="guest-pwd-tip-inline" v-if="isGuest">
+        <van-icon name="info-o" size="14" color="#ff9500" />
+        <span>游客默认密码为：12345678</span>
+      </div>
+
+      <!-- 原密码 -->
+      <div class="form-item">
+        <div class="item-label">原密码：</div>
+        <div class="item-input">
+          <input type="password" v-model="oldPwd" placeholder="不修改密码请留空" />
         </div>
-        <div class="item-arrow">
-          <van-icon name="arrow" size="20" color="#ccc" />
+      </div>
+
+      <!-- 新密码 -->
+      <div class="form-item">
+        <div class="item-label">新密码：</div>
+        <div class="item-input">
+          <input 
+            type="password" 
+            v-model="newPwd" 
+            placeholder="不修改密码请留空"
+            @input="onNewPwdInput"
+          />
+        </div>
+        <div class="input-tip" v-if="newPwd && !pwdValidationMsg">
+          密码需8位以上，包含大小写字母和数字
+        </div>
+        <div
+          class="pwd-validation"
+          :class="{
+            valid: pwdValidationMsg.includes('✓'),
+            invalid: pwdValidationMsg && !pwdValidationMsg.includes('✓'),
+          }"
+          v-if="pwdValidationMsg"
+        >
+          {{ pwdValidationMsg }}
+        </div>
+      </div>
+
+      <!-- 确认新密码 -->
+      <div class="form-item">
+        <div class="item-label">确认密码：</div>
+        <div class="item-input">
+          <input type="password" v-model="repeatPwd" placeholder="不修改密码请留空" />
         </div>
       </div>
     </div>
@@ -596,6 +637,49 @@ const handleAvatarChange = async (event: Event) => {
 const saveProfile = async () => {
   if (loading.value) return
 
+  // 检查是否填写了密码字段
+  const hasPasswordFields = !!(oldPwd.value || newPwd.value || repeatPwd.value)
+  
+  // 检查密码字段是否完整
+  if (hasPasswordFields) {
+    if (!oldPwd.value) {
+      showDialog({
+        title: '提示',
+        message: '请输入原密码',
+        confirmButtonText: '确定',
+        confirmButtonColor: '#ff9500',
+      })
+      return
+    }
+    if (!newPwd.value) {
+      showDialog({
+        title: '提示',
+        message: '请输入新密码',
+        confirmButtonText: '确定',
+        confirmButtonColor: '#ff9500',
+      })
+      return
+    }
+    if (!validatePassword(newPwd.value)) {
+      showDialog({
+        title: '提示',
+        message: '新密码必须包含大小写字母和数字，且不少于8位',
+        confirmButtonText: '确定',
+        confirmButtonColor: '#ff9500',
+      })
+      return
+    }
+    if (newPwd.value !== repeatPwd.value) {
+      showDialog({
+        title: '提示',
+        message: '两次输入的新密码不一致',
+        confirmButtonText: '确定',
+        confirmButtonColor: '#ff9500',
+      })
+      return
+    }
+  }
+
   try {
     loading.value = true
     showLoadingToast({
@@ -603,31 +687,89 @@ const saveProfile = async () => {
       forbidClick: true,
     })
 
-    // 调用API保存数据，包含新字段
-    const updateParams: any = {
+    let profileUpdateSuccess = false
+    let passwordUpdateSuccess = false
+
+    // 1. 保存个人资料（如果有变化）
+    const profileParams: any = {
       user_nick_name: nickname.value,
       sex: sex.value.toString(),
       birthday: birthday.value,
-      user_pwd: '', // 原密码，不修改密码时传空字符串
-      user_pwd1: '', // 新密码，不修改密码时传空字符串
-      user_pwd2: '', // 确认密码，不修改密码时传空字符串
     }
 
     // 🔥 只有游客用户才可以修改账号，使用 user_login 字段
-    if (isGuest.value) {
-      updateParams.user_login = userId.value
+    if (isGuest.value && userId.value) {
+      profileParams.user_login = userId.value
       console.log('🎯 游客修改账号，API会自动添加 isyouke=1 参数')
     }
 
-    const result = await updateUserInfo(updateParams)
+    const profileResult = await updateUserInfo(profileParams)
 
-    if (result && result.code === 1) {
+    if (profileResult && profileResult.code === 1) {
+      profileUpdateSuccess = true
+      console.log('✅ 个人资料保存成功')
+      
       // 🔥 修改账号成功后，如果是游客用户，将本地存储的用户改为非游客用户
-      if (isGuest.value) {
+      if (isGuest.value && userId.value) {
         localStorage.setItem('isGuest', 'false')
         console.log('✅ 账号修改成功，将用户状态改为非游客用户 (isGuest=false)')
       }
+    } else {
+      console.error('❌ 个人资料保存失败:', profileResult?.msg)
+    }
 
+    // 2. 修改密码（如果填写了密码字段）
+    if (hasPasswordFields) {
+      const passwordParams: any = {
+        user_pwd: oldPwd.value,
+        user_pwd1: newPwd.value,
+        user_pwd2: repeatPwd.value,
+      }
+
+      const passwordResult = await updateUserInfo(passwordParams)
+
+      if (passwordResult && passwordResult.code === 1) {
+        passwordUpdateSuccess = true
+        console.log('✅ 密码修改成功')
+        
+        // 🔥 修改密码成功后，如果是游客用户，将本地存储的用户改为非游客用户
+        if (isGuest.value) {
+          localStorage.setItem('isGuest', 'false')
+          console.log('✅ 密码修改成功，将用户状态改为非游客用户 (isGuest=false)')
+        }
+        
+        // 清空密码字段
+        oldPwd.value = ''
+        newPwd.value = ''
+        repeatPwd.value = ''
+        pwdValidationMsg.value = ''
+      } else {
+        console.error('❌ 密码修改失败:', passwordResult?.msg)
+        
+        // 密码修改失败，显示错误信息
+        closeToast()
+        loading.value = false
+        
+        showDialog({
+          title: '提示',
+          message: passwordResult?.msg || '密码修改失败，请重试',
+          confirmButtonText: '确定',
+          confirmButtonColor: '#ff9500',
+        })
+        return
+      }
+    }
+
+    // 3. 关闭加载提示
+    closeToast()
+    loading.value = false
+
+    // 4. 根据结果显示不同的提示
+    if (passwordUpdateSuccess) {
+      // 如果修改了密码，显示密码修改成功弹窗并强制退出登录
+      showPasswordSuccessPopup.value = true
+    } else if (profileUpdateSuccess) {
+      // 如果只修改了个人资料，显示普通成功提示
       showDialog({
         title: '提示',
         message: '保存成功',
@@ -637,22 +779,23 @@ const saveProfile = async () => {
         router.back()
       })
     } else {
+      // 两者都失败
       showDialog({
         title: '提示',
-        message: result?.msg || '保存失败，请重试',
+        message: '保存失败，请重试',
         confirmButtonText: '确定',
         confirmButtonColor: '#ff9500',
       })
     }
   } catch (error: any) {
-    console.error('保存个人资料失败:', error)
+    console.error('保存失败:', error)
+    loading.value = false
+    closeToast()
+    
     showToast({
       message: error.message || '保存失败，请稍后再试',
       duration: 2000,
     })
-  } finally {
-    loading.value = false
-    closeToast()
   }
 }
 
@@ -1278,6 +1421,37 @@ onBeforeUnmount(() => {
 .birthday-confirm {
   background-color: #ff9500;
   color: #fff;
+}
+
+/* 修改密码区域样式 */
+.password-section {
+  padding: 0 15px;
+  margin-top: 20px;
+}
+
+.section-title-simple {
+  font-size: 16px;
+  font-weight: 500;
+  color: #fff;
+  margin-bottom: 15px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid #333;
+}
+
+.guest-pwd-tip-inline {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 10px 15px;
+  margin-bottom: 15px;
+  background-color: rgba(255, 149, 0, 0.1);
+  border-radius: 8px;
+  font-size: 13px;
+  color: #ff9500;
+}
+
+.guest-pwd-tip-inline span {
+  flex: 1;
 }
 
 /* 密码修改成功弹窗样式 */
