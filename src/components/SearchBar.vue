@@ -17,22 +17,20 @@
         @click="clearSearch"
       />
     </div>
-    <div class="app-download" @click="showDomainPopup = true">
+    <div class="app-download" @click="openAppDownload">
       <img src="@/assets/img/icon-yjym.svg" alt="永久域名" />
       永久域名
     </div>
-
-    <!-- 域名弹窗 -->
-    <DomainPopup v-model:show="showDomainPopup" />
   </div>
 </template>
 
 <script setup lang="ts">
 import { ref } from 'vue'
 import { useRouter } from 'vue-router'
-import DomainPopup from './DomainPopup.vue'
 
 const router = useRouter()
+
+const APP_DOWNLOAD_URL = 'https://download.jiji8.cc'
 
 interface Props {
   keyword?: string
@@ -49,7 +47,10 @@ const props = withDefaults(defineProps<Props>(), {
 const emit = defineEmits<Emits>()
 
 const searchKeyword = ref(props.keyword)
-const showDomainPopup = ref(false)
+
+const openAppDownload = () => {
+  window.open(APP_DOWNLOAD_URL, '_blank')
+}
 
 const handleSearch = () => {
   if (searchKeyword.value.trim()) {

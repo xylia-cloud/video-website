@@ -8,7 +8,6 @@ import AdBanner from '@/components/AdBanner.vue'
 import VideoSection from '@/components/VideoSection.vue'
 import LoadingStates from '@/components/LoadingStates.vue'
 import BottomTabbar from '@/components/BottomTabbar.vue'
-import DomainPopup from '@/components/DomainPopup.vue'
 import { ref, onMounted, onBeforeUnmount, computed, onActivated } from 'vue'
 import { getRecommendVideos } from '@/api/video'
 import {
@@ -163,10 +162,6 @@ const searchKeyword = ref('')
 
 // 轮播图当前索引
 const currentBannerIndex = ref(0)
-
-// 首页首次打开弹窗
-const showDomainPopup = ref(false)
-const DOMAIN_POPUP_SHOWN_KEY = 'domainPopupShownInSession'
 
 // 计算属性：判断当前是否为第一个标签
 const isFirstTabActive = computed(() => {
@@ -1187,13 +1182,6 @@ const handlePageUnload = () => {
 
 // 组件挂载时获取数据
 onMounted(async () => {
-  const initialRouteName = sessionStorage.getItem('initialRouteName')
-  const hasShownPopup = sessionStorage.getItem(DOMAIN_POPUP_SHOWN_KEY)
-  if (initialRouteName === 'home' && !hasShownPopup) {
-    showDomainPopup.value = true
-    sessionStorage.setItem(DOMAIN_POPUP_SHOWN_KEY, 'true')
-  }
-
   // 添加页面关闭或刷新的事件监听
   window.addEventListener('beforeunload', handlePageUnload)
 
@@ -1552,8 +1540,6 @@ const performTouristLogin = async () => {
 
 <template>
   <div class="home">
-    <DomainPopup v-model:show="showDomainPopup" />
-
     <!-- 加载状态组件 -->
     <LoadingStates
       :isFullScreenLoading="isFullScreenLoading"

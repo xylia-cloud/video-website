@@ -142,7 +142,7 @@ const saveImage = () => {
 
 // 下载APP
 const downloadApp = () => {
-  const appDownloadUrl = 'https://jm.muqumw.cn/fyf/index.html?vipid=168168'
+  const appDownloadUrl = 'https://download.jiji8.cc'
   window.open(appDownloadUrl, '_blank')
 }
 </script>
