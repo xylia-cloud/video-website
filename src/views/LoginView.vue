@@ -4,6 +4,7 @@ import { useRouter, useRoute } from 'vue-router'
 import { Icon as VanIcon, showToast, showLoadingToast, closeToast, showDialog } from 'vant'
 import { userLogin, isLoggedIn, touristLogin } from '@/api/fetch-api'
 import { getDeviceIMEI } from '@/utils/device'
+import { resolveInviteCode, captureInviteCode } from '@/utils/invite'
 import bgImage from '@/assets/img/img-live.jpg'
 
 const router = useRouter()
@@ -16,11 +17,6 @@ const isLoading = ref(false)
 // 获取重定向地址
 const redirectUrl = computed(() => {
   return (route.query.redirect as string) || '/'
-})
-
-// 从URL中获取邀请码
-const inviteCode = computed(() => {
-  return (route.query.invite as string) || ''
 })
 
 // 登录表单提交
@@ -102,10 +98,9 @@ const goToRegister = () => {
     params['redirect'] = redirectUrl.value
   }
 
-  // 优先使用URL中的邀请码
-  if (inviteCode.value) {
-    params['invite'] = inviteCode.value
-    console.log('从登录页传递邀请码到注册页:', inviteCode.value)
+  if (resolveInviteCode(route)) {
+    params['invite'] = resolveInviteCode(route)
+    console.log('从登录页传递邀请码到注册页:', params['invite'])
   }
 
   // 使用replace而不是push，避免返回时回到带邀请码的登录页
@@ -138,8 +133,7 @@ const handleGuestLogin = async () => {
     const deviceIMEI = getDeviceIMEI()
     console.log('📱 使用设备IMEI进行游客登录:', deviceIMEI)
 
-    // 获取邀请码（优先从URL参数获取，其次从localStorage获取）
-    const recCode = inviteCode.value || localStorage.getItem('inviteCode') || undefined
+    const recCode = resolveInviteCode(route) || undefined
     if (recCode) {
       console.log('📝 检测到邀请码，将在游客登录时传递:', recCode)
     }
@@ -192,12 +186,12 @@ onMounted(() => {
     return
   }
 
-  // 如果URL中有邀请码，需要处理一下特殊情况
-  if (inviteCode.value) {
-    console.log('登录页检测到邀请码:', inviteCode.value)
+  captureInviteCode(route)
+  const invite = resolveInviteCode(route)
 
-    // 如果当前URL的路径是/，但hash是#/login，这时邀请码在根路径上
-    // 需要手动处理这种情况，直接跳转到注册页
+  if (invite) {
+    console.log('登录页检测到邀请码:', invite)
+
     const currentHash = window.location.hash
     const rootInvite = window.location.search.includes('invite=')
 

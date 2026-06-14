@@ -1,4 +1,5 @@
 import { createRouter, createWebHashHistory } from 'vue-router'
+import { captureInviteCode } from '@/utils/invite'
 import HomeView from '../views/HomeView.vue'
 import GameView from '../views/GameView.vue'
 import GameSecondaryView from '../views/GameSecondaryView.vue'
@@ -304,6 +305,14 @@ const router = createRouter({
       component: TutorialDetailView,
     },
   ],
+})
+
+router.beforeEach((to, _from, next) => {
+  const invite = captureInviteCode(to)
+  if (invite) {
+    console.log('路由守卫捕获邀请码:', invite)
+  }
+  next()
 })
 
 router.afterEach((to) => {

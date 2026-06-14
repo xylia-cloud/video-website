@@ -842,7 +842,7 @@ export const clearAllCache = () => {
 
   // 清除首页相关缓存
   localStorage.removeItem('lastActiveTabId')
-  localStorage.removeItem('inviteCode')
+  // 保留 inviteCode：token 过期后仍应能用于注册/重新登录
 
   // 清除首页弹窗状态
   sessionStorage.removeItem('homePopupShownThisSession')

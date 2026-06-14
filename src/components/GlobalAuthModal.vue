@@ -2,6 +2,7 @@
 import { onBeforeUnmount, onMounted, ref } from 'vue'
 import { closeToast, showToast } from 'vant'
 import { registerUser, userLogin } from '@/api/fetch-api'
+import { captureInviteCode, resolveInviteCode } from '@/utils/invite'
 
 type AuthTab = 'login' | 'register'
 
@@ -42,12 +43,26 @@ const closeModal = () => {
 const switchTab = (tab: AuthTab) => {
   activeTab.value = tab
   authErrorMsg.value = ''
+  if (tab === 'register') {
+    fillRegisterInviteCode()
+  }
+}
+
+const fillRegisterInviteCode = () => {
+  const code = resolveInviteCode()
+  if (code) {
+    registerInviteCode.value = code
+  }
 }
 
 const openModal = (detail?: AuthModalDetail) => {
   activeTab.value = detail?.tab || 'login'
   authMessage.value = detail?.message || '登录状态已失效，请重新登录'
   authErrorMsg.value = ''
+  captureInviteCode()
+  if (activeTab.value === 'register') {
+    fillRegisterInviteCode()
+  }
   isVisible.value = true
 }
 

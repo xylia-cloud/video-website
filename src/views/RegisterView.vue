@@ -3,6 +3,7 @@ import { ref, onMounted, defineProps } from 'vue';
 import { useRouter, useRoute } from 'vue-router';
 import { Icon as VanIcon, showDialog, showLoadingToast, closeToast } from 'vant';
 import { registerUser, userLogin, setUserInfo } from '@/api/fetch-api';
+import { captureInviteCode, resolveInviteCode } from '@/utils/invite';
 
 // 接收路由参数
 const props = defineProps({
@@ -208,52 +209,13 @@ const goToLogin = () => {
 onMounted(() => {
   console.log('注册页面加载，路由参数:', route.query);
 
-  // 检查是否有邀请码
-  let hasInviteCode = false;
-
-  // 1. 优先使用props中的邀请码
-  if (props.invite) {
-    inviteCode.value = props.invite;
-    console.log('从props获取邀请码:', props.invite);
-    hasInviteCode = true;
+  const code = resolveInviteCode(route)
+  if (code) {
+    inviteCode.value = code
+    console.log('注册页面最终邀请码:', code)
+  } else {
+    console.log('注册页面最终邀请码: 无邀请码')
   }
-  // 2. 其次从URL参数中获取邀请码
-  else {
-    const inviteParam = route.query.invite as string;
-    if (inviteParam) {
-      inviteCode.value = inviteParam;
-      console.log('从URL查询参数获取邀请码:', inviteParam);
-      hasInviteCode = true;
-    }
-  }
-
-  // 3. 如果上面方法都没获取到，但URL的根路径有invite参数(处理特殊情况)
-  if (!hasInviteCode) {
-    const urlParams = new URLSearchParams(window.location.search);
-    const rootInviteCode = urlParams.get('invite');
-
-    if (rootInviteCode) {
-      inviteCode.value = rootInviteCode;
-      console.log('从根路径获取邀请码:', rootInviteCode);
-      hasInviteCode = true;
-
-      // 可以选择清理URL，但这不是必须的
-      // 这里不执行清理，因为可能会影响用户体验
-    }
-  }
-
-  // 4. 如果以上方法都没获取到，从localStorage中获取
-  if (!hasInviteCode) {
-    const storedInviteCode = localStorage.getItem('inviteCode');
-    if (storedInviteCode) {
-      inviteCode.value = storedInviteCode;
-      console.log('从localStorage获取邀请码:', storedInviteCode);
-      hasInviteCode = true;
-    }
-  }
-
-  // 打印最终邀请码状态
-  console.log('注册页面最终邀请码:', inviteCode.value || '无邀请码');
 });
 </script>
 

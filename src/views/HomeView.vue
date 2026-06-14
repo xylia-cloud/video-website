@@ -26,27 +26,11 @@ import { BASE_URL, VIDEO_CATEGORIES, DEFAULT_PAGE_SIZE } from '@/utils/config'
 import { useRouter, useRoute } from 'vue-router'
 import { getDeviceIMEI } from '@/utils/device'
 import { showToast } from 'vant'
+import { resolveInviteCode } from '@/utils/invite'
 
 // 使用路由
 const router = useRouter()
 const route = useRoute()
-
-// 获取邀请码参数
-const inviteCode = computed(() => {
-  return (route.query.invite as string) || ''
-})
-
-// 处理邀请码
-const handleInviteCode = () => {
-  if (inviteCode.value) {
-    console.log('检测到邀请码:', inviteCode.value)
-    // 保存邀请码到本地存储，以便后续使用
-    localStorage.setItem('inviteCode', inviteCode.value)
-
-    // 只记录邀请码，不显示弹窗提示
-    // 当用户点击注册时，注册页面会自动读取此邀请码
-  }
-}
 
 // 定义视频数据接口
 interface VideoItem {
@@ -1216,8 +1200,11 @@ onMounted(async () => {
   // 尝试恢复之前的会话数据
   restoreSessionData()
 
-  // 处理邀请码参数
-  handleInviteCode()
+  // 捕获并持久化邀请码（路由守卫已处理，此处兜底）
+  const invite = resolveInviteCode(route)
+  if (invite) {
+    console.log('首页检测到邀请码:', invite)
+  }
 
   // 首先执行游客登录（如果需要的话）
   await performTouristLogin()
@@ -1527,8 +1514,7 @@ const performTouristLogin = async () => {
     const deviceIMEI = getDeviceIMEI()
     console.log('📱 使用设备IMEI进行游客登录:', deviceIMEI)
 
-    // 获取邀请码（优先从URL参数获取，其次从localStorage获取）
-    const recCode = inviteCode.value || localStorage.getItem('inviteCode') || undefined
+    const recCode = resolveInviteCode(route) || undefined
     if (recCode) {
       console.log('📝 检测到邀请码，将在游客登录时传递:', recCode)
     }

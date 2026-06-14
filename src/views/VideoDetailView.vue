@@ -22,6 +22,7 @@ import {
 import type { VideoDetail } from '@/api/fetch-api'
 import { BASE_URL } from '@/utils/config'
 import { getDeviceIMEI } from '@/utils/device'
+import { resolveInviteCode, captureInviteCode } from '@/utils/invite'
 // 导入Vant组件
 import { Icon, Loading, showToast, showDialog, closeToast } from 'vant'
 // 导入hls.js
@@ -57,6 +58,7 @@ interface ListAd {
 
 const route = useRoute()
 const router = useRouter()
+const inviteCode = computed(() => resolveInviteCode(route))
 const videoId = ref(route.params.id as string)
 const isLoading = ref(true)
 const hasError = ref(false)
@@ -228,48 +230,6 @@ const isLoginRequiredResult = (result: any): boolean => {
   return msg.includes('请先登录') || msg.includes('重新登录')
 }
 
-// 添加一个专门用于解析URL中的邀请码的方法
-const parseUrlInviteCode = () => {
-  // 获取完整URL
-  const fullUrl = window.location.href
-  console.log('开始解析URL邀请码，完整URL:', fullUrl)
-
-  // 尝试正则匹配invite参数
-  // 这个正则会匹配 invite=xxxx 格式，无论它在哈希前还是哈希后
-  const inviteRegex = /[?&]invite=([^&#]*)/
-  const match = fullUrl.match(inviteRegex)
-
-  if (match && match[1]) {
-    const extractedInvite = decodeURIComponent(match[1])
-    console.log('正则匹配到的邀请码:', extractedInvite)
-
-    // 存储到localStorage以便后续使用
-    localStorage.setItem('inviteCode', extractedInvite)
-
-    return extractedInvite
-  }
-
-  return ''
-}
-
-// 从路由中获取邀请码和分享ID
-const inviteCode = computed(() => {
-  // 首先尝试从路由查询参数获取
-  const routeInvite = route.query.invite as string
-  if (routeInvite) {
-    console.log('从路由查询参数获取邀请码:', routeInvite)
-    return routeInvite
-  }
-
-  // 如果都没有找到，从localStorage尝试获取
-  const storedInvite = localStorage.getItem('inviteCode')
-  if (storedInvite) {
-    console.log('从localStorage获取邀请码:', storedInvite)
-    return storedInvite
-  }
-
-  return ''
-})
 
 // 是否是从分享链接进入
 const isFromShare = computed(() => {
@@ -333,17 +293,10 @@ const showAuthenticationModal = (defaultTab = 'login') => {
 
   // 如果是注册选项卡，检查是否有邀请码
   if (defaultTab === 'register') {
-    // 从各种可能的来源获取邀请码
-    const urlInviteCode = parseUrlInviteCode() // 先尝试从URL中解析
-    const computedInviteCode = inviteCode.value // 使用计算属性的值
-
-    // 优先使用直接从URL解析的邀请码
-    if (urlInviteCode) {
-      registerInviteCode.value = urlInviteCode
-      console.log('从URL直接解析并填充邀请码:', urlInviteCode)
-    } else if (computedInviteCode) {
-      registerInviteCode.value = computedInviteCode
-      console.log('从计算属性填充邀请码:', computedInviteCode)
+    const code = resolveInviteCode(route)
+    if (code) {
+      registerInviteCode.value = code
+      console.log('填充注册邀请码:', code)
     }
   }
 
@@ -358,17 +311,10 @@ const switchAuthTab = (tab: string) => {
 
   // 如果切换到注册选项卡，尝试填充邀请码
   if (tab === 'register' && !registerInviteCode.value) {
-    // 从各种可能的来源获取邀请码
-    const urlInviteCode = parseUrlInviteCode() // 先尝试从URL中解析
-    const computedInviteCode = inviteCode.value // 使用计算属性的值
-
-    // 优先使用直接从URL解析的邀请码
-    if (urlInviteCode) {
-      registerInviteCode.value = urlInviteCode
-      console.log('切换选项卡时从URL直接解析并填充邀请码:', urlInviteCode)
-    } else if (computedInviteCode) {
-      registerInviteCode.value = computedInviteCode
-      console.log('切换选项卡时从计算属性填充邀请码:', computedInviteCode)
+    const code = resolveInviteCode(route)
+    if (code) {
+      registerInviteCode.value = code
+      console.log('切换选项卡时填充邀请码:', code)
     }
   }
 }
@@ -1284,10 +1230,17 @@ const getUserRealTimeInfo = async () => {
   }
 }
 
+// 播放前广告开关（暂时关闭）
+const ENABLE_PLAY_VIDEO_AD = false
+
 // 播放视频
 const playVideo = async () => {
-  // 先显示广告弹窗
-  showVideoAd.value = true
+  if (ENABLE_PLAY_VIDEO_AD) {
+    showVideoAd.value = true
+    return
+  }
+
+  await proceedToPlay()
 }
 
 // 关闭广告弹窗并继续播放流程
@@ -2391,8 +2344,7 @@ const performTouristLogin = async () => {
     const deviceIMEI = getDeviceIMEI()
     console.log('📱 使用设备IMEI进行游客登录:', deviceIMEI)
 
-    // 获取邀请码（优先从URL参数获取，其次从localStorage获取）
-    const recCode = inviteCode.value || localStorage.getItem('inviteCode') || undefined
+    const recCode = resolveInviteCode(route) || undefined
     if (recCode) {
       console.log('📝 检测到邀请码，将在游客登录时传递:', recCode)
     }
@@ -2423,14 +2375,10 @@ const performTouristLogin = async () => {
 }
 
 onMounted(async () => {
-  // 首先执行游客登录（如果需要的话）
-  await performTouristLogin()
+  captureInviteCode(route)
 
-  // 尝试解析URL中的邀请码
-  const urlInviteCode = parseUrlInviteCode()
-  if (urlInviteCode) {
-    console.log('组件挂载时从URL成功解析到邀请码:', urlInviteCode)
-  }
+  // 先捕获邀请码，再执行游客登录
+  await performTouristLogin()
 
   // 将测试函数暴露给全局作用域（仅开发环境）
   if (import.meta.env.DEV) {
@@ -2755,8 +2703,8 @@ const handleAdClick = (ad: ListAd) => {
             <div class="shape-model"></div>
           </div>
         </div>
-        <!-- 视频广告弹窗 -->
-        <div v-if="showVideoAd" class="video-ad-overlay">
+        <!-- 视频广告弹窗（暂时隐藏，ENABLE_PLAY_VIDEO_AD 开启后生效） -->
+        <div v-if="ENABLE_PLAY_VIDEO_AD && showVideoAd" class="video-ad-overlay">
           <div class="video-ad-modal">
             <!-- 关闭按钮 -->
             <div class="ad-close-btn" @click="closeVideoAdAndPlay">
