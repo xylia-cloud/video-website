@@ -11,8 +11,8 @@ import vueDevTools from 'vite-plugin-vue-devtools'
 dns.setDefaultResultOrder('ipv4first')
 
 // https://vite.dev/config/
-export default defineConfig({
-  plugins: [vue(), vueJsx(), vueDevTools()],
+export default defineConfig(({ mode }) => ({
+  plugins: [vue(), vueJsx(), mode === 'development' && vueDevTools()].filter(Boolean),
   resolve: {
     alias: {
       '@': fileURLToPath(new URL('./src', import.meta.url)),
@@ -26,6 +26,25 @@ export default defineConfig({
       compress: {
         drop_console: true, // 移除所有 console
         drop_debugger: true, // 移除 debugger
+      },
+    },
+    rollupOptions: {
+      output: {
+        manualChunks(id) {
+          if (!id.includes('node_modules')) return
+
+          if (id.includes('vant')) return 'vant'
+          if (id.includes('hls.js')) return 'hls'
+          if (id.includes('qrcode')) return 'qrcode'
+          if (
+            id.includes('/vue/') ||
+            id.includes('/vue-router/') ||
+            id.includes('/pinia/') ||
+            id.includes('@vue/')
+          ) {
+            return 'vue-vendor'
+          }
+        },
       },
     },
   },
@@ -108,4 +127,4 @@ export default defineConfig({
       },
     },
   },
-})
+}))

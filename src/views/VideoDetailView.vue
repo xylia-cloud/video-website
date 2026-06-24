@@ -3,7 +3,6 @@ import { ref, onMounted, computed, onBeforeUnmount, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import {
   fetchVideoDetail,
-  fetchRecommendVideos,
   fetchDetailRecommend,
   updateVideoHits,
   updateVideoDigg,
@@ -25,8 +24,7 @@ import { getDeviceIMEI } from '@/utils/device'
 import { resolveInviteCode, captureInviteCode } from '@/utils/invite'
 // 导入Vant组件
 import { Icon, Loading, showToast, showDialog, closeToast } from 'vant'
-// 导入hls.js
-import Hls from 'hls.js'
+import type Hls from 'hls.js'
 // 导入视频列表组件
 import VideoList from '@/components/VideoList.vue'
 
@@ -77,6 +75,30 @@ const videoContainerRef = ref<HTMLElement | null>(null)
 const hls = ref<Hls | null>(null)
 // 视频元素引用
 const videoEl = ref<HTMLVideoElement | null>(null)
+let playbackSetupTimer: ReturnType<typeof setTimeout> | null = null
+
+const cleanupVideoPlayer = () => {
+  if (playbackSetupTimer !== null) {
+    clearTimeout(playbackSetupTimer)
+    playbackSetupTimer = null
+  }
+
+  if (hls.value) {
+    hls.value.destroy()
+    hls.value = null
+  }
+
+  if (videoEl.value) {
+    videoEl.value.pause()
+    videoEl.value.removeAttribute('src')
+    videoEl.value.load()
+  }
+}
+
+const stopPlayback = () => {
+  cleanupVideoPlayer()
+  isPlaying.value = false
+}
 
 // 付费逻辑状态
 const isNeedPay = ref(false)
@@ -947,17 +969,10 @@ watch(
       console.log('视频ID变化:', newId)
       videoId.value = newId as string
 
-      // 重置播放状态
-      isPlaying.value = false
+      stopPlayback()
 
       // 重置广告状态
       showVideoAd.value = false
-
-      // 清理HLS实例
-      if (hls.value) {
-        hls.value.destroy()
-        hls.value = null
-      }
 
       // 重新获取视频详情
       fetchVideoDetailData()
@@ -981,12 +996,8 @@ const getCoverUrl = (url?: string) => {
 }
 
 // 设置视频源
-const setupVideoSource = (src: string) => {
-  // 清理之前的实例
-  if (hls.value) {
-    hls.value.destroy()
-    hls.value = null
-  }
+const setupVideoSource = async (src: string) => {
+  cleanupVideoPlayer()
 
   // 检查视频元素是否存在
   if (!videoEl.value) {
@@ -1026,10 +1037,6 @@ const setupVideoSource = (src: string) => {
   videoEl.value.setAttribute('x5-video-player-type', 'h5')
   videoEl.value.setAttribute('x5-video-player-fullscreen', 'false')
 
-  // 添加视频事件监听
-  videoEl.value.addEventListener('play', handleVideoPlay)
-  videoEl.value.addEventListener('ended', handleVideoEnded)
-
   // 判断是否是m3u8格式
   if (videoUrl.includes('.m3u8')) {
     console.log('检测到m3u8格式，使用HLS播放')
@@ -1039,10 +1046,12 @@ const setupVideoSource = (src: string) => {
       console.log('浏览器原生支持HLS，直接播放')
       videoEl.value.src = videoUrl
     }
-    // 使用HLS.js
-    else if (Hls.isSupported()) {
+    // 使用HLS.js（按需加载）
+    else {
+      const { default: HlsLib } = await import('hls.js')
+      if (HlsLib.isSupported()) {
       console.log('使用HLS.js播放')
-      const newHls = new Hls({
+      const newHls = new HlsLib({
         // 配置HLS.js
         maxBufferLength: 30,
         maxMaxBufferLength: 60,
@@ -1056,11 +1065,11 @@ const setupVideoSource = (src: string) => {
       hls.value = newHls
 
       // 先添加错误处理程序
-      newHls.on(Hls.Events.ERROR, (event, data) => {
+      newHls.on(HlsLib.Events.ERROR, (event, data) => {
         console.error('HLS播放错误:', data)
         if (data.fatal) {
           switch (data.type) {
-            case Hls.ErrorTypes.NETWORK_ERROR:
+            case HlsLib.ErrorTypes.NETWORK_ERROR:
               console.error('致命网络错误')
 
               // 检查错误响应是否包含HTML内容
@@ -1083,7 +1092,7 @@ const setupVideoSource = (src: string) => {
                 newHls.startLoad()
               }
               break
-            case Hls.ErrorTypes.MEDIA_ERROR:
+            case HlsLib.ErrorTypes.MEDIA_ERROR:
               console.error('致命媒体错误')
               newHls.recoverMediaError() // 尝试恢复
               break
@@ -1105,7 +1114,7 @@ const setupVideoSource = (src: string) => {
         newHls.loadSource(videoUrl)
         newHls.attachMedia(videoEl.value)
 
-        newHls.on(Hls.Events.MANIFEST_PARSED, () => {
+        newHls.on(HlsLib.Events.MANIFEST_PARSED, () => {
           console.log('HLS清单解析完成，开始播放')
           videoEl.value?.play().catch((e: Error) => {
             console.error('自动播放失败:', e)
@@ -1116,11 +1125,12 @@ const setupVideoSource = (src: string) => {
         hasVideoError.value = true
         videoErrorMessage.value = '加载视频源失败: ' + (error.message || '未知错误')
       }
-    } else {
-      console.error('浏览器不支持HLS.js')
-      videoEl.value.src = videoUrl // 尝试直接播放
-      hasVideoError.value = true
-      videoErrorMessage.value = '您的浏览器不支持当前视频格式'
+      } else {
+        console.error('浏览器不支持HLS.js')
+        videoEl.value.src = videoUrl // 尝试直接播放
+        hasVideoError.value = true
+        videoErrorMessage.value = '您的浏览器不支持当前视频格式'
+      }
     }
   } else {
     // 普通视频格式
@@ -1146,7 +1156,6 @@ const handleVideoPlay = () => {
       // 延迟更新用户积分和观看次数信息，确保后端扣费已完成
       setTimeout(async () => {
         await getUserRealTimeInfo()
-        await fetchLatestPointsInfo()
         console.log('✅ 播放后已更新用户信息，当前观看次数:', userVideoNums.value)
       }, 2000)
     }
@@ -1302,9 +1311,6 @@ const continuePlay = async () => {
     console.log('正在获取用户最新积分信息...')
     const latestUserInfo = await getUserRealTimeInfo()
 
-    // 同时获取最新的VIP和积分状态
-    await fetchLatestPointsInfo()
-
     // 关闭加载提示
     closeToast()
 
@@ -1433,7 +1439,6 @@ const deductPointsAndPlay = async () => {
   // 视频开始播放后，延迟更新用户积分和观看次数信息，确保扣费已完成
   setTimeout(async () => {
     await getUserRealTimeInfo()
-    await fetchLatestPointsInfo()
     console.log('✅ 播放后已更新用户信息，当前观看次数:', userVideoNums.value)
   }, 2000)
 }
@@ -1454,8 +1459,9 @@ const startVideoPlayback = async (): Promise<boolean> => {
   isPlaying.value = true
 
   // 异步设置视频源，确保DOM已更新
-  setTimeout(() => {
-    setupVideoSource(videoSrc.value)
+  playbackSetupTimer = setTimeout(() => {
+    playbackSetupTimer = null
+    void setupVideoSource(videoSrc.value)
   }, 100)
 
   return true
@@ -1580,9 +1586,6 @@ const fetchVideoDetailData = async () => {
   pointsNeeded.value = 0
 
   try {
-    // 获取用户实时信息
-    await getUserRealTimeInfo()
-
     const result = await fetchVideoDetail(videoId.value)
     console.log('视频详情数据:', result)
 
@@ -2042,21 +2045,9 @@ const checkShareAndRegister = () => {
 
 // 返回上一页
 const goBack = () => {
-  // 如果正在播放视频，停止播放
   if (isPlaying.value) {
     console.log('停止播放视频并返回上一页')
-    isPlaying.value = false
-
-    // 清理视频资源
-    if (videoEl.value) {
-      videoEl.value.pause()
-      videoEl.value.src = ''
-    }
-
-    if (hls.value) {
-      hls.value.destroy()
-      hls.value = null
-    }
+    stopPlayback()
   }
 
   // 使用浏览器的历史记录返回上一页
@@ -2317,16 +2308,7 @@ const goToLogin = () => {
 
 // 组件卸载前清理HLS实例和事件监听
 onBeforeUnmount(() => {
-  if (hls.value) {
-    hls.value.destroy()
-    hls.value = null
-  }
-
-  // 移除视频事件监听
-  if (videoEl.value) {
-    videoEl.value.removeEventListener('play', handleVideoPlay)
-    videoEl.value.removeEventListener('ended', handleVideoEnded)
-  }
+  cleanupVideoPlayer()
 
   // 重置广告状态
   showVideoAd.value = false
@@ -2412,9 +2394,6 @@ onMounted(async () => {
   fetchVideoDetailData()
   fetchUserInfo()
   fetchListAds() // 获取广告数据
-
-  // 获取最新的积分和VIP信息
-  fetchLatestPointsInfo()
 
   // 添加滚动事件监听
   window.addEventListener('scroll', handleScroll)
@@ -2793,7 +2772,7 @@ const handleAdClick = (ad: ListAd) => {
           </div>
 
           <!-- 浮动状态下的关闭按钮 -->
-          <div v-if="isVideoFloating" class="floating-close" @click="isPlaying = false">
+          <div v-if="isVideoFloating" class="floating-close" @click="stopPlayback">
             <Icon name="cross" size="20" color="#fff" />
           </div>
         </template>
