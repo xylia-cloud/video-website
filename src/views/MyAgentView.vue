@@ -3,7 +3,6 @@ import { ref, onMounted, computed } from 'vue'
 import { useRouter } from 'vue-router'
 import HeaderNav from '@/components/HeaderNav.vue'
 import { getUserInfo, isLoggedIn } from '@/api/fetch-api'
-import QRCode from 'qrcode'
 import { NEW_API_BASE_URL } from '@/utils/config'
 
 const router = useRouter()
@@ -79,6 +78,7 @@ const inviteCode = computed(() => {
 // 生成二维码
 const generateQRCode = async (text: string) => {
   try {
+    const QRCode = (await import('qrcode')).default
     const dataUrl = await QRCode.toDataURL(text, {
       width: 200,
       margin: 1,

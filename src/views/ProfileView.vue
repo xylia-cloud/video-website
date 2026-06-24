@@ -15,7 +15,6 @@ import {
 } from '@/api/fetch-api'
 import { BASE_URL } from '@/utils/config'
 import { openCustomerServiceModal } from '@/utils/customerService'
-import QRCode from 'qrcode'
 import BottomTabbar from '@/components/BottomTabbar.vue'
 
 const router = useRouter()
@@ -642,6 +641,7 @@ const goToPromotionRecord = () => {
 // 生成二维码
 const generateQRCode = async (url: string) => {
   try {
+    const QRCode = (await import('qrcode')).default
     const qrCodeUrl = await QRCode.toDataURL(url, {
       width: 200,
       margin: 2,
