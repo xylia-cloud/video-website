@@ -61,8 +61,12 @@ const router = useRouter()
 const inviteCode = computed(() => resolveInviteCode(route))
 const videoId = ref(route.params.id as string)
 const isLoading = ref(true)
-const hasError = ref(false)
-const errorMessage = ref('')
+const hasDetailError = ref(false)
+const detailErrorMessage = ref('')
+const hasVideoError = ref(false)
+const videoErrorMessage = ref('')
+const hasRecommendError = ref(false)
+const recommendErrorMessage = ref('')
 const isPlaying = ref(false)
 
 // 添加视频浮动状态
@@ -202,7 +206,7 @@ const videoSrc = ref('')
 const isVideoPlayed = ref(false) // 记录视频是否已经播放过
 
 const canShowDownload = computed(() => {
-  return isPlaying.value && !!videoSrc.value && !hasError.value
+  return isPlaying.value && !!videoSrc.value && !hasVideoError.value
 })
 
 // 广告弹窗相关状态
@@ -1067,12 +1071,12 @@ const setupVideoSource = (src: string) => {
                 data.response.data.includes('<!DOCTYPE html>')
               ) {
                 console.error('服务器返回了HTML内容而不是视频流，URL可能有误')
-                hasError.value = true
-                errorMessage.value = '视频资源不可用或地址错误，请稍后再试'
+                hasVideoError.value = true
+                videoErrorMessage.value = '视频资源不可用或地址错误，请稍后再试'
 
                 // 尝试显示更具体的错误信息
                 const serverMessage = '服务器返回了网页而不是视频内容'
-                errorMessage.value = serverMessage
+                videoErrorMessage.value = serverMessage
               } else {
                 // 尝试恢复一次
                 console.log('尝试重新加载...')
@@ -1085,8 +1089,8 @@ const setupVideoSource = (src: string) => {
               break
             default:
               console.error('无法恢复的错误:', data)
-              hasError.value = true
-              errorMessage.value = '视频播放失败，格式可能不受支持'
+              hasVideoError.value = true
+              videoErrorMessage.value = '视频播放失败，格式可能不受支持'
               newHls.destroy()
               break
           }
@@ -1109,14 +1113,14 @@ const setupVideoSource = (src: string) => {
         })
       } catch (error: any) {
         console.error('加载视频源时出错:', error)
-        hasError.value = true
-        errorMessage.value = '加载视频源失败: ' + (error.message || '未知错误')
+        hasVideoError.value = true
+        videoErrorMessage.value = '加载视频源失败: ' + (error.message || '未知错误')
       }
     } else {
       console.error('浏览器不支持HLS.js')
       videoEl.value.src = videoUrl // 尝试直接播放
-      hasError.value = true
-      errorMessage.value = '您的浏览器不支持当前视频格式'
+      hasVideoError.value = true
+      videoErrorMessage.value = '您的浏览器不支持当前视频格式'
     }
   } else {
     // 普通视频格式
@@ -1444,9 +1448,9 @@ const startVideoPlayback = async (): Promise<boolean> => {
 
   // 直接播放视频，不隐藏其他内容
   console.log('开始播放视频:', videoSrc.value)
-  // 重置错误状态
-  hasError.value = false
-  errorMessage.value = ''
+  // 重置播放错误状态（不影响推荐列表）
+  hasVideoError.value = false
+  videoErrorMessage.value = ''
   isPlaying.value = true
 
   // 异步设置视频源，确保DOM已更新
@@ -1545,11 +1549,23 @@ const recordWatchHistory = async (): Promise<boolean> => {
   }
 }
 
+// 详情加载完成后拉取推荐视频
+const scheduleRecommendFetch = () => {
+  setTimeout(() => {
+    fetchRecommendVideosData()
+  }, 300)
+}
+
 // 获取视频详情
 const fetchVideoDetailData = async () => {
   isLoading.value = true
-  hasError.value = false
-  errorMessage.value = ''
+  hasDetailError.value = false
+  detailErrorMessage.value = ''
+  hasVideoError.value = false
+  videoErrorMessage.value = ''
+  hasRecommendError.value = false
+  recommendErrorMessage.value = ''
+  recommendVideos.value = []
 
   // 重置点赞状态
   isDigged.value = false
@@ -1606,18 +1622,16 @@ const fetchVideoDetailData = async () => {
         // 验证URL是否有效
         if (!playUrl || playUrl === 'undefined' || playUrl === 'null') {
           console.error('视频播放地址无效')
-          hasError.value = true
-          errorMessage.value = '视频源不可用，请稍后再试'
-          return
+          hasVideoError.value = true
+          videoErrorMessage.value = '视频源不可用，请稍后再试'
+        } else {
+          videoSrc.value = playUrl
+          console.log('设置最终播放地址:', videoSrc.value)
         }
-
-        // 确保URL是有效的，使用直接提供的链接
-        videoSrc.value = playUrl
-        console.log('设置最终播放地址:', videoSrc.value)
       } else {
         console.error('视频播放地址为空')
-        hasError.value = true
-        errorMessage.value = '视频源不可用，请稍后再试'
+        hasVideoError.value = true
+        videoErrorMessage.value = '视频源不可用，请稍后再试'
       }
 
       // 检查是否付费视频
@@ -1658,21 +1672,19 @@ const fetchVideoDetailData = async () => {
         isCollected.value = true
       }
 
-      // 视频详情加载完成后，再获取推荐视频
-      setTimeout(() => {
-        fetchRecommendVideosData()
-      }, 300)
+      // 视频详情加载完成后拉取推荐（与播放地址是否有效无关）
+      scheduleRecommendFetch()
 
       // 滚动到页面顶部
       window.scrollTo({ top: 0, behavior: 'smooth' })
     } else {
-      hasError.value = true
-      errorMessage.value = result.msg || '获取视频详情失败'
+      hasDetailError.value = true
+      detailErrorMessage.value = result.msg || '获取视频详情失败'
     }
   } catch (error: any) {
     console.error('获取视频详情请求失败:', error)
-    hasError.value = true
-    errorMessage.value = error.message || '网络请求错误'
+    hasDetailError.value = true
+    detailErrorMessage.value = error.message || '网络请求错误'
   } finally {
     isLoading.value = false
   }
@@ -1683,12 +1695,13 @@ const fetchRecommendVideosData = async (refresh = false) => {
   try {
     if (refresh) {
       isRefreshingRecommends.value = true
+      recommendVideos.value = []
     } else {
       isRecommendLoading.value = true
     }
 
-    // 清空现有推荐视频数据
-    recommendVideos.value = []
+    hasRecommendError.value = false
+    recommendErrorMessage.value = ''
 
     // 构建参数，传递当前视频ID和分类ID
     const params = {
@@ -1906,8 +1919,10 @@ const fetchRecommendVideosData = async (refresh = false) => {
         })
       }
     }
-  } catch (error) {
+  } catch (error: any) {
     console.error('获取推荐视频失败:', error)
+    hasRecommendError.value = true
+    recommendErrorMessage.value = error?.message || '加载失败，请稍后再试'
   } finally {
     isRecommendLoading.value = false
     isRefreshingRecommends.value = false
@@ -2676,10 +2691,10 @@ const handleAdClick = (ad: ListAd) => {
       <div class="loading-text">加载中...</div>
     </div>
 
-    <div v-else-if="hasError && !isPlaying" class="error-state">
+    <div v-else-if="hasDetailError" class="error-state">
       <Icon name="warning-o" size="24" color="#ff9500" />
       <div class="error-text">加载失败，请稍后再试</div>
-      <div v-if="errorMessage" class="error-detail">{{ errorMessage }}</div>
+      <div v-if="detailErrorMessage" class="error-detail">{{ detailErrorMessage }}</div>
     </div>
 
     <template v-else-if="videoDetail">
@@ -2731,9 +2746,9 @@ const handleAdClick = (ad: ListAd) => {
             <div class="banner-text">365娱乐永久网址：68.fo 十年品牌 大额提现秒到账</div>
           </div>
 
-          <div v-if="hasError" class="play-error">
+          <div v-if="hasVideoError" class="play-error">
             <Icon name="warning-o" size="50" color="#ff6b6b" />
-            <div class="error-msg">{{ errorMessage || '视频播放失败' }}</div>
+            <div class="error-msg">{{ videoErrorMessage || '视频播放失败' }}</div>
             <div class="retry-btn" @click="playVideo">重试</div>
           </div>
           <video
@@ -2750,8 +2765,8 @@ const handleAdClick = (ad: ListAd) => {
             @error="
               (e) => {
                 console.error('视频加载错误:', e)
-                hasError = true
-                errorMessage = '视频加载失败，播放地址可能无效'
+                hasVideoError = true
+                videoErrorMessage = '视频加载失败，播放地址可能无效'
               }
             "
             @play="handleVideoPlay"
@@ -2875,10 +2890,10 @@ const handleAdClick = (ad: ListAd) => {
           <Loading type="spinner" color="#ff9500" />
           <div class="loading-text">加载中...</div>
         </div>
-        <div v-else-if="hasError" class="error-state">
+        <div v-else-if="hasRecommendError" class="error-state">
           <Icon name="warning-o" size="24" color="#ff9500" />
           <div class="error-text">加载失败，请稍后再试</div>
-          <div v-if="errorMessage" class="error-detail">{{ errorMessage }}</div>
+          <div v-if="recommendErrorMessage" class="error-detail">{{ recommendErrorMessage }}</div>
         </div>
         <template v-else-if="recommendVideos.length > 0">
           <VideoList :videos="recommendVideos" return-path="/" />

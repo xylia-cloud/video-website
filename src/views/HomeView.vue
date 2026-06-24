@@ -111,17 +111,23 @@ const activeTypeId = ref<number>(1) // 默认选中首页
 const activeSubTypeId = ref<number | null>(null) // 当前选中的二级分类ID
 const expandedTypeId = ref<number | null>(null) // 当前展开的一级分类ID
 
+// Tab 缓存有效期（30 分钟）
+const TAB_CACHE_DURATION = 30 * 60 * 1000
+
+interface TabState {
+  scrollPosition: number
+  currentPage: number
+  totalPages: number
+  hasMoreVideos: boolean
+  videos: VideoItem[]
+  lastUpdateTime: number
+}
+
 // 记录每个标签页的完整状态
-const tabStates = ref<{
-  [key: number]: {
-    scrollPosition: number
-    currentPage: number
-    totalPages: number
-    hasMoreVideos: boolean
-    videos: VideoItem[]
-    lastUpdateTime: number // 添加更新时间，用于判断缓存是否过期
-  }
-}>({})
+const tabStates = ref<Record<number, TabState>>({})
+
+// 视频列表请求序号，用于忽略过期响应（快速切换 Tab 时的竞态保护）
+let videoListRequestSeq = 0
 
 // 标签数据
 interface TagData {
@@ -253,107 +259,90 @@ const handleSubTypeClick = (subType: TypeItem) => {
   saveSessionData()
 }
 
+const getFirstTypeId = () => (typesList.value.length > 0 ? typesList.value[0].type_id : 1)
+
+const isCacheValid = (lastUpdateTime: number): boolean => {
+  return Date.now() - lastUpdateTime < TAB_CACHE_DURATION
+}
+
+const shouldUseCache = (tabState: TabState | undefined): tabState is TabState => {
+  return !!(tabState && tabState.videos.length > 0 && isCacheValid(tabState.lastUpdateTime))
+}
+
+const clearStaleTabCache = (typeId: number) => {
+  const tabState = tabStates.value[typeId]
+  if (tabState && !isCacheValid(tabState.lastUpdateTime)) {
+    delete tabStates.value[typeId]
+    console.log(`标签${typeId}缓存已过期，已清除`)
+  }
+}
+
+const restoreTabFromCache = (typeId: number, tabState: TabState) => {
+  currentPage.value = tabState.currentPage
+  totalPages.value = tabState.totalPages
+  hasMoreVideos.value = tabState.hasMoreVideos
+  isFirstLoad.value = false
+
+  const firstTypeId = getFirstTypeId()
+  if (typeId === firstTypeId) {
+    const videosWithoutAds = tabState.videos.filter((item) => !item.isAd)
+    videoData.value = processDataWithAds(videosWithoutAds, 1)
+  } else {
+    videoData.value = [...tabState.videos]
+  }
+
+  setTimeout(() => {
+    window.scrollTo(0, tabState.scrollPosition)
+  }, 100)
+}
+
 // 切换栏目
 const switchType = (typeId: number) => {
   if (activeTypeId.value === typeId) return
 
-  // 显示全屏loading
-  isFullScreenLoading.value = true
+  // 递增请求序号，使进行中的旧请求响应被忽略
+  videoListRequestSeq++
 
-  // 保存当前标签的状态
+  isFullScreenLoading.value = true
   saveCurrentTabState()
 
   activeTypeId.value = typeId
-
-  // 保存当前选中的标签ID到localStorage
   localStorage.setItem('lastActiveTabId', typeId.toString())
-
-  // 保存完整的分类状态到sessionStorage
   saveSessionData()
 
-  // 恢复这个标签的状态，如果有有效缓存的话
+  clearStaleTabCache(typeId)
+
   const targetTabState = tabStates.value[typeId]
-  if (
-    targetTabState &&
-    targetTabState.videos.length > 0 &&
-    isCacheValid(targetTabState.lastUpdateTime)
-  ) {
+  const firstTypeId = getFirstTypeId()
+  const isFirstTab = typeId === firstTypeId
+  const hasValidCache = shouldUseCache(targetTabState)
+
+  if (hasValidCache) {
     console.log(`恢复标签${typeId}的有效缓存状态`)
-
-    currentPage.value = targetTabState.currentPage
-    totalPages.value = targetTabState.totalPages
-    hasMoreVideos.value = targetTabState.hasMoreVideos
-    videoData.value = [...targetTabState.videos] // 创建副本
-    isFirstLoad.value = false // 重要：标记为非首次加载
-
-    // 延迟恢复滚动位置，确保DOM已经更新
-    setTimeout(() => {
-      window.scrollTo(0, targetTabState.scrollPosition)
-    }, 100)
-
-    console.log(
-      `缓存状态恢复完成: 页码=${currentPage.value}, 总页数=${totalPages.value}, 数据长度=${videoData.value.length}, 滚动位置=${targetTabState.scrollPosition}`,
-    )
-
-    // 🔥 恢复缓存数据后立即关闭全屏loading
+    restoreTabFromCache(typeId, targetTabState)
     isFullScreenLoading.value = false
 
-    // 如果是热门标签，还需要加载最新视频数据
-    const firstTypeIdForCache = typesList.value.length > 0 ? typesList.value[0].type_id : 1
-    if (typeId === firstTypeIdForCache) {
-      fetchLatestVideosData()
-    }
-  } else {
-    // 重置状态
-    currentPage.value = 1
-    totalPages.value = 1
-    hasMoreVideos.value = true
-    isFirstLoad.value = true
-    videoData.value = []
-  }
-
-  // 检查是否为第一个标签（热门）
-  const firstTypeId = typesList.value.length > 0 ? typesList.value[0].type_id : 1
-  const isFirstTab = typeId === firstTypeId
-
-  if (isFirstTab) {
-    // 第一个标签（热门）立即加载，如果没有缓存数据
-    if (!tabStates.value[typeId]) {
-      // 先获取广告数据，然后再获取视频数据和最新视频数据
-      fetchListAds().then(() => {
-        // 🔥 最热视频必须使用 tid=1，否则API只返回10条数据
-        fetchRecommendVideosData(1, VIDEO_CATEGORIES.ALL)
-        // 加载最新视频数据
-        fetchLatestVideosData()
-      })
-    } else {
-      // 如果有缓存数据，仍然需要获取广告数据以备后续使用
-      fetchListAds()
-      // 加载最新视频数据
-      fetchLatestVideosData()
-      // 🔥 首页标签有缓存数据时也要关闭全屏loading
-      isFullScreenLoading.value = false
-    }
-  } else {
-    // 其他标签也需要获取广告数据
     fetchListAds()
-    // 其他标签，如果没有缓存数据，立即加载第一页数据
-    if (!tabStates.value[typeId]) {
-      isFirstLoad.value = true
-      // 立即加载数据
-      console.log(`非首页标签${typeId}没有缓存，立即加载第一页数据`)
-      fetchRecommendVideosData(1, typeId)
-    } else {
-      // 如果有缓存数据，关闭全屏loading
-      isFullScreenLoading.value = false
+    if (isFirstTab) {
+      fetchLatestVideosData()
     }
+    return
   }
-}
 
-// 检查缓存是否有效（30分钟内的缓存认为有效）
-const isCacheValid = (lastUpdateTime: number): boolean => {
-  const CACHE_DURATION = 30 * 60 * 1000 // 30分钟
-  return Date.now() - lastUpdateTime < CACHE_DURATION
+  // 无有效缓存：重置列表状态并重新拉取
+  currentPage.value = 1
+  totalPages.value = 1
+  hasMoreVideos.value = true
+  isFirstLoad.value = true
+  videoData.value = []
+
+  fetchListAds().then(() => {
+    const tidToUse = isFirstTab ? VIDEO_CATEGORIES.ALL : typeId
+    fetchRecommendVideosData(1, tidToUse)
+    if (isFirstTab) {
+      fetchLatestVideosData()
+    }
+  })
 }
 
 // 更新指定标签的缓存
@@ -473,6 +462,9 @@ const fetchLatestVideosData = async (page: number = 1) => {
 
 // 获取推荐视频数据
 const fetchRecommendVideosData = async (page = 1, tid = VIDEO_CATEGORIES.ALL) => {
+  const requestSeq = ++videoListRequestSeq
+  const requestTabId = activeTypeId.value
+
   isLoading.value = true
   hasError.value = false
   errorMessage.value = ''
@@ -490,6 +482,11 @@ const fetchRecommendVideosData = async (page = 1, tid = VIDEO_CATEGORIES.ALL) =>
     const result = useFetch
       ? await fetchRecommendVideos(params)
       : ((await getRecommendVideos(params)) as ApiResponse)
+
+    if (requestSeq !== videoListRequestSeq || activeTypeId.value !== requestTabId) {
+      console.log('忽略过期的视频列表响应', { requestTabId, currentTab: activeTypeId.value })
+      return
+    }
 
     console.log('API返回数据:', result)
 
@@ -537,8 +534,8 @@ const fetchRecommendVideosData = async (page = 1, tid = VIDEO_CATEGORIES.ALL) =>
       isFirstLoad.value = false
     }
 
-    // 数据加载完成后立即更新缓存
-    updateTabCache(tid)
+    // 数据加载完成后立即更新缓存（按 Tab ID 而非 API tid 存储）
+    updateTabCache(requestTabId)
 
     // 关闭全屏loading
     isFullScreenLoading.value = false
@@ -546,6 +543,10 @@ const fetchRecommendVideosData = async (page = 1, tid = VIDEO_CATEGORIES.ALL) =>
     console.log('处理后的视频数据:', videoData.value)
     console.log(`当前页: ${currentPage.value}, 总页数: ${totalPages.value}`)
   } catch (error: any) {
+    if (requestSeq !== videoListRequestSeq || activeTypeId.value !== requestTabId) {
+      return
+    }
+
     console.error('获取推荐视频失败:', error)
     hasError.value = true
 
@@ -559,9 +560,10 @@ const fetchRecommendVideosData = async (page = 1, tid = VIDEO_CATEGORIES.ALL) =>
       console.error('服务器返回数据:', error.response.data)
     }
   } finally {
-    isLoading.value = false
-    // 确保在任何情况下都关闭全屏loading
-    isFullScreenLoading.value = false
+    if (requestSeq === videoListRequestSeq && activeTypeId.value === requestTabId) {
+      isLoading.value = false
+      isFullScreenLoading.value = false
+    }
   }
 }
 
@@ -1241,49 +1243,17 @@ onMounted(async () => {
 
   // 检查当前标签是否有有效的缓存数据
   const currentTabCache = tabStates.value[activeTypeId.value]
-  if (
-    currentTabCache &&
-    currentTabCache.videos.length > 0 &&
-    isCacheValid(currentTabCache.lastUpdateTime)
-  ) {
+  if (shouldUseCache(currentTabCache)) {
     console.log('使用有效的缓存数据')
-
-    // 恢复完整状态
-    currentPage.value = currentTabCache.currentPage
-    totalPages.value = currentTabCache.totalPages
-    hasMoreVideos.value = currentTabCache.hasMoreVideos
-
-    // 对于首页标签，需要重新处理广告插入
-    if (isFirstTab) {
-      console.log('首页标签使用缓存数据，重新处理广告插入')
-      // 从缓存数据中过滤出非广告的视频数据
-      const videosWithoutAds = currentTabCache.videos.filter((item) => !item.isAd)
-      console.log('缓存中的纯视频数据长度:', videosWithoutAds.length)
-
-      // 重新插入最新的广告数据
-      const finalData = processDataWithAds(videosWithoutAds, 1)
-      videoData.value = finalData
-      console.log('重新插入广告后的数据长度:', finalData.length)
-    } else {
-      // 非首页标签直接使用缓存数据
-      videoData.value = [...currentTabCache.videos]
-    }
-
-    isFirstLoad.value = false // 重要：标记为非首次加载
-
-    // 恢复滚动位置
-    setTimeout(() => {
-      window.scrollTo(0, currentTabCache.scrollPosition)
-    }, 100)
+    restoreTabFromCache(activeTypeId.value, currentTabCache)
   } else {
-    // 没有有效缓存，重新获取视频数据
     if (currentTabCache) {
+      clearStaleTabCache(activeTypeId.value)
       console.log('缓存已过期，重新获取视频数据')
     } else {
       console.log('没有缓存，重新获取视频数据')
     }
 
-    // 🔥 如果是首页标签，必须使用 tid=1，否则API只返回10条数据
     const tidToUse = isFirstTab ? VIDEO_CATEGORIES.ALL : activeTypeId.value
     console.log('🔥 onMounted加载数据 - isFirstTab:', isFirstTab, 'tidToUse:', tidToUse)
     fetchRecommendVideosData(1, tidToUse)
@@ -1316,72 +1286,32 @@ onActivated(() => {
 
   // 尝试恢复当前标签的缓存数据
   const currentTabCache = tabStates.value[activeTypeId.value]
-  if (
-    currentTabCache &&
-    currentTabCache.videos.length > 0 &&
-    isCacheValid(currentTabCache.lastUpdateTime)
-  ) {
+  const firstTypeId = getFirstTypeId()
+  const isFirstTab = activeTypeId.value === firstTypeId
+
+  if (shouldUseCache(currentTabCache)) {
     console.log(`从有效缓存恢复标签${activeTypeId.value}的数据`)
 
-    // 检查是否为首页标签
-    const firstTypeId = typesList.value.length > 0 ? typesList.value[0].type_id : 1
-    const isFirstTab = activeTypeId.value === firstTypeId
+    const applyCache = () => restoreTabFromCache(activeTypeId.value, currentTabCache)
 
-    // 恢复所有状态
-    currentPage.value = currentTabCache.currentPage
-    totalPages.value = currentTabCache.totalPages
-    hasMoreVideos.value = currentTabCache.hasMoreVideos
-    isFirstLoad.value = false // 重要：标记为非首次加载
-
-    // 如果是首页标签，需要重新获取广告并插入
-    if (isFirstTab) {
-      console.log('首页标签从缓存恢复，重新获取广告并插入')
-
-      // 从缓存数据中过滤出非广告的视频数据
-      const videosWithoutAds = currentTabCache.videos.filter((item) => !item.isAd)
-      console.log('缓存中的纯视频数据长度:', videosWithoutAds.length)
-      console.log('当前广告数据长度:', listAds.value.length)
-
-      // 如果广告数据已存在，直接使用；否则先获取广告数据
-      const processAds = () => {
-        // 重新插入最新的广告数据
-        const finalData = processDataWithAds(videosWithoutAds, 1)
-        videoData.value = finalData
-        console.log('重新插入广告后的数据长度:', finalData.length)
-
-        // 恢复滚动位置
-        setTimeout(() => {
-          window.scrollTo(0, currentTabCache.scrollPosition)
-          console.log(`恢复滚动位置到: ${currentTabCache.scrollPosition}`)
-        }, 50)
-      }
-
-      if (listAds.value.length > 0) {
-        // 广告数据已存在，直接处理
-        processAds()
-      } else {
-        // 广告数据不存在，先获取再处理
-        fetchListAds().then(() => {
-          processAds()
-        })
-      }
+    if (isFirstTab && listAds.value.length === 0) {
+      fetchListAds().then(applyCache)
     } else {
-      // 非首页标签直接使用缓存数据
-      videoData.value = [...currentTabCache.videos]
-
-      // 恢复滚动位置
-      setTimeout(() => {
-        window.scrollTo(0, currentTabCache.scrollPosition)
-        console.log(`恢复滚动位置到: ${currentTabCache.scrollPosition}`)
-      }, 50)
+      applyCache()
     }
   } else {
-    // 如果没有有效缓存，确保广告数据已加载（特别是首页标签）
-    const firstTypeId = typesList.value.length > 0 ? typesList.value[0].type_id : 1
-    const isFirstTab = activeTypeId.value === firstTypeId
+    if (currentTabCache) {
+      clearStaleTabCache(activeTypeId.value)
+    }
+
     if (isFirstTab && listAds.value.length === 0) {
-      console.log('首页标签没有缓存且广告未加载，重新获取广告')
       fetchListAds()
+    }
+
+    const tidToUse = isFirstTab ? VIDEO_CATEGORIES.ALL : activeTypeId.value
+    fetchRecommendVideosData(1, tidToUse)
+    if (isFirstTab) {
+      fetchLatestVideosData()
     }
   }
 
@@ -1446,9 +1376,16 @@ const restoreSessionData = () => {
       const sessionData = JSON.parse(homeViewStateData)
 
       // 检查数据是否在有效期内（30分钟）
-      const CACHE_DURATION = 30 * 60 * 1000 // 30分钟
-      if (Date.now() - sessionData.lastUpdateTime < CACHE_DURATION) {
-        tabStates.value = sessionData.tabStates || {}
+      if (Date.now() - sessionData.lastUpdateTime < TAB_CACHE_DURATION) {
+        const restoredTabStates = sessionData.tabStates || {}
+        const validTabStates: Record<number, TabState> = {}
+        for (const [key, state] of Object.entries(restoredTabStates)) {
+          const tabState = state as TabState
+          if (shouldUseCache(tabState)) {
+            validTabStates[Number(key)] = tabState
+          }
+        }
+        tabStates.value = validTabStates
         activeTypeId.value = sessionData.activeTypeId || 1
         activeSubTypeId.value = sessionData.activeSubTypeId || null
         expandedTypeId.value = sessionData.expandedTypeId || null
@@ -1465,10 +1402,17 @@ const restoreSessionData = () => {
       }
     }
 
-    // 降级：尝试恢复原有的tabStates数据
+    // 降级：尝试恢复原有的tabStates数据（仅保留未过期的条目）
     const savedData = sessionStorage.getItem('tabStates')
     if (savedData) {
-      tabStates.value = JSON.parse(savedData)
+      const parsed = JSON.parse(savedData) as Record<number, TabState>
+      const validTabStates: Record<number, TabState> = {}
+      for (const [key, state] of Object.entries(parsed)) {
+        if (shouldUseCache(state)) {
+          validTabStates[Number(key)] = state
+        }
+      }
+      tabStates.value = validTabStates
       console.log('从sessionStorage恢复基础会话数据')
       return true
     }
