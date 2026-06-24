@@ -105,9 +105,9 @@ export default defineConfig(({ mode }) => ({
           })
         },
       },
-      // 配置跨域代理 - 用户接口（livevideo）
+      // 配置跨域代理 - 用户接口（与 nginx-config.conf / proxy.php 保持一致）
       '/livevideo/': {
-        target: 'https://jiji8.cc/livevideo/',
+        target: 'https://live.88tv.co/appapi/',
         changeOrigin: true,
         rewrite: (path) => path.replace(/^\/livevideo\//, '/'),
         secure: false,
@@ -119,6 +119,7 @@ export default defineConfig(({ mode }) => ({
         proxyTimeout: 30000,
         followRedirects: true,
         headers: {
+          Host: 'live.88tv.co',
           'User-Agent':
             'Mozilla/5.0 (iPhone; CPU iPhone OS 16_6 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.6 Mobile/15E148 Safari/604.1',
           Accept: 'application/json, text/plain, */*',

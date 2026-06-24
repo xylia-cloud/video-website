@@ -5,6 +5,7 @@ import {
   DEFAULT_PAGE_SIZE,
   VIDEO_CATEGORIES,
   NEW_API_BASE_URL,
+  buildNewApiUrl,
 } from '@/utils/config'
 import { showTopLoading, hideTopLoading } from '@/utils/topLoading'
 import { showToast } from 'vant/es/toast'
@@ -1269,7 +1270,7 @@ export const fetchUserBaseInfo = async (params: { uid: number; token: string }) 
   }
 
   // 发起POST请求到新接口
-  const response = await fetch(`${NEW_API_BASE_URL}/?${queryParams.toString()}`, {
+  const response = await fetch(buildNewApiUrl(queryParams), {
     method: 'POST',
     headers,
   })
@@ -1475,7 +1476,7 @@ export const updateUserInfo = async (params: {
 
     try {
       // 发起POST请求到新接口
-      const response = await fetch(`${NEW_API_BASE_URL}/?${queryParams.toString()}`, {
+      const response = await fetch(buildNewApiUrl(queryParams), {
         method: 'POST',
         headers,
       })
@@ -1564,7 +1565,7 @@ export const updateUserInfo = async (params: {
 
     try {
       // 发起POST请求到新接口
-      const response = await fetch(`${NEW_API_BASE_URL}/?${queryParams.toString()}`, {
+      const response = await fetch(buildNewApiUrl(queryParams), {
         method: 'POST',
         headers,
       })
@@ -1754,7 +1755,7 @@ export const fetchTags = async () => {
  */
 export const fetchPayChannels = async () => {
   // 直接GET请求
-  const response = await fetch(`${NEW_API_BASE_URL}/?service=charge.getqudao`, {
+  const response = await fetch(buildNewApiUrl('service=charge.getqudao'), {
     method: 'GET',
     headers: {
       Accept: 'application/json, text/plain, */*',
@@ -1787,7 +1788,7 @@ export const fetchChargeRules = async (qudaoid: number) => {
     formData.append('token', token)
     formData.append('qudaoid', qudaoid.toString())
 
-    const response = await fetch(`${NEW_API_BASE_URL}/?service=charge.getcharge_rules`, {
+    const response = await fetch(buildNewApiUrl('service=charge.getcharge_rules'), {
       method: 'POST',
       body: formData,
       headers: {
@@ -1848,7 +1849,7 @@ export const createChargeOrder = async (params: {
     formData.append('paytypecode', params.paytypecode)
     formData.append('moneylistid', params.moneylistid.toString())
 
-    const response = await fetch(`${NEW_API_BASE_URL}/?service=charge.getchargeorders`, {
+    const response = await fetch(buildNewApiUrl('service=charge.getchargeorders'), {
       method: 'POST',
       body: formData,
       headers: {
@@ -2000,7 +2001,7 @@ export const fetchWithdrawTypes = async () => {
       'Mozilla/5.0 (iPhone; CPU iPhone OS 16_6 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.6 Mobile/15E148 Safari/604.1',
   }
 
-  const response = await fetch(`${NEW_API_BASE_URL}/?${queryParams.toString()}`, {
+  const response = await fetch(buildNewApiUrl(queryParams), {
     method: 'POST',
     headers,
   })
@@ -2059,7 +2060,7 @@ export const fetchUserProfit = async () => {
       'Mozilla/5.0 (iPhone; CPU iPhone OS 16_6 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.6 Mobile/15E148 Safari/604.1',
   }
 
-  const response = await fetch(`${NEW_API_BASE_URL}/?${queryParams.toString()}`, {
+  const response = await fetch(buildNewApiUrl(queryParams), {
     method: 'POST',
     headers,
   })
@@ -2118,7 +2119,7 @@ export const fetchUserAccountList = async () => {
       'Mozilla/5.0 (iPhone; CPU iPhone OS 16_6 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.6 Mobile/15E148 Safari/604.1',
   }
 
-  const response = await fetch(`${NEW_API_BASE_URL}/?${queryParams.toString()}`, {
+  const response = await fetch(buildNewApiUrl(queryParams), {
     method: 'POST',
     headers,
   })
@@ -2186,7 +2187,7 @@ export const addUserAccount = async (params: {
       'Mozilla/5.0 (iPhone; CPU iPhone OS 16_6 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.6 Mobile/15E148 Safari/604.1',
   }
 
-  const response = await fetch(`${NEW_API_BASE_URL}/?${queryParams.toString()}`, {
+  const response = await fetch(buildNewApiUrl(queryParams), {
     method: 'POST',
     headers,
   })
@@ -2246,7 +2247,7 @@ export const deleteUserAccount = async (accountId: number) => {
       'Mozilla/5.0 (iPhone; CPU iPhone OS 16_6 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.6 Mobile/15E148 Safari/604.1',
   }
 
-  const response = await fetch(`${NEW_API_BASE_URL}/?${queryParams.toString()}`, {
+  const response = await fetch(buildNewApiUrl(queryParams), {
     method: 'POST',
     headers,
   })
@@ -2307,7 +2308,7 @@ export const submitWithdraw = async (params: { accountid: number; cashvote: numb
       'Mozilla/5.0 (iPhone; CPU iPhone OS 16_6 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.6 Mobile/15E148 Safari/604.1',
   }
 
-  const response = await fetch(`${NEW_API_BASE_URL}/?${queryParams.toString()}`, {
+  const response = await fetch(buildNewApiUrl(queryParams), {
     method: 'POST',
     headers,
   })
@@ -2400,7 +2401,7 @@ export const fetchGameRecord = async (params: { p?: number } = {}) => {
   }
 
   try {
-    const response = await fetch(`${NEW_API_BASE_URL}/?${queryParams.toString()}`, {
+    const response = await fetch(buildNewApiUrl(queryParams), {
       method: 'POST',
       headers,
     })
@@ -2483,7 +2484,7 @@ export const fetchNotices = async () => {
   }
 
   try {
-    const response = await fetch(`${NEW_API_BASE_URL}/?${queryParams.toString()}`, {
+    const response = await fetch(buildNewApiUrl(queryParams), {
       method: 'GET',
       headers,
     })
@@ -2576,7 +2577,7 @@ export const fetchAccountDetails = async () => {
   }
 
   try {
-    const response = await fetch(`${NEW_API_BASE_URL}/?${queryParams.toString()}`, {
+    const response = await fetch(buildNewApiUrl(queryParams), {
       method: 'POST',
       headers,
       body: formData.toString(),
@@ -2715,9 +2716,11 @@ export const fetchUserPoints = async () => {
     queryParams.append('token', token)
     queryParams.append('lang', 'zh_cn')
 
-    // 构建完整URL，模仿: /proxy.php?target=user/?service=User.GetPoints&uid=xxx&token=xxx&lang=zh_cn
-    const separator = NEW_API_BASE_URL.includes('?') ? '&' : '?'
-    const requestUrl = `${NEW_API_BASE_URL}${separator}${queryParams.toString()}`
+    if (localStorage.getItem('isGuest') === 'true') {
+      queryParams.append('isyouke', '1')
+    }
+
+    const requestUrl = buildNewApiUrl(queryParams)
 
     const headers = {
       Accept: 'application/json, text/plain, */*',
@@ -2828,7 +2831,7 @@ export const fetchVideoChargeLog = async (params: { page?: number; limit?: numbe
     }
 
     try {
-      const response = await fetch(`${NEW_API_BASE_URL}/?${queryParams.toString()}`, {
+      const response = await fetch(buildNewApiUrl(queryParams), {
         method: 'POST',
         headers,
         body: formData.toString(),
@@ -3172,8 +3175,7 @@ export const fetchUserBalance = async () => {
       token: token,
     })
 
-    const separator = NEW_API_BASE_URL.includes('?') ? '&' : '?'
-    const requestUrl = `${NEW_API_BASE_URL}${separator}${queryParams.toString()}`
+    const requestUrl = buildNewApiUrl(queryParams)
 
     const response = await fetch(requestUrl, {
       method: 'GET',
