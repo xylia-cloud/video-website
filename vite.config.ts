@@ -6,13 +6,28 @@ import { defineConfig } from 'vite'
 import vue from '@vitejs/plugin-vue'
 import vueJsx from '@vitejs/plugin-vue-jsx'
 import vueDevTools from 'vite-plugin-vue-devtools'
+import AutoImport from 'unplugin-auto-import/vite'
+import Components from 'unplugin-vue-components/vite'
+import { VantResolver } from '@vant/auto-import-resolver'
 
 // 某些网络环境下 Node 优先解析到不可用的 IPv6，导致代理 TLS 握手 ECONNRESET
 dns.setDefaultResultOrder('ipv4first')
 
 // https://vite.dev/config/
 export default defineConfig(({ mode }) => ({
-  plugins: [vue(), vueJsx(), mode === 'development' && vueDevTools()].filter(Boolean),
+  plugins: [
+    vue(),
+    vueJsx(),
+    AutoImport({
+      resolvers: [VantResolver()],
+      dts: 'src/auto-imports.d.ts',
+    }),
+    Components({
+      resolvers: [VantResolver()],
+      dts: 'src/components.d.ts',
+    }),
+    mode === 'development' && vueDevTools(),
+  ].filter(Boolean),
   resolve: {
     alias: {
       '@': fileURLToPath(new URL('./src', import.meta.url)),
