@@ -10,6 +10,10 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
+import imgTgjc05 from '@/assets/img/img-tgjc-05.webp'
+import imgTgjc06 from '@/assets/img/img-tgjc-06.webp'
+import imgTgjc07 from '@/assets/img/img-tgjc-07.webp'
+import imgTgjc08 from '@/assets/img/img-tgjc-08.webp'
 
 const router = useRouter()
 const route = useRoute()
@@ -26,12 +30,17 @@ const pageTitle = computed(() => {
   return titles[tutorialId.value] || '教程详情'
 })
 
-const detailImg = computed(() => {
-  // 根据 ID 映射图片：1 -> 05, 2 -> 06, 3 -> 07, 4 -> 08
-  const imgNum = 4 + tutorialId.value
-  const imgName = `img-tgjc-0${imgNum}.webp`
-  return new URL(`../assets/img/${imgName}`, import.meta.url).href
-})
+// 静态映射，避免 import.meta.url 动态路径把多张图打进同一 JS chunk
+const TUTORIAL_DETAIL_IMAGES: Record<number, string> = {
+  1: imgTgjc05,
+  2: imgTgjc06,
+  3: imgTgjc07,
+  4: imgTgjc08,
+}
+
+const detailImg = computed(
+  () => TUTORIAL_DETAIL_IMAGES[tutorialId.value] ?? TUTORIAL_DETAIL_IMAGES[1],
+)
 
 const onBack = () => {
   router.back()
