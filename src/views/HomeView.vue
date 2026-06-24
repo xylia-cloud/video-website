@@ -323,9 +323,9 @@ const switchType = (typeId: number) => {
     restoreTabFromCache(typeId, targetTabState)
     isFullScreenLoading.value = false
 
-    fetchListAds()
     if (isFirstTab) {
       fetchLatestVideosData()
+      scheduleDeferredListAds()
     }
     return
   }
@@ -337,13 +337,12 @@ const switchType = (typeId: number) => {
   isFirstLoad.value = true
   videoData.value = []
 
-  fetchListAds().then(() => {
-    const tidToUse = isFirstTab ? VIDEO_CATEGORIES.ALL : typeId
-    fetchRecommendVideosData(1, tidToUse)
-    if (isFirstTab) {
-      fetchLatestVideosData()
-    }
-  })
+  const tidToUse = isFirstTab ? VIDEO_CATEGORIES.ALL : typeId
+  fetchRecommendVideosData(1, tidToUse)
+  if (isFirstTab) {
+    fetchLatestVideosData()
+    scheduleDeferredListAds()
+  }
 }
 
 // 更新指定标签的缓存
@@ -952,6 +951,25 @@ interface ListAd {
 
 const listAds = ref<ListAd[]>([])
 
+const applyListAdsToCurrentView = () => {
+  const firstTypeId = getFirstTypeId()
+  if (activeTypeId.value !== firstTypeId || currentPage.value !== 1) return
+  if (listAds.value.length === 0) return
+
+  const videosWithoutAds = videoData.value.filter((item) => !item.isAd)
+  if (videosWithoutAds.length === 0) return
+
+  videoData.value = processDataWithAds(videosWithoutAds, 1)
+}
+
+const scheduleDeferredListAds = () => {
+  requestAnimationFrame(() => {
+    requestAnimationFrame(() => {
+      fetchListAds()
+    })
+  })
+}
+
 // 获取列表广告数据
 const fetchListAds = async () => {
   console.log('🎯 [fetchListAds] 开始获取列表广告数据...')
@@ -995,6 +1013,7 @@ const fetchListAds = async () => {
       // 更新列表广告数据
       console.log('更新列表广告数据:', apiAds)
       listAds.value = apiAds
+      applyListAdsToCurrentView()
     } else {
       console.log('没有获取到列表广告数据，不显示广告')
       listAds.value = []
@@ -1031,13 +1050,12 @@ onMounted(async () => {
     console.log('首页检测到邀请码:', invite)
   }
 
-  // 并行冷启动：登录、分类、广告互不依赖，缩短首屏等待
+  // 并行冷启动：登录、分类、头图广告互不依赖；列表广告延后加载
   await Promise.all([
     performTouristLogin({ route }),
     fetchTypesData(),
     fetchBannerAds(),
     fetchSingleAd(),
-    fetchListAds(),
   ])
 
   // 只有在页面内导航时才恢复选项卡状态，关闭页面后重新打开应该重置为默认选项卡
@@ -1093,6 +1111,7 @@ onMounted(async () => {
   // 如果是首页标签，与推荐列表并行加载最新视频
   if (isFirstTab) {
     fetchLatestVideosData()
+    scheduleDeferredListAds()
   }
 
   // 所有标签都使用翻页模式，无需滚动监听
@@ -1134,27 +1153,21 @@ onActivated(() => {
 
   if (shouldUseCache(currentTabCache)) {
     console.log(`从有效缓存恢复标签${activeTypeId.value}的数据`)
-
-    const applyCache = () => restoreTabFromCache(activeTypeId.value, currentTabCache)
+    restoreTabFromCache(activeTypeId.value, currentTabCache)
 
     if (isFirstTab && listAds.value.length === 0) {
-      fetchListAds().then(applyCache)
-    } else {
-      applyCache()
+      scheduleDeferredListAds()
     }
   } else {
     if (currentTabCache) {
       clearStaleTabCache(activeTypeId.value)
     }
 
-    if (isFirstTab && listAds.value.length === 0) {
-      fetchListAds()
-    }
-
     const tidToUse = isFirstTab ? VIDEO_CATEGORIES.ALL : activeTypeId.value
     fetchRecommendVideosData(1, tidToUse)
     if (isFirstTab) {
       fetchLatestVideosData()
+      scheduleDeferredListAds()
     }
   }
 

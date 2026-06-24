@@ -144,27 +144,94 @@ export const fetchVideoDetail = async (vodId: string | number) => {
   })
 }
 
+const STATIC_DATA_TTL_MS = 5 * 60 * 1000
+
+interface TtlCacheEntry<T> {
+  data: T
+  cachedAt: number
+}
+
+function createTtlCache<T>() {
+  let entry: TtlCacheEntry<T> | null = null
+  let inflight: Promise<T> | null = null
+
+  return {
+    getIfValid(): T | null {
+      if (!entry) return null
+      if (Date.now() - entry.cachedAt >= STATIC_DATA_TTL_MS) {
+        entry = null
+        return null
+      }
+      return entry.data
+    },
+    set(data: T) {
+      entry = { data, cachedAt: Date.now() }
+    },
+    getInflight() {
+      return inflight
+    },
+    setInflight(promise: Promise<T> | null) {
+      inflight = promise
+    },
+  }
+}
+
+const typesListCache = createTtlCache<any>()
+const adsCache = new Map<string, ReturnType<typeof createTtlCache<any>>>()
+
+const getAdsCacheKey = (params: { ad_pos: number | string; ad_type?: number | string }) =>
+  `${params.ad_pos}:${params.ad_type ?? 'all'}`
+
+const getAdsCache = (key: string) => {
+  let cache = adsCache.get(key)
+  if (!cache) {
+    cache = createTtlCache<any>()
+    adsCache.set(key, cache)
+  }
+  return cache
+}
+
 /**
  * 获取栏目列表
  */
 export const fetchTypesList = async () => {
-  console.log('正在获取栏目列表...')
-
-  // 获取包含时间戳的请求头（栏目列表不强制要求登录）
-  const headers = createAuthHeaders(false)
-
-  // 发起GET请求
-  const response = await fetch(`${BASE_URL}/index.php/ajax/types.html`, {
-    method: 'GET',
-    headers,
-  })
-
-  if (!response.ok) {
-    const errorText = await response.text()
-    throw new Error(`HTTP error! Status: ${response.status}, Response: ${errorText}`)
+  const cached = typesListCache.getIfValid()
+  if (cached) {
+    console.log('使用栏目列表缓存')
+    return cached
   }
 
-  return await response.json()
+  const inflight = typesListCache.getInflight()
+  if (inflight) {
+    return inflight
+  }
+
+  const request = (async () => {
+    console.log('正在获取栏目列表...')
+
+    const headers = createAuthHeaders(false)
+    const response = await fetch(`${BASE_URL}/index.php/ajax/types.html`, {
+      method: 'GET',
+      headers,
+    })
+
+    if (!response.ok) {
+      const errorText = await response.text()
+      throw new Error(`HTTP error! Status: ${response.status}, Response: ${errorText}`)
+    }
+
+    const result = await response.json()
+    typesListCache.set(result)
+    return result
+  })()
+
+  typesListCache.setInflight(request)
+
+  try {
+    return await request
+  } finally {
+    typesListCache.setInflight(null)
+  }
 }
 
 /**
@@ -1683,61 +1750,77 @@ export const fetchAds = async (params: {
     throw new Error('广告位置(ad_pos)不能为空')
   }
 
-  console.log(`正在获取广告数据，位置: ${params.ad_pos}, 类型: ${params.ad_type || '所有类型'}`)
-
-  // 构建查询参数
-  const queryParams = new URLSearchParams()
-  queryParams.append('ad_pos', String(params.ad_pos))
-
-  if (params.ad_type) {
-    queryParams.append('ad_type', String(params.ad_type))
+  const cacheKey = getAdsCacheKey(params)
+  const cache = getAdsCache(cacheKey)
+  const cached = cache.getIfValid()
+  if (cached) {
+    console.log(`使用广告缓存，位置: ${params.ad_pos}, 类型: ${params.ad_type || '所有类型'}`)
+    return cached
   }
 
-  // 获取包含时间戳的请求头（广告不强制要求登录）
-  const headers = createAuthHeaders(false)
+  const inflight = cache.getInflight()
+  if (inflight) {
+    return inflight
+  }
+
+  const request = (async () => {
+    console.log(`正在获取广告数据，位置: ${params.ad_pos}, 类型: ${params.ad_type || '所有类型'}`)
+
+    const queryParams = new URLSearchParams()
+    queryParams.append('ad_pos', String(params.ad_pos))
+
+    if (params.ad_type) {
+      queryParams.append('ad_type', String(params.ad_type))
+    }
+
+    const headers = createAuthHeaders(false)
+
+    try {
+      const fullUrl = `${BASE_URL}/index.php/ajax/ads.html?${queryParams.toString()}`
+      const response = await fetch(fullUrl, {
+        method: 'GET',
+        headers,
+      })
+
+      const responseText = await response.text()
+      console.log('广告API原始响应:', responseText)
+
+      if (!response.ok) {
+        console.error(`获取广告数据失败: ${response.status}`, responseText)
+        throw new Error(`HTTP error! Status: ${response.status}, Response: ${responseText}`)
+      }
+
+      let result
+      try {
+        result = JSON.parse(responseText)
+      } catch (e) {
+        console.error('广告API返回的JSON解析失败:', e)
+        throw new Error('广告API返回的数据格式不正确')
+      }
+
+      console.log('获取广告数据结果:', result)
+
+      if (result.list) {
+        result = {
+          code: 1,
+          data: result.list,
+        }
+      }
+
+      cache.set(result)
+      return result
+    } catch (error) {
+      console.error('获取广告数据请求错误:', error)
+      throw error
+    }
+  })()
+
+  cache.setInflight(request)
 
   try {
-    // 构建完整的URL
-    const fullUrl = `${BASE_URL}/index.php/ajax/ads.html?${queryParams.toString()}`
-
-    // 发起GET请求
-    const response = await fetch(fullUrl, {
-      method: 'GET',
-      headers,
-    })
-
-    const responseText = await response.text()
-    console.log('广告API原始响应:', responseText)
-
-    if (!response.ok) {
-      console.error(`获取广告数据失败: ${response.status}`, responseText)
-      throw new Error(`HTTP error! Status: ${response.status}, Response: ${responseText}`)
-    }
-
-    // 尝试解析JSON
-    let result
-    try {
-      result = JSON.parse(responseText)
-    } catch (e) {
-      console.error('广告API返回的JSON解析失败:', e)
-      throw new Error('广告API返回的数据格式不正确')
-    }
-
-    console.log('获取广告数据结果:', result)
-
-    // 处理不同的返回格式
-    if (result.list) {
-      // 如果API直接返回列表格式
-      return {
-        code: 1,
-        data: result.list,
-      }
-    }
-
-    return result
-  } catch (error) {
-    console.error('获取广告数据请求错误:', error)
-    throw error
+    return await request
+  } finally {
+    cache.setInflight(null)
   }
 }
 
