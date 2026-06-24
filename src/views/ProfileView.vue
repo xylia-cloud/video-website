@@ -8,16 +8,17 @@ import {
   isLoggedIn,
   fetchAds,
   fetchNotices,
-  fetchUserPoints,
-  setUserInfo,
+  isGuestUser,
   applyAgent,
   type NoticeGroup,
 } from '@/api/fetch-api'
+import { useUserStore } from '@/stores/user'
 import { BASE_URL } from '@/utils/config'
 import { openCustomerServiceModal } from '@/utils/customerService'
 import BottomTabbar from '@/components/BottomTabbar.vue'
 
 const router = useRouter()
+const userStore = useUserStore()
 
 // 控制账户凭证弹窗显示
 const showCredential = ref(false)
@@ -238,60 +239,28 @@ const vipExpireTime = computed(() => {
 })
 
 // 判断是否是VIP用户
-const isVipUser = computed(() => {
-  // is_vip 可能是数字或字符串，统一转换为数字比较
-  const vipStatus = Number(isVip.value)
+const isVipUser = computed(() => userStore.isVipUser)
 
-  if (vipStatus !== 1) return false
+const syncProfileFromStore = () => {
+  const localUserInfo = userStore.profile
+  if (!localUserInfo) return
 
-  if (!vipEndtime.value) return true // 如果是VIP但没有到期时间，认为是永久VIP
-
-  // 解析日期字符串或时间戳
-  let endDate
-  if (typeof vipEndtime.value === 'string' && vipEndtime.value.includes('-')) {
-    // 字符串格式：2026-03-14 00:00:00
-    endDate = new Date(vipEndtime.value)
-  } else {
-    // 时间戳格式
-    endDate = new Date(parseInt(vipEndtime.value) * 1000)
-  }
-
-  const now = new Date()
-  return endDate > now
-})
+  userInfo.value = { ...localUserInfo }
+  userVideoNums.value = userStore.videoNums
+  isVip.value = userStore.isVip
+  vipEndtime.value = localUserInfo.endtime != null ? String(localUserInfo.endtime) : ''
+}
 
 // 获取积分和VIP信息
 const fetchPointsAndVipInfo = async () => {
   try {
-    const pointsResult = await fetchUserPoints()
+    const pointsResult = await userStore.refreshPoints()
     if (pointsResult.code === 1 && pointsResult.data) {
-      // 更新用户积分信息
-      const localUserInfo = getUserInfo()
-      if (localUserInfo) {
-        // 更新本地存储的用户信息
-        localUserInfo.user_points = pointsResult.data.points
-        localUserInfo.points = pointsResult.data.points
-        localUserInfo.video_nums = pointsResult.data.video_nums
-        localUserInfo.is_vip = pointsResult.data.is_vip
-        if (pointsResult.data.endtime) {
-          localUserInfo.endtime = pointsResult.data.endtime
-        }
-
-        // 保存到本地存储
-        setUserInfo(localUserInfo)
-
-        // 更新页面显示的数据
-        userInfo.value = localUserInfo
-        userVideoNums.value = pointsResult.data.video_nums
-        isVip.value = pointsResult.data.is_vip !== undefined ? pointsResult.data.is_vip : 0
-        vipEndtime.value = pointsResult.data.endtime || ''
-
-        console.log('✅ 个人中心积分信息获取成功:', pointsResult.data)
-      }
+      syncProfileFromStore()
+      console.log('✅ 个人中心积分信息获取成功:', pointsResult.data)
     }
   } catch (error) {
     console.error('❌ 个人中心获取积分信息失败:', error)
-    // 静默失败，不显示错误提示
   }
 }
 
@@ -401,10 +370,11 @@ onMounted(async () => {
   console.log('=== ProfileView onMounted 开始 ===')
 
   // 优先从本地获取用户信息（无论是游客还是正式用户）
-  const localUserInfo = getUserInfo()
+  userStore.hydrateFromStorage()
+  const localUserInfo = userStore.profile
 
   // 🔥 根据本地存储判断是否为游客用户
-  const isGuest = localStorage.getItem('isGuest') === 'true'
+  const isGuest = isGuestUser()
 
   console.log('📦 本地用户信息检查:', {
     hasLocalUserInfo: !!localUserInfo,

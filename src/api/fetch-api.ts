@@ -8,6 +8,7 @@ import {
   buildNewApiUrl,
 } from '@/utils/config'
 import { showTopLoading, hideTopLoading } from '@/utils/topLoading'
+import { notifyUserStoreHydrate } from '@/api/user-store-sync'
 import { showToast } from 'vant/es/toast'
 
 // 定义参数接口
@@ -675,8 +676,39 @@ export const syncTokenExpiryWatcher = () => {
   }, delay)
 }
 
+const GUEST_FLAG_KEY = 'isGuest'
+
+export interface UserPointsData {
+  points: number | string
+  coin: number | string
+  video_nums: number
+  is_vip: number | string
+  endtime?: string | number
+}
+
+export interface RefreshUserPointsResult {
+  code: 0 | 1
+  data: UserPointsData | null
+  msg?: string
+}
+
+const USER_POINTS_TTL_MS = 30_000
+const userPointsCache: { result: RefreshUserPointsResult | null; cachedAt: number } = {
+  result: null,
+  cachedAt: 0,
+}
+let userPointsInflight: Promise<RefreshUserPointsResult> | null = null
+
+export const isGuestUser = (): boolean => localStorage.getItem(GUEST_FLAG_KEY) === 'true'
+
+const invalidateUserPointsCache = () => {
+  userPointsCache.result = null
+  userPointsCache.cachedAt = 0
+  userPointsInflight = null
+}
+
 // 设置用户信息到本地存储
-export const setUserInfo = (userInfo: UserInfo) => {
+export const setUserInfo = (userInfo: UserInfo, options?: { isGuest?: boolean }) => {
   const expireTime = Date.now() + TOKEN_EXPIRE_DURATION
 
   // 清理重复的用户信息键（如果存在）
@@ -688,7 +720,18 @@ export const setUserInfo = (userInfo: UserInfo) => {
   localStorage.setItem(USER_INFO_KEY, JSON.stringify(userInfo))
   localStorage.setItem(TOKEN_KEY, userInfo.token)
   localStorage.setItem(TOKEN_EXPIRE_KEY, expireTime.toString())
+
+  if (options?.isGuest === true) {
+    localStorage.setItem(GUEST_FLAG_KEY, 'true')
+    invalidateUserPointsCache()
+  } else if (options?.isGuest === false) {
+    localStorage.removeItem(GUEST_FLAG_KEY)
+    invalidateUserPointsCache()
+  }
+
   syncTokenExpiryWatcher()
+
+  notifyUserStoreHydrate()
 
   console.log(`TOKEN已保存，将在${new Date(expireTime).toLocaleString()}过期`)
 }
@@ -827,11 +870,13 @@ export const clearUserInfo = () => {
   localStorage.removeItem(USER_INFO_KEY)
   localStorage.removeItem(TOKEN_KEY)
   localStorage.removeItem(TOKEN_EXPIRE_KEY)
-  localStorage.removeItem('isGuest') // 清除游客标记
+  localStorage.removeItem(GUEST_FLAG_KEY) // 清除游客标记
+  invalidateUserPointsCache()
   localStorage.removeItem('deviceIMEI') // 清除设备IMEI（可选，保留可以避免重复生成）
 
   // 清理重复的用户信息键
   localStorage.removeItem('userInfo') // 清除重复的userInfo键
+  notifyUserStoreHydrate()
 }
 
 // 清除所有本地缓存数据
@@ -1023,8 +1068,8 @@ export const userLogin = async (params: {
 
     console.log('💾 正在保存完整的用户信息到localStorage:', userInfo)
 
-    // 保存到本地存储
-    setUserInfo(userInfo)
+    // 保存到本地存储（正式登录，清除游客标记）
+    setUserInfo(userInfo, { isGuest: false })
 
     // 转换为原有的返回格式
     adaptedResult = {
@@ -1137,15 +1182,9 @@ export const touristLogin = async (imei: string, rec_code?: string) => {
         统一后昵称字段: userInfo.user_nick_name,
       })
 
-      // 保存游客用户信息到本地存储，包括过期时间
-      const expireTime = Date.now() + TOKEN_EXPIRE_DURATION
-      localStorage.setItem(USER_INFO_KEY, JSON.stringify(userInfo))
-      localStorage.setItem(TOKEN_KEY, userInfo.token)
-      localStorage.setItem(TOKEN_EXPIRE_KEY, expireTime.toString())
-      localStorage.setItem('isGuest', 'true') // 标记为游客用户
+      setUserInfo(userInfo as UserInfo, { isGuest: true })
 
       console.log('💾 游客登录成功，已保存统一格式的用户信息到localStorage')
-      console.log('⏰ Token过期时间:', new Date(expireTime).toLocaleString())
 
       return {
         code: 1,
@@ -1461,8 +1500,7 @@ export const updateUserInfo = async (params: {
     queryParams.append('pass2', params.user_pwd2!)
 
     // 🔥 如果本地存储 isGuest 为 true（游客用户），则添加 isyouke=1 参数
-    const isGuestUser = localStorage.getItem('isGuest') === 'true'
-    if (isGuestUser) {
+    if (isGuestUser()) {
       queryParams.append('isyouke', '1')
       console.log('🎯 检测到游客用户修改密码，添加 isyouke=1 查询参数')
     }
@@ -1516,8 +1554,7 @@ export const updateUserInfo = async (params: {
     queryParams.append('token', userInfo.token)
 
     // 🔥 如果本地存储 isGuest 为 true（游客用户），则添加 isyouke=1 参数
-    const isGuestUser = localStorage.getItem('isGuest') === 'true'
-    if (isGuestUser) {
+    if (isGuestUser()) {
       queryParams.append('isyouke', '1')
       console.log('🎯 检测到游客用户，添加 isyouke=1 查询参数')
     }
@@ -2688,105 +2725,160 @@ export const fetchFollowsList = async (params: {
 }
 
 /**
+ * 获取用户积分信息（无全局 loading）
+ */
+const fetchUserPointsRaw = async (): Promise<RefreshUserPointsResult> => {
+  const userInfo = getUserInfo()
+  if (!userInfo) {
+    throw new Error('用户信息不存在')
+  }
+
+  const userId = userInfo.user_id || userInfo.id
+  const token = userInfo.token
+
+  if (!userId || !token) {
+    throw new Error('用户信息不完整')
+  }
+
+  console.log('正在获取用户积分信息...')
+
+  const queryParams = new URLSearchParams()
+  queryParams.append('service', 'User.GetPoints')
+  queryParams.append('uid', String(userId))
+  queryParams.append('token', token)
+  queryParams.append('lang', 'zh_cn')
+
+  if (isGuestUser()) {
+    queryParams.append('isyouke', '1')
+  }
+
+  const requestUrl = buildNewApiUrl(queryParams)
+
+  const headers = {
+    Accept: 'application/json, text/plain, */*',
+    'User-Agent':
+      'Mozilla/5.0 (iPhone; CPU iPhone OS 16_6 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.6 Mobile/15E148 Safari/604.1',
+  }
+
+  const response = await fetch(requestUrl, {
+    method: 'POST',
+    headers,
+  })
+
+  if (!response.ok) {
+    const errorText = await response.text()
+    throw new Error(`HTTP error! Status: ${response.status}, Response: ${errorText}`)
+  }
+
+  const result = await response.json()
+  console.log('获取积分信息返回:', result)
+
+  if (checkApiAuthError(result) || (result.data && checkApiAuthError(result.data))) {
+    handleAuthError('登录已过期，请重新登录')
+    throw new Error('认证失败，请重新登录')
+  }
+
+  if (result && result.ret === 200 && result.data) {
+    if (result.data.code === 0) {
+      return {
+        code: 1,
+        data: {
+          points: result.data.info.points,
+          coin: result.data.info.coin || '0',
+          video_nums: result.data.info.video_nums,
+          is_vip: result.data.info.is_vip,
+          endtime: result.data.info.endtime,
+        },
+        msg: result.data.msg || '获取成功',
+      }
+    }
+
+    return {
+      code: 0,
+      data: null,
+      msg: result.data.msg || '获取失败',
+    }
+  }
+
+  return {
+    code: 0,
+    data: null,
+    msg: result?.msg || '获取失败',
+  }
+}
+
+const mergePointsIntoUserInfo = (data: UserPointsData): UserInfo | null => {
+  const currentUserInfo = getUserInfo()
+  if (!currentUserInfo) return null
+
+  const updatedUserInfo: UserInfo = {
+    ...currentUserInfo,
+    coin: parseFloat(String(data.coin || '0')),
+    user_points: parseFloat(String(data.points || '0')),
+    points: data.points,
+    video_nums: data.video_nums,
+    is_vip: data.is_vip,
+  }
+
+  if (data.endtime) {
+    updatedUserInfo.endtime = data.endtime
+  }
+
+  return updatedUserInfo
+}
+
+/**
+ * 刷新用户积分/VIP/余额并写入 localStorage（带去重与 30s 缓存）
+ */
+export const refreshUserPoints = async (options?: {
+  force?: boolean
+  loading?: boolean
+}): Promise<RefreshUserPointsResult> => {
+  const force = options?.force ?? false
+  const now = Date.now()
+
+  if (!force && userPointsCache.result?.code === 1 && now - userPointsCache.cachedAt < USER_POINTS_TTL_MS) {
+    return userPointsCache.result
+  }
+
+  if (userPointsInflight && !force) {
+    return userPointsInflight
+  }
+
+  const run = async (): Promise<RefreshUserPointsResult> => {
+    try {
+      const result = options?.loading
+        ? await withTopLoading(() => fetchUserPointsRaw())
+        : await fetchUserPointsRaw()
+
+      if (result.code === 1 && result.data) {
+        const updatedUserInfo = mergePointsIntoUserInfo(result.data)
+        if (updatedUserInfo) {
+          setUserInfo(updatedUserInfo)
+        }
+        userPointsCache.result = result
+        userPointsCache.cachedAt = Date.now()
+      }
+
+      return result
+    } catch (error) {
+      console.error('刷新用户积分失败:', error)
+      throw error
+    } finally {
+      userPointsInflight = null
+    }
+  }
+
+  userPointsInflight = run()
+  return userPointsInflight
+}
+
+/**
  * 获取用户积分信息
  * @returns 用户积分信息
  */
 export const fetchUserPoints = async () => {
-  return withTopLoading(async () => {
-    // 获取用户信息
-    const userInfo = getUserInfo()
-    if (!userInfo) {
-      throw new Error('用户信息不存在')
-    }
-
-    // 兼容游客用户和正式用户的数据结构
-    const userId = userInfo.user_id || userInfo.id
-    const token = userInfo.token
-
-    if (!userId || !token) {
-      throw new Error('用户信息不完整')
-    }
-
-    console.log('正在获取用户积分信息...')
-
-    // 🔧 完全模仿Gameapi.Getrecord的成功模式：POST请求，所有参数在URL中，body为空
-    const queryParams = new URLSearchParams()
-    queryParams.append('service', 'User.GetPoints')
-    queryParams.append('uid', String(userId))
-    queryParams.append('token', token)
-    queryParams.append('lang', 'zh_cn')
-
-    if (localStorage.getItem('isGuest') === 'true') {
-      queryParams.append('isyouke', '1')
-    }
-
-    const requestUrl = buildNewApiUrl(queryParams)
-
-    const headers = {
-      Accept: 'application/json, text/plain, */*',
-      'User-Agent':
-        'Mozilla/5.0 (iPhone; CPU iPhone OS 16_6 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.6 Mobile/15E148 Safari/604.1',
-    }
-
-    console.log('📝 获取积分请求 (模仿Gameapi.Getrecord):', {
-      url: requestUrl,
-      method: 'POST',
-      contentLength: 0,
-    })
-
-    try {
-      const response = await fetch(requestUrl, {
-        method: 'POST',
-        headers,
-        // 不设置body，保持Content-Length: 0，完全模仿Gameapi.Getrecord
-      })
-
-      if (!response.ok) {
-        const errorText = await response.text()
-        throw new Error(`HTTP error! Status: ${response.status}, Response: ${errorText}`)
-      }
-
-      const result = await response.json()
-      console.log('获取积分信息返回:', result)
-
-      // 检查是否是认证错误
-      if (checkApiAuthError(result) || (result.data && checkApiAuthError(result.data))) {
-        handleAuthError('登录已过期，请重新登录')
-        throw new Error('认证失败，请重新登录')
-      }
-
-      if (result && result.ret === 200 && result.data) {
-        if (result.data.code === 0) {
-          return {
-            code: 1,
-            data: {
-              points: result.data.info.points,
-              coin: result.data.info.coin || '0', // 账户余额和游戏余额
-              video_nums: result.data.info.video_nums,
-              is_vip: result.data.info.is_vip,
-              endtime: result.data.info.endtime,
-            },
-            msg: result.data.msg || '获取成功',
-          }
-        } else {
-          return {
-            code: 0,
-            data: null,
-            msg: result.data.msg || '获取失败',
-          }
-        }
-      } else {
-        return {
-          code: 0,
-          data: null,
-          msg: result?.msg || '获取失败',
-        }
-      }
-    } catch (error) {
-      console.error('获取积分信息失败:', error)
-      throw error
-    }
-  })
+  return withTopLoading(() => fetchUserPointsRaw())
 }
 
 /**
@@ -3147,83 +3239,27 @@ export const fetchPromotionRecord = async (params: { p?: number } = {}) => {
 }
 
 /**
- * 获取用户余额
- * @returns 用户余额信息
+ * 获取用户余额（统一走 User.GetPoints，与 refreshUserPoints 一致）
  */
 export const fetchUserBalance = async () => {
   try {
-    // 获取用户信息
-    const userInfo = getUserInfo()
-    if (!userInfo) {
-      throw new Error('用户信息不存在')
-    }
+    const result = await refreshUserPoints({ force: true })
 
-    const userId = userInfo.user_id || userInfo.id
-    const token = userInfo.token
-
-    if (!userId || !token) {
-      throw new Error('用户信息不完整')
-    }
-
-    console.log('正在获取用户余额...')
-
-    // 构建请求参数
-    const queryParams = new URLSearchParams({
-      service: 'User.GetBalance',
-      lang: 'zh',
-      uid: String(userId),
-      token: token,
-    })
-
-    const requestUrl = buildNewApiUrl(queryParams)
-
-    const response = await fetch(requestUrl, {
-      method: 'GET',
-      headers: {
-        Accept: 'application/json',
-      },
-    })
-
-    if (!response.ok) {
-      throw new Error(`HTTP error! Status: ${response.status}`)
-    }
-
-    const result = await response.json()
-    console.log('获取用户余额返回:', result)
-
-    if (result && result.ret === 200 && result.data) {
-      if (result.data.code === 0) {
-        // 返回余额信息
-        const balanceInfo = result.data.info?.[0]
-        return {
-          code: 1,
-          data: {
-            coin: parseFloat(balanceInfo?.coin || '0'),
-            score: parseInt(balanceInfo?.score || '0'),
-          },
-          msg: result.data.msg || '获取成功',
-        }
-      } else if (result.data.code === 700) {
-        // 登录状态失效
-        return {
-          code: 700,
-          data: null,
-          msg: result.data.msg || '登陆状态失效',
-        }
-      } else {
-        // 其他错误
-        return {
-          code: 0,
-          data: null,
-          msg: result.data.msg || '获取失败',
-        }
-      }
-    } else {
+    if (result.code === 1 && result.data) {
       return {
-        code: 0,
-        data: null,
-        msg: result?.data?.msg || result?.msg || '获取失败',
+        code: 1 as const,
+        data: {
+          coin: parseFloat(String(result.data.coin || '0')),
+          score: parseInt(String(result.data.points || '0'), 10),
+        },
+        msg: result.msg || '获取成功',
       }
+    }
+
+    return {
+      code: 0 as const,
+      data: null,
+      msg: result.msg || '获取失败',
     }
   } catch (error) {
     console.error('获取用户余额失败:', error)

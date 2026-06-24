@@ -1,10 +1,10 @@
 <script setup lang="ts">
 import { ref, onMounted, computed } from 'vue'
 import { NEW_API_BASE_URL } from '@/utils/config'
+import { useUserStore } from '@/stores/user'
 import {
   getUserInfo,
   isLoggedIn,
-  fetchUserPoints,
   clearAllCache,
   checkApiAuthError,
 } from '@/api/fetch-api'
@@ -526,6 +526,7 @@ const fetchGamesForSubCategory = async (
 
 const router = useRouter()
 const route = useRoute()
+const userStore = useUserStore()
 
 // 处理顶级分类点击
 const handleTopCategoryClick = (categoryId: string) => {
@@ -784,7 +785,7 @@ const handleManualRefreshBalance = async () => {
   collectHintText.value = '资金归集中，请稍等...'
   try {
     await collectGameBalanceIfNeeded({ force: true })
-    await fetchUserBalance()
+    await loadGameBalance()
   } finally {
     collectHintText.value = ''
     isRefreshingBalance.value = false
@@ -803,35 +804,25 @@ const goToRegister = () => {
 }
 
 // 获取用户余额和登录状态
-const fetchUserBalance = async () => {
+const loadGameBalance = async () => {
   const userInfo = getUserInfo()
-  if (userInfo && userInfo.token) {
-    // 用户已登录
-    isUserLoggedIn.value = true
-    try {
-      // 调用接口获取余额
-      const result = await fetchUserPoints()
-      if (result && result.code === 1 && result.data) {
-        // coin就是账户余额和游戏余额
-        const coin = parseFloat(result.data.coin || '0')
-        userBalance.value = coin
-        gameBalance.value = coin
-      } else {
-        // 接口调用失败，使用本地存储的余额
-        userBalance.value = userInfo.coin || 0
-        gameBalance.value = userInfo.coin || 0
-      }
-    } catch (error) {
-      console.error('获取余额失败:', error)
-      // 出错时使用本地存储的余额
-      userBalance.value = userInfo.coin || 0
-      gameBalance.value = userInfo.coin || 0
-    }
-  } else {
-    // 用户未登录
+  if (!userInfo?.token) {
     isUserLoggedIn.value = false
     userBalance.value = 0
     gameBalance.value = 0
+    return
+  }
+
+  isUserLoggedIn.value = true
+  try {
+    await userStore.refreshPoints({ force: true })
+    const coin = userStore.coin
+    userBalance.value = coin
+    gameBalance.value = coin
+  } catch (error) {
+    console.error('获取余额失败:', error)
+    userBalance.value = userInfo.coin || 0
+    gameBalance.value = userInfo.coin || 0
   }
 }
 
@@ -900,7 +891,7 @@ const collectGameBalanceIfNeeded = async (options?: { force?: boolean; silent?: 
     // 业务提示已移除 - 不再显示toast
 
     // 无论是否归集成功，都尝试刷新一次余额展示
-    await fetchUserBalance()
+    await loadGameBalance()
   } catch (error) {
     console.error('余额归集请求失败:', error)
   }
@@ -925,7 +916,7 @@ const autoCollectAndPollAfterGameReturn = async () => {
   try {
     for (let i = 0; i < maxRounds; i += 1) {
       await collectGameBalanceIfNeeded({ force: true, silent: true })
-      await fetchUserBalance()
+      await loadGameBalance()
 
       // 余额变动或已大于0即可认为归集到账
       if (Number(userBalance.value) > 0 || Number(userBalance.value) !== startBalance) {
@@ -949,7 +940,7 @@ onMounted(() => {
   // 获取顶级分类数据
   fetchTopCategories()
   // 获取用户余额后按需触发余额归集
-  fetchUserBalance().then(() => {
+  loadGameBalance().then(() => {
     collectGameBalanceIfNeeded()
     autoCollectAndPollAfterGameReturn()
   })

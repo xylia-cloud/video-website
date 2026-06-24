@@ -1,5 +1,6 @@
 import { createRouter, createWebHashHistory } from 'vue-router'
 import { captureInviteCode } from '@/utils/invite'
+import { isLoggedIn } from '@/api/fetch-api'
 import HomeView from '../views/HomeView.vue'
 
 const router = createRouter({
@@ -85,6 +86,7 @@ const router = createRouter({
     {
       path: '/profile',
       name: 'profile',
+      meta: { requiresAuth: true },
       component: () => import('../views/ProfileView.vue'),
     },
     {
@@ -109,6 +111,7 @@ const router = createRouter({
     {
       path: '/recharge',
       name: 'recharge',
+      meta: { requiresAuth: true },
       component: () => import('../views/RechargeView.vue'),
     },
     {
@@ -119,6 +122,7 @@ const router = createRouter({
     {
       path: '/payment',
       name: 'payment',
+      meta: { requiresAuth: true },
       component: () => import('../views/PaymentView.vue'),
     },
     {
@@ -129,56 +133,67 @@ const router = createRouter({
     {
       path: '/vip-recharge',
       name: 'vipRecharge',
+      meta: { requiresAuth: true },
       component: () => import('../views/VipRechargeView.vue'),
     },
     {
       path: '/withdraw',
       name: 'withdraw',
+      meta: { requiresAuth: true },
       component: () => import('../views/WithdrawView.vue'),
     },
     {
       path: '/points-record',
       name: 'points-record',
+      meta: { requiresAuth: true },
       component: () => import('../views/PointsRecordView.vue'),
     },
     {
       path: '/points-details',
       name: 'points-details',
+      meta: { requiresAuth: true },
       component: () => import('../views/PointsDetailsView.vue'),
     },
     {
       path: '/edit-profile',
       name: 'editProfile',
+      meta: { requiresAuth: true },
       component: () => import('../views/EditProfileView.vue'),
     },
     {
       path: '/share-friends',
       name: 'shareFriends',
+      meta: { requiresAuth: true },
       component: () => import('../views/ShareFriendsView.vue'),
     },
     {
       path: '/wallet',
       name: 'wallet',
+      meta: { requiresAuth: true },
       component: () => import('../views/WalletView.vue'),
     },
     {
       path: '/recharge-record',
       name: 'rechargeRecord',
+      meta: { requiresAuth: true },
       component: () => import('../views/RechargeRecordView.vue'),
     },
     {
       path: '/withdraw-record',
       name: 'withdrawRecord',
+      meta: { requiresAuth: true },
       component: () => import('../views/WithdrawRecordView.vue'),
     },
     {
       path: '/bank-card',
       name: 'bankCard',
+      meta: { requiresAuth: true },
       component: () => import('../views/BankCardView.vue'),
     },
     {
       path: '/footprint',
       name: 'footprint',
+      meta: { requiresAuth: true },
       component: () => import('../views/FootprintView.vue'),
     },
     {
@@ -199,26 +214,31 @@ const router = createRouter({
     {
       path: '/follow-list',
       name: 'followList',
+      meta: { requiresAuth: true },
       component: () => import('../views/FollowListView.vue'),
     },
     {
       path: '/collection',
       name: 'collection',
+      meta: { requiresAuth: true },
       component: () => import('../views/CollectionView.vue'),
     },
     {
       path: '/watch-history',
       name: 'watchHistory',
+      meta: { requiresAuth: true },
       component: () => import('../views/WatchHistoryView.vue'),
     },
     {
       path: '/account-details',
       name: 'accountDetails',
+      meta: { requiresAuth: true },
       component: () => import('../views/AccountDetailsView.vue'),
     },
     {
       path: '/promotion-record',
       name: 'promotionRecord',
+      meta: { requiresAuth: true },
       component: () => import('../views/PromotionRecordView.vue'),
     },
     {
@@ -229,16 +249,19 @@ const router = createRouter({
     {
       path: '/my-agent',
       name: 'myAgent',
+      meta: { requiresAuth: true },
       component: () => import('../views/MyAgentView.vue'),
     },
     {
       path: '/team-management',
       name: 'teamManagement',
+      meta: { requiresAuth: true },
       component: () => import('../views/TeamManagementView.vue'),
     },
     {
       path: '/agent-report',
       name: 'agentReport',
+      meta: { requiresAuth: true },
       component: () => import('../views/AgentReportView.vue'),
     },
     {
@@ -269,6 +292,15 @@ router.beforeEach((to, _from, next) => {
   if (invite) {
     console.log('路由守卫捕获邀请码:', invite)
   }
+
+  if (to.meta.requiresAuth && !isLoggedIn()) {
+    next({
+      path: '/login',
+      query: { redirect: to.fullPath },
+    })
+    return
+  }
+
   next()
 })
 

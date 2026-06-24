@@ -1,35 +1,31 @@
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
+import { computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
+import { storeToRefs } from 'pinia'
 import HeaderNav from '@/components/HeaderNav.vue'
-import { getUserInfo, type UserInfo } from '@/api/fetch-api'
+import { useUserStore } from '@/stores/user'
 
 const router = useRouter()
+const userStore = useUserStore()
+const { coin, isLoggedIn } = storeToRefs(userStore)
 
-// 用户数据
-const userInfo = ref<UserInfo | null>(null)
-const userBalance = ref(0) // 账户余额（钻石）
-const isUserLoggedIn = ref(false)
+const userBalance = computed(() => coin.value)
 
-// 获取用户余额和登录状态 - 参考游戏界面的实现
-const fetchUserBalance = () => {
-  const localUserInfo = getUserInfo()
-  if (localUserInfo && localUserInfo.token) {
-    // 用户已登录
-    isUserLoggedIn.value = true
-    userInfo.value = localUserInfo
-    userBalance.value = localUserInfo.coin || 0 // 使用coin字段作为钻石余额
-  } else {
-    // 用户未登录
-    isUserLoggedIn.value = false
-    userInfo.value = null
-    userBalance.value = 0
+const loadWalletBalance = async () => {
+  if (!userStore.isLoggedIn) {
+    return
+  }
+
+  try {
+    await userStore.refreshPoints()
+  } catch (error) {
+    console.error('刷新钱包余额失败:', error)
   }
 }
 
 // 检查登录状态并跳转
 const checkLogin = () => {
-  if (!isUserLoggedIn.value) {
+  if (!isLoggedIn.value) {
     showToast('请先登录')
     router.push('/login')
     return false
@@ -73,7 +69,7 @@ const goToRechargeRecord = () => {
 }
 
 onMounted(() => {
-  fetchUserBalance()
+  loadWalletBalance()
 })
 </script>
 
@@ -85,7 +81,7 @@ onMounted(() => {
     <!-- 钱包主体内容 -->
     <div class="wallet-container">
       <!-- 未登录提示 -->
-      <div v-if="!isUserLoggedIn" class="login-prompt">
+      <div v-if="!isLoggedIn" class="login-prompt">
         <div class="login-prompt-icon">
           <van-icon name="lock" size="48" color="#666" />
         </div>
@@ -108,7 +104,7 @@ onMounted(() => {
       </div>
 
       <!-- 已登录状态 - 操作按钮区域 -->
-      <div v-if="isUserLoggedIn" class="action-buttons">
+      <div v-if="isLoggedIn" class="action-buttons">
         <!-- 充值按钮 -->
         <button class="action-btn recharge-btn" @click="goToRecharge">
           + 充值
@@ -119,8 +115,6 @@ onMounted(() => {
           ⇓ 提现
         </button>
       </div>
-
-
     </div>
   </div>
 </template>
@@ -136,7 +130,6 @@ onMounted(() => {
   padding: 80px 20px 20px;
 }
 
-/* 登录提示样式 */
 .login-prompt {
   display: flex;
   flex-direction: column;
@@ -171,7 +164,6 @@ onMounted(() => {
   background-color: #e68600;
 }
 
-/* 钻石余额展示区域 */
 .balance-section {
   display: flex;
   flex-direction: column;
@@ -203,7 +195,6 @@ onMounted(() => {
   margin-bottom: 20px;
 }
 
-/* 操作按钮区域 */
 .action-buttons {
   display: flex;
   gap: 20px;
@@ -221,84 +212,17 @@ onMounted(() => {
   transition: all 0.3s ease;
 }
 
-.recharge-btn {
-  background-color: #ff9500;
-  color: #fff;
-}
-
-.recharge-btn:hover {
-  background-color: #e68600;
-}
-
+.recharge-btn,
 .withdraw-btn {
   background-color: #ff9500;
   color: #fff;
 }
 
+.recharge-btn:hover,
 .withdraw-btn:hover {
   background-color: #e68600;
 }
 
-/* 功能列表 */
-.function-list {
-  background-color: #222;
-  border-radius: 12px;
-  overflow: hidden;
-}
-
-.function-item {
-  display: flex;
-  align-items: center;
-  padding: 16px 20px;
-  border-bottom: 1px solid #333;
-  cursor: pointer;
-  transition: background-color 0.3s ease;
-}
-
-.function-item:last-child {
-  border-bottom: none;
-}
-
-.function-item:hover {
-  background-color: #2a2a2a;
-}
-
-.function-icon {
-  width: 40px;
-  height: 40px;
-  margin-right: 15px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.function-icon img {
-  width: 24px;
-  height: 24px;
-  object-fit: contain;
-}
-
-.function-text {
-  flex: 1;
-}
-
-.function-title {
-  font-size: 16px;
-  font-weight: 500;
-  color: #fff;
-  margin-bottom: 4px;
-}
-
-.function-desc {
-  font-size: 14px;
-  color: #999;
-}
-
-.function-arrow {
-  color: #666;
-}
-
-/* 响应式设计 */
 @media (max-width: 375px) {
   .wallet-container {
     padding: 70px 16px 20px;
@@ -319,10 +243,6 @@ onMounted(() => {
 
   .action-buttons {
     gap: 16px;
-  }
-
-  .function-item {
-    padding: 14px 16px;
   }
 }
 </style>

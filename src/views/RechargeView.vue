@@ -7,8 +7,7 @@ import {
   fetchChargeRules,
   createChargeOrder,
   getUserInfo,
-  fetchUserPoints,
-  setUserInfo,
+  refreshUserPoints,
 } from '@/api/fetch-api'
 import HeaderNav from '@/components/HeaderNav.vue'
 import BalanceInfoCard from '@/components/BalanceInfoCard.vue'
@@ -894,23 +893,11 @@ const refreshUserBalance = async () => {
 
   isRefreshingBalance.value = true
   try {
-    const result = await fetchUserPoints()
-    if (result && result.code === 1 && result.data) {
-      // 更新本地用户信息
-      const currentUserInfo = getUserInfo()
-      if (currentUserInfo) {
-        const updatedUserInfo = {
-          ...currentUserInfo,
-          coin: parseFloat(result.data.coin || '0'),
-          user_points: parseFloat(result.data.points || '0'),
-          video_nums: result.data.video_nums || 0,
-          is_vip: result.data.is_vip !== undefined ? result.data.is_vip : 0,
-        }
-        setUserInfo(updatedUserInfo)
-        diamondBalance.value = parseFloat(result.data.coin || '0')
-        userVideoNums.value = result.data.video_nums || 0
-        isVip.value = result.data.is_vip !== undefined ? result.data.is_vip : 0
-      }
+    const result = await refreshUserPoints({ force: true })
+    if (result.code === 1 && result.data) {
+      diamondBalance.value = parseFloat(String(result.data.coin || '0'))
+      userVideoNums.value = result.data.video_nums || 0
+      isVip.value = result.data.is_vip !== undefined ? Number(result.data.is_vip) : 0
     }
   } catch (error) {
     console.error('刷新用户余额失败:', error)

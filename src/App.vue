@@ -2,6 +2,8 @@
 import { RouterView } from 'vue-router'
 import { defineAsyncComponent, nextTick, onBeforeUnmount, onMounted, ref } from 'vue'
 import { isLoggedIn, isTokenExpired, syncTokenExpiryWatcher } from '@/api/fetch-api'
+import { registerUserStoreHydrate } from '@/api/user-store-sync'
+import { useUserStore } from '@/stores/user'
 import TopLoading from '@/components/TopLoading.vue'
 import CustomerServiceButton from '@/components/CustomerServiceButton.vue'
 import {
@@ -85,6 +87,10 @@ const onCustomerServiceModalMounted = async () => {
 
 // 应用启动时同步登录过期监听
 onMounted(() => {
+  const userStore = useUserStore()
+  registerUserStoreHydrate(() => userStore.hydrateFromStorage())
+  userStore.hydrateFromStorage()
+
   window.addEventListener('open-global-auth-modal', handleAuthModalOpen as EventListener)
   window.addEventListener(CUSTOMER_SERVICE_MODAL_EVENT, handleCustomerServiceOpen as EventListener)
 

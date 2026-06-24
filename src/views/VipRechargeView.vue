@@ -7,10 +7,9 @@ import HeaderNav from '@/components/HeaderNav.vue'
 import BalanceInfoCard from '@/components/BalanceInfoCard.vue'
 import {
     getUserInfo,
-    setUserInfo,
     type UserInfo,
     createAuthHeaders,
-    fetchUserPoints,
+    refreshUserPoints as syncUserPoints,
     checkApiAuthError,
 } from '@/api/fetch-api'
 import { BASE_URL } from '@/utils/config'
@@ -323,50 +322,48 @@ const showChargeCompletePrompt = () => {
     showChargeCompleteDialog.value = true
 }
 
+const applyPointsDataToView = (data: {
+    video_nums?: number
+    is_vip?: number | string
+    endtime?: string | number
+    coin?: number | string
+}) => {
+    const localUserInfo = getUserInfo()
+    if (localUserInfo) {
+        userInfo.value = localUserInfo
+    }
+    if (data.video_nums !== undefined) {
+        userVideoNums.value = data.video_nums
+    }
+    if (data.coin !== undefined) {
+        userBalance.value = parseFloat(String(data.coin || '0'))
+    }
+    if (data.is_vip !== undefined) {
+        isVip.value = String(data.is_vip)
+    }
+    if (data.endtime) {
+        vipEndtime.value = String(data.endtime)
+    }
+}
+
 // 刷新积分（充值完成后调用）
 const refreshUserPoints = async () => {
     console.log('🔄 开始刷新用户积分信息...')
 
     try {
-        // 显示加载提示
         showToast({
             message: '充值中...',
             position: 'top',
-            duration: 0, // 不自动消失
+            duration: 0,
             icon: 'loading',
         })
 
-        // 调用获取积分接口
-        const pointsResult = await fetchUserPoints()
-
-        // 关闭加载提示
+        const pointsResult = await syncUserPoints({ force: true, loading: true })
         closeToast()
 
         if (pointsResult.code === 1 && pointsResult.data) {
-            // 更新用户积分信息
-            const localUserInfo = getUserInfo()
-            if (localUserInfo) {
-                // 更新本地存储的用户信息
-                localUserInfo.user_points = pointsResult.data.points
-                localUserInfo.points = pointsResult.data.points
-                localUserInfo.video_nums = pointsResult.data.video_nums
-                localUserInfo.is_vip = pointsResult.data.is_vip
-                if (pointsResult.data.endtime) {
-                    localUserInfo.endtime = pointsResult.data.endtime
-                }
+            applyPointsDataToView(pointsResult.data)
 
-                // 保存到本地存储
-                setUserInfo(localUserInfo)
-
-                // 更新页面显示的数据
-                userInfo.value = localUserInfo
-                userVideoNums.value = pointsResult.data.video_nums
-                userBalance.value = localUserInfo.coin || 0
-                isVip.value = pointsResult.data.is_vip || '0'
-                vipEndtime.value = pointsResult.data.endtime || ''
-            }
-
-            // 显示成功提示
             showToast({
                 message: `当前观看次数：${pointsResult.data.video_nums}`,
                 position: 'top',
@@ -374,10 +371,7 @@ const refreshUserPoints = async () => {
             })
 
             console.log('✅ 积分刷新完成，当前观看次数:', pointsResult.data.video_nums)
-            console.log('✅ 积分详情:', pointsResult.data)
-
         } else {
-            // 显示失败提示
             showToast({
                 message: pointsResult.msg || '积分刷新失败',
                 position: 'top',
@@ -385,15 +379,10 @@ const refreshUserPoints = async () => {
             })
         }
 
-        // 关闭充值完成弹窗
         showChargeCompleteDialog.value = false
-
     } catch (error) {
         console.error('❌ 刷新积分失败:', error)
-
-        // 关闭加载提示
         closeToast()
-
         showToast({
             message: '刷新失败，请稍后再试',
             position: 'top',
@@ -407,37 +396,14 @@ onMounted(async () => {
     fetchUserInfo()
     fetchChargeOptions()
 
-    // 获取最新的积分和VIP状态信息
     try {
-        const pointsResult = await fetchUserPoints()
+        const pointsResult = await syncUserPoints()
         if (pointsResult.code === 1 && pointsResult.data) {
-            // 更新用户积分信息
-            const localUserInfo = getUserInfo()
-            if (localUserInfo) {
-                // 更新本地存储的用户信息
-                localUserInfo.user_points = pointsResult.data.points
-                localUserInfo.points = pointsResult.data.points
-                localUserInfo.video_nums = pointsResult.data.video_nums
-                localUserInfo.is_vip = pointsResult.data.is_vip
-                if (pointsResult.data.endtime) {
-                    localUserInfo.endtime = pointsResult.data.endtime
-                }
-
-                // 保存到本地存储
-                setUserInfo(localUserInfo)
-
-                // 更新页面显示的数据
-                userInfo.value = localUserInfo
-                userVideoNums.value = pointsResult.data.video_nums
-                isVip.value = pointsResult.data.is_vip || '0'
-                vipEndtime.value = pointsResult.data.endtime || ''
-
-                console.log('✅ 页面加载时积分信息获取成功:', pointsResult.data)
-            }
+            applyPointsDataToView(pointsResult.data)
+            console.log('✅ 页面加载时积分信息获取成功:', pointsResult.data)
         }
     } catch (error) {
         console.error('❌ 页面加载时获取积分信息失败:', error)
-        // 静默失败，不显示错误提示，避免影响页面正常加载
     }
 })
 </script>

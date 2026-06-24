@@ -11,8 +11,7 @@ import {
   deleteUserAccount,
   submitWithdraw,
   getUserInfo,
-  fetchUserPoints,
-  setUserInfo,
+  refreshUserPoints,
 } from '@/api/fetch-api'
 
 const router = useRouter()
@@ -292,23 +291,7 @@ const handleWithdraw = async () => {
 // 刷新用户余额
 const refreshUserBalance = async () => {
   try {
-    const pointsResult = await fetchUserPoints()
-    if (pointsResult.code === 1 && pointsResult.data) {
-      // 更新本地存储的用户信息
-      const userInfo = getUserInfo()
-      if (userInfo) {
-        userInfo.coin = pointsResult.data.coin
-        userInfo.user_points = pointsResult.data.points
-        userInfo.points = pointsResult.data.points
-        userInfo.video_nums = pointsResult.data.video_nums
-        userInfo.is_vip = pointsResult.data.is_vip
-        if (pointsResult.data.endtime) {
-          userInfo.endtime = pointsResult.data.endtime
-        }
-        setUserInfo(userInfo)
-        console.log('✅ 提现后余额已刷新，当前余额:', pointsResult.data.coin)
-      }
-    }
+    await refreshUserPoints({ force: true })
   } catch (error) {
     console.error('刷新余额失败:', error)
   }

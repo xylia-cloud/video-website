@@ -569,7 +569,6 @@ onMounted(() => {
   fetchUserBalance()
     .then((res) => {
       if (res.code === 1 && res.data) userBalance.value = res.data.coin
-      else if (res.code === 700) showLoginExpiredModal.value = true
     })
     .catch(() => {
       const u = getUserInfo()

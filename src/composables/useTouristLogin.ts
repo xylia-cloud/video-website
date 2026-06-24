@@ -1,4 +1,5 @@
 import { getUserInfo, isLoggedIn, touristLogin } from '@/api/fetch-api'
+import { useUserStore } from '@/stores/user'
 import { getDeviceIMEI } from '@/utils/device'
 import { resolveInviteCode } from '@/utils/invite'
 import type { RouteLocationNormalizedLoaded } from 'vue-router'
@@ -23,6 +24,7 @@ export async function performTouristLogin({
     const result = await touristLogin(getDeviceIMEI(), recCode)
 
     if (result.code === 1 && result.data) {
+      useUserStore().hydrateFromStorage()
       showToast({ message: '已获取游客信息', duration: 1000 })
       await onSuccess?.()
       return

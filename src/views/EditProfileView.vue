@@ -276,7 +276,7 @@
 <script setup lang="ts">
 import { ref, onMounted, onBeforeUnmount, onActivated, onDeactivated, computed } from 'vue'
 import { useRouter } from 'vue-router'
-import { updateUserInfo, getUserInfo, isLoggedIn, updateUserPortrait, userLogout } from '@/api/fetch-api'
+import { updateUserInfo, getUserInfo, isLoggedIn, updateUserPortrait, userLogout, setUserInfo, isGuestUser } from '@/api/fetch-api'
 import { BASE_URL } from '@/utils/config'
 
 const router = useRouter()
@@ -310,14 +310,15 @@ const tempMonth = ref(new Date().getMonth() + 1)
 const tempDay = ref(new Date().getDate())
 
 // 计算属性：是否为游客
-const isGuest = computed(() => {
-  const guestFlag = localStorage.getItem('isGuest')
-  console.log('🔍 EditProfileView - isGuest 计算属性:', {
-    guestFlag: guestFlag,
-    isGuest: guestFlag === 'true',
-  })
-  return guestFlag === 'true'
-})
+const isGuest = computed(() => isGuestUser())
+
+const markUserAsRegistered = () => {
+  const currentUserInfo = getUserInfo()
+  if (currentUserInfo) {
+    setUserInfo(currentUserInfo, { isGuest: false })
+    console.log('✅ 用户状态已更新为非游客')
+  }
+}
 
 // 计算属性：显示的用户名（用于密码弹窗）
 const displayUsername = computed(() => {
@@ -710,8 +711,7 @@ const saveProfile = async () => {
       
       // 🔥 修改账号成功后，如果是游客用户，将本地存储的用户改为非游客用户
       if (isGuest.value && userId.value) {
-        localStorage.setItem('isGuest', 'false')
-        console.log('✅ 账号修改成功，将用户状态改为非游客用户 (isGuest=false)')
+        markUserAsRegistered()
       }
     } else {
       console.error('❌ 个人资料保存失败:', profileResult?.msg)
@@ -733,8 +733,7 @@ const saveProfile = async () => {
         
         // 🔥 修改密码成功后，如果是游客用户，将本地存储的用户改为非游客用户
         if (isGuest.value) {
-          localStorage.setItem('isGuest', 'false')
-          console.log('✅ 密码修改成功，将用户状态改为非游客用户 (isGuest=false)')
+          markUserAsRegistered()
         }
         
         // 清空密码字段
@@ -904,8 +903,7 @@ const changePassword = async () => {
     if (result && result.code === 1) {
       // 🔥 修改密码成功后，如果是游客用户，将本地存储的用户改为非游客用户
       if (isGuest.value) {
-        localStorage.setItem('isGuest', 'false')
-        console.log('✅ 密码修改成功，将用户状态改为非游客用户 (isGuest=false)')
+        markUserAsRegistered()
       }
       
       // 🔥 清空密码字段

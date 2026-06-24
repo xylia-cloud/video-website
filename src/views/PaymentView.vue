@@ -34,7 +34,7 @@
 <script setup lang="ts">
 import { ref, onMounted, onBeforeUnmount } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { fetchUserPoints, getUserInfo, setUserInfo } from '@/api/fetch-api'
+import { refreshUserPoints } from '@/api/fetch-api'
 
 const route = useRoute()
 const router = useRouter()
@@ -65,28 +65,16 @@ const refreshUserBalance = async () => {
       duration: 1000,
     })
 
-    const result = await fetchUserPoints()
-    
-    if (result && result.code === 1 && result.data) {
-      const currentUserInfo = getUserInfo()
-      if (currentUserInfo) {
-        const updatedUserInfo = {
-          ...currentUserInfo,
-          coin: parseFloat(result.data.coin || '0'),
-          user_points: parseFloat(result.data.points || '0'),
-          video_nums: result.data.video_nums || 0,
-          is_vip: result.data.is_vip !== undefined ? result.data.is_vip : 0,
-        }
-        setUserInfo(updatedUserInfo)
-        
-        showToast({
-          message: '余额已更新',
-          duration: 1500,
-        })
-      }
+    const result = await refreshUserPoints({ force: true, loading: true })
+
+    if (result.code === 1 && result.data) {
+      showToast({
+        message: '余额已更新',
+        duration: 1500,
+      })
     } else {
       showToast({
-        message: result?.msg || '刷新余额失败',
+        message: result.msg || '刷新余额失败',
         duration: 2000,
       })
     }

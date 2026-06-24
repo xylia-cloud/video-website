@@ -1,18 +1,7 @@
 <script setup lang="ts">
-import { ref, onMounted } from 'vue';
-import { Icon } from 'vant/es/icon'
-import { Loading } from 'vant/es/loading'
-import { Tabs } from 'vant/es/tabs'
-import { Tab } from 'vant/es/tab'
-import { useRouter } from 'vue-router';
-import { fetchVideoChargeLog, fetchGameChargeLog } from '@/api/fetch-api';
-
-const router = useRouter();
-
-// 返回上一页
-const goBack = () => {
-  router.back();
-};
+import { ref, onMounted, onBeforeUnmount } from 'vue'
+import HeaderNav from '@/components/HeaderNav.vue'
+import { fetchVideoChargeLog, fetchGameChargeLog } from '@/api/fetch-api'
 
 // 视频充值记录数据接口
 interface ChargeRecord {
@@ -174,14 +163,14 @@ const fetchGameRecords = async (loadMore = false) => {
 };
 
 // 切换选项卡
-const handleTabChange = (index: number) => {
-  activeTab.value = index;
+const handleTabChange = (name: number | string) => {
+  const index = Number(name)
   if (index === 0 && videoRecords.value.length === 0 && !hasVideoError.value) {
-    fetchVideoRecords();
+    fetchVideoRecords()
   } else if (index === 1 && gameRecords.value.length === 0 && !hasGameError.value) {
-    fetchGameRecords();
+    fetchGameRecords()
   }
-};
+}
 
 // 滚动加载更多
 const handleScroll = () => {
@@ -269,53 +258,46 @@ const copyOrderNo = async (orderNo: string) => {
 };
 
 onMounted(() => {
-  // 默认加载视频充值记录
-  fetchVideoRecords();
-  // 添加滚动监听
-  window.addEventListener('scroll', handleScroll);
-});
+  fetchVideoRecords()
+  window.addEventListener('scroll', handleScroll)
+})
 
-// 组件卸载时移除监听
-import { onBeforeUnmount } from 'vue';
 onBeforeUnmount(() => {
-  window.removeEventListener('scroll', handleScroll);
-});
+  window.removeEventListener('scroll', handleScroll)
+})
 </script>
 
 <template>
   <div class="recharge-record-page">
-    <!-- 顶部导航栏 -->
-    <div class="page-header">
-      <div class="nav-bar">
-        <div class="back-button" @click="goBack">
-          <Icon name="arrow-left" color="#fff" size="20" />
-        </div>
-        <div class="page-title">充值记录</div>
-        <div class="right-placeholder"></div>
-      </div>
-    </div>
+    <HeaderNav title="充值记录" />
 
-    <!-- 选项卡 -->
-    <div class="tabs-container">
-      <Tabs v-model:active="activeTab" @change="handleTabChange" background="#111" color="#ff9500"
-        title-active-color="#ff9500" title-inactive-color="#999">
-        <Tab title="视频充值记录">
+    <div class="page-content">
+      <div class="tabs-container">
+        <van-tabs
+          v-model:active="activeTab"
+          background="#111"
+          color="#ff9500"
+          title-active-color="#ff9500"
+          title-inactive-color="#999"
+          @change="handleTabChange"
+        >
+          <van-tab title="视频充值记录">
           <!-- 加载状态 -->
           <div v-if="isVideoLoading && videoRecords.length === 0" class="loading-state">
-            <Loading type="spinner" color="#ff9500" />
+            <van-loading type="spinner" color="#ff9500" />
             <div class="loading-text">加载中...</div>
           </div>
 
           <!-- 错误状态 -->
           <div v-else-if="hasVideoError && videoRecords.length === 0" class="error-state">
-            <Icon name="warning-o" size="24" color="#ff9500" />
+            <van-icon name="warning-o" size="24" color="#ff9500" />
             <div class="error-text">{{ videoErrorMessage || '加载失败，请稍后再试' }}</div>
             <div class="retry-btn" @click="() => fetchVideoRecords()">重试</div>
           </div>
 
           <!-- 空状态 -->
           <div v-else-if="videoRecords.length === 0" class="empty-state">
-            <Icon name="orders-o" size="48" color="#999" />
+            <van-icon name="orders-o" size="48" color="#999" />
             <div class="empty-text">暂无视频充值记录</div>
           </div>
 
@@ -331,7 +313,7 @@ onBeforeUnmount(() => {
                     @click="copyOrderNo(record.order_code)"
                     aria-label="复制视频充值订单号"
                   >
-                    <Icon name="copy-o" size="16" />
+                    <van-icon name="copy-o" size="16" />
                   </button>
                 </div>
                 <div class="record-status" :class="getStatusClass(record.order_status)">
@@ -366,7 +348,7 @@ onBeforeUnmount(() => {
 
             <!-- 加载更多指示器 -->
             <div v-if="isLoadingMoreVideo" class="loading-more">
-              <Loading type="spinner" color="#ff9500" size="20" />
+              <van-loading type="spinner" color="#ff9500" size="20" />
               <span>正在加载更多...</span>
             </div>
 
@@ -375,25 +357,25 @@ onBeforeUnmount(() => {
               已经到底了~
             </div>
           </div>
-        </Tab>
+        </van-tab>
 
-        <Tab title="游戏充值记录">
+        <van-tab title="游戏充值记录">
           <!-- 加载状态 -->
           <div v-if="isGameLoading && gameRecords.length === 0" class="loading-state">
-            <Loading type="spinner" color="#ff9500" />
+            <van-loading type="spinner" color="#ff9500" />
             <div class="loading-text">加载中...</div>
           </div>
 
           <!-- 错误状态 -->
           <div v-else-if="hasGameError && gameRecords.length === 0" class="error-state">
-            <Icon name="warning-o" size="24" color="#ff9500" />
+            <van-icon name="warning-o" size="24" color="#ff9500" />
             <div class="error-text">{{ gameErrorMessage || '加载失败，请稍后再试' }}</div>
             <div class="retry-btn" @click="() => fetchGameRecords()">重试</div>
           </div>
 
           <!-- 空状态 -->
           <div v-else-if="gameRecords.length === 0" class="empty-state">
-            <Icon name="orders-o" size="48" color="#999" />
+            <van-icon name="orders-o" size="48" color="#999" />
             <div class="empty-text">暂无游戏充值记录</div>
           </div>
 
@@ -409,7 +391,7 @@ onBeforeUnmount(() => {
                     @click="copyOrderNo(record.orderno)"
                     aria-label="复制游戏充值订单号"
                   >
-                    <Icon name="copy-o" size="16" />
+                    <van-icon name="copy-o" size="16" />
                   </button>
                 </div>
                 <div class="record-status" :class="getGameStatusClass(record.status_cn)">
@@ -444,7 +426,7 @@ onBeforeUnmount(() => {
 
             <!-- 加载更多指示器 -->
             <div v-if="isLoadingMoreGame" class="loading-more">
-              <Loading type="spinner" color="#ff9500" size="20" />
+              <van-loading type="spinner" color="#ff9500" size="20" />
               <span>正在加载更多...</span>
             </div>
 
@@ -453,8 +435,9 @@ onBeforeUnmount(() => {
               已经到底了~
             </div>
           </div>
-        </Tab>
-      </Tabs>
+        </van-tab>
+      </van-tabs>
+    </div>
     </div>
   </div>
 </template>
@@ -467,36 +450,8 @@ onBeforeUnmount(() => {
   padding-bottom: 20px;
 }
 
-.page-header {
-  padding: 10px 15px;
-  background-color: #111;
-  position: sticky;
-  top: 0;
-  z-index: 100;
-}
-
-.nav-bar {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  height: 44px;
-}
-
-.back-button {
-  width: 44px;
-  height: 44px;
-  display: flex;
-  align-items: center;
-  cursor: pointer;
-}
-
-.page-title {
-  font-size: 18px;
-  font-weight: bold;
-}
-
-.right-placeholder {
-  width: 44px;
+.page-content {
+  padding-top: 64px;
 }
 
 .tabs-container {
