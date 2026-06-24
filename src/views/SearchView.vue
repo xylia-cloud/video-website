@@ -2,9 +2,9 @@
 import { ref, onMounted, watchEffect, onBeforeUnmount } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import VideoList from '@/components/VideoList.vue';
-import { searchVideos } from '@/api/video';
 import { fetchSearchVideos } from '@/api/fetch-api';
 import { DEFAULT_PAGE_SIZE, BASE_URL } from '@/utils/config';
+import { parseVideoListResponse } from '@/utils/videoList';
 // 导入Vant组件
 import { Icon, Loading } from 'vant';
 
@@ -53,7 +53,6 @@ const searchResults = ref<VideoItem[]>([]);
 const isLoading = ref(false);
 const hasError = ref(false);
 const errorMessage = ref<string>('');
-const useFetch = true; // 是否使用原生fetch还是axios
 
 // 分页相关
 const currentPage = ref(1);
@@ -140,25 +139,11 @@ const performSearch = async (keyword: string, page: number = 1, loadMore: boolea
     console.log('搜索请求参数:', params);
     console.log('performSearch调用 - 是否加载更多:', loadMore, '请求页码:', page, '当前页码:', currentPage.value);
     
-    // 选择使用哪种请求方法
-    const result = useFetch 
-      ? await fetchSearchVideos(params) 
-      : await searchVideos(params);
+    const result = await fetchSearchVideos(params);
       
     console.log('搜索返回数据:', result);
     
-    // 处理API返回的数据
-    let apiData: ApiVideoItem[] = [];
-    
-    // 适应不同的数据结构
-    if (result.list) {
-      apiData = result.list;
-    } else if (result.data && result.data.list) {
-      apiData = result.data.list;
-    } else if (result.data) {
-      apiData = Array.isArray(result.data) ? result.data : [];
-    }
-    
+    const apiData = parseVideoListResponse(result) as ApiVideoItem[];
     // 更新分页信息
     if (result.pagecount) {
       totalPages.value = result.pagecount;

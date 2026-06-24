@@ -28,7 +28,14 @@ onMounted(() => {
 <template>
   <div class="app-container">
     <TopLoading />
-    <RouterView />
+    <RouterView v-slot="{ Component, route }">
+      <KeepAlive include="HomeView">
+        <component
+          :is="Component"
+          :key="route.name === 'home' ? 'home' : route.fullPath"
+        />
+      </KeepAlive>
+    </RouterView>
     <GlobalAuthModal />
     <GlobalCustomerServiceModal />
     <CustomerServiceButton />

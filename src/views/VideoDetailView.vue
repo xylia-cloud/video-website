@@ -15,13 +15,12 @@ import {
   registerUser,
   createAuthHeaders,
   fetchUserPoints,
-  touristLogin,
   checkApiAuthError,
 } from '@/api/fetch-api'
 import type { VideoDetail } from '@/api/fetch-api'
 import { BASE_URL } from '@/utils/config'
-import { getDeviceIMEI } from '@/utils/device'
 import { resolveInviteCode, captureInviteCode } from '@/utils/invite'
+import { performTouristLogin } from '@/composables/useTouristLogin'
 // 导入Vant组件
 import { Icon, Loading, showToast, showDialog, closeToast } from 'vant'
 import type Hls from 'hls.js'
@@ -2317,65 +2316,14 @@ onBeforeUnmount(() => {
   window.removeEventListener('scroll', handleScroll)
 })
 
-// 游客自动登录函数
-const performTouristLogin = async () => {
-  console.log('=== 视频详情页游客登录开始 ===')
-
-  // 检查本地是否已有用户信息
-  const localUserInfo = getUserInfo()
-
-  if (localUserInfo) {
-    console.log('✅ 本地已有用户信息，跳过游客登录')
-    return
-  }
-
-  // 检查是否已登录
-  if (isLoggedIn()) {
-    console.log('✅ 用户已登录，跳过游客登录')
-    return
-  }
-
-  try {
-    console.log('🔄 开始游客登录流程...')
-
-    const deviceIMEI = getDeviceIMEI()
-    console.log('📱 使用设备IMEI进行游客登录:', deviceIMEI)
-
-    const recCode = resolveInviteCode(route) || undefined
-    if (recCode) {
-      console.log('📝 检测到邀请码，将在游客登录时传递:', recCode)
-    }
-
-    const result = await touristLogin(deviceIMEI, recCode)
-    console.log('📥 游客登录API响应:', result)
-
-    if (result.code === 1 && result.data) {
-      // 游客登录成功，保存用户信息
-      console.log('✅ 游客登录成功，用户信息已保存到本地')
-
-      showToast({
-        message: '已获取游客信息',
-        duration: 1000,
-      })
-
-      // 游客登录成功后，重新获取用户信息
-      await fetchUserInfo()
-    } else {
-      // 游客登录失败
-      console.error('❌ 游客登录失败:', result)
-    }
-  } catch (error) {
-    console.error('❌ 游客登录异常:', error)
-  }
-
-  console.log('=== 视频详情页游客登录结束 ===')
-}
-
 onMounted(async () => {
   captureInviteCode(route)
 
-  // 先捕获邀请码，再执行游客登录
-  await performTouristLogin()
+  await performTouristLogin({
+    route,
+    onSuccess: fetchUserInfo,
+    showFailureToast: false,
+  })
 
   // 将测试函数暴露给全局作用域（仅开发环境）
   if (import.meta.env.DEV) {

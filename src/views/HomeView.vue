@@ -1,4 +1,6 @@
 <script setup lang="ts">
+defineOptions({ name: 'HomeView' })
+
 // 导入组件
 import PrimaryMenu from '@/components/PrimaryMenu.vue'
 import SecondaryMenu from '@/components/SecondaryMenu.vue'
@@ -9,21 +11,21 @@ import VideoSection from '@/components/VideoSection.vue'
 import LoadingStates from '@/components/LoadingStates.vue'
 import BottomTabbar from '@/components/BottomTabbar.vue'
 import { ref, onMounted, onBeforeUnmount, computed, onActivated } from 'vue'
-import { getRecommendVideos } from '@/api/video'
 import {
   fetchRecommendVideos,
   fetchTypesList,
   fetchAds,
   fetchTags,
-  touristLogin,
-  getUserInfo,
-  isLoggedIn,
   getFullImageUrl,
 } from '@/api/fetch-api'
 import type { TypeItem } from '@/api/fetch-api'
 import { BASE_URL, VIDEO_CATEGORIES, DEFAULT_PAGE_SIZE } from '@/utils/config'
+import {
+  applyFirstPageListAds,
+  parseVideoListResponse,
+} from '@/utils/videoList'
+import { performTouristLogin } from '@/composables/useTouristLogin'
 import { useRouter, useRoute } from 'vue-router'
-import { getDeviceIMEI } from '@/utils/device'
 import { showToast } from 'vant'
 import { resolveInviteCode } from '@/utils/invite'
 
@@ -159,9 +161,6 @@ const hasLatestError = ref(false)
 const latestErrorMessage = ref('')
 const latestCurrentPage = ref(1)
 const latestTotalPages = ref(1)
-
-// 是否使用原生fetch还是axios
-const useFetch = true
 
 // 搜索相关
 const searchKeyword = ref('')
@@ -386,11 +385,6 @@ const saveCurrentTabState = () => {
   updateTabCache(activeTypeId.value)
 }
 
-// 存储广告位置信息，以便在"换一批"后依然保留广告位置
-const adPositions = ref<number[]>([3, 6, 11])
-// 存储已插入广告的视频数据，用于"换一批"后的数据处理
-const videoDataWithAds = ref<VideoItem[]>([])
-
 // 获取最新视频数据
 const fetchLatestVideosData = async (page: number = 1) => {
   isLoadingLatest.value = true
@@ -478,10 +472,7 @@ const fetchRecommendVideosData = async (page = 1, tid = VIDEO_CATEGORIES.ALL) =>
       tid: tid,
     }
 
-    // 选择使用哪种请求方法
-    const result = useFetch
-      ? await fetchRecommendVideos(params)
-      : ((await getRecommendVideos(params)) as ApiResponse)
+    const result = await fetchRecommendVideos(params)
 
     if (requestSeq !== videoListRequestSeq || activeTypeId.value !== requestTabId) {
       console.log('忽略过期的视频列表响应', { requestTabId, currentTab: activeTypeId.value })
@@ -502,19 +493,7 @@ const fetchRecommendVideosData = async (page = 1, tid = VIDEO_CATEGORIES.ALL) =>
     hasMoreVideos.value = currentPage.value < totalPages.value
 
     // 处理API返回的数据，并根据实际响应结构调整
-    let apiData: ApiVideoItem[] = []
-
-    // 适应不同的数据结构
-    if (result.data && result.data.list) {
-      // 新的数据结构 { data: { list: [...] } }
-      apiData = result.data.list
-    } else if (result.data) {
-      // 直接返回数据列表 { data: [...] }
-      apiData = Array.isArray(result.data) ? result.data : []
-    } else if (result.list) {
-      // 另一种结构 { list: [...] }
-      apiData = result.list
-    }
+    const apiData = parseVideoListResponse(result) as ApiVideoItem[]
 
     // 映射字段
     const processedData = apiData.map(processVideoData)
@@ -569,56 +548,7 @@ const fetchRecommendVideosData = async (page = 1, tid = VIDEO_CATEGORIES.ALL) =>
 
 // 处理数据并插入广告
 const processDataWithAds = (processedData: VideoItem[], page: number): VideoItem[] => {
-  // 创建数据副本，避免直接修改原始数据
-  const finalData = [...processedData]
-
-  // 只有第一页且有广告时才处理
-  console.log(
-    '📢 [processDataWithAds] 检查广告插入条件 - page:',
-    page,
-    'listAds.length:',
-    listAds.value.length,
-  )
-  console.log('📢 [processDataWithAds] 广告数据详情:', listAds.value)
-
-  if (page === 1 && listAds.value.length > 0) {
-    console.log('📢 [processDataWithAds] ✅ 开始处理广告插入，广告数据长度:', listAds.value.length)
-    console.log('📢 [processDataWithAds] 输入视频数据长度:', processedData.length)
-
-    // 🔥 使用前3个广告
-    const adsToUse = listAds.value.slice(0, 3)
-    console.log('将使用的广告数量:', adsToUse.length)
-
-    // 🔥 目标：17条视频 + 3条广告 = 20条
-    // 移除最后3条视频（20-3=17），为广告腾出位置
-    if (finalData.length >= 20) {
-      finalData.splice(17) // 只保留前17条视频
-      console.log('🔥 保留前17条视频，移除后的数据长度:', finalData.length)
-    }
-
-    // 插入广告到预设位置（位置3、6、11）
-    for (let i = 0; i < Math.min(adPositions.value.length, adsToUse.length); i++) {
-      const position = adPositions.value[i]
-      // 确保位置在有效范围内（位置需要小于等于当前数组长度）
-      if (position <= finalData.length) {
-        console.log(`在位置${position}插入第${i + 1}个广告:`, adsToUse[i])
-        console.log(`插入前数据长度: ${finalData.length}`)
-        finalData.splice(position, 0, adsToUse[i])
-        console.log(`插入后数据长度: ${finalData.length}`)
-      } else {
-        console.warn(`⚠️ 位置${position}超出数据范围(${finalData.length})，跳过第${i + 1}个广告`)
-      }
-    }
-
-    console.log('🔥 插入广告后的最终数据长度:', finalData.length, '（目标：20条）')
-    // 保存带广告的数据供后续使用
-    videoDataWithAds.value = [...finalData]
-  } else if (page === 1) {
-    // 如果是第一页但没有广告，则使用原始数据
-    videoDataWithAds.value = finalData
-  }
-
-  return page === 1 ? finalData : processedData
+  return applyFirstPageListAds(processedData, listAds.value.slice(0, 3), page)
 }
 
 // 处理搜索提交
@@ -661,9 +591,8 @@ const handleHotPageChange = (page: number) => {
   }
 
   // 发起请求获取新数据
-  ;(useFetch ? fetchRecommendVideos(params) : getRecommendVideos(params))
+  fetchRecommendVideos(params)
     .then((result: ApiResponse) => {
-      // 更新页码信息
       if (result.page) {
         currentPage.value = result.page
       }
@@ -671,57 +600,13 @@ const handleHotPageChange = (page: number) => {
         totalPages.value = result.pagecount
       }
 
-      // 处理API返回的数据
-      let apiData: ApiVideoItem[] = []
-
-      // 适应不同的数据结构
-      if (result.data && result.data.list) {
-        apiData = result.data.list
-      } else if (result.data) {
-        apiData = Array.isArray(result.data) ? result.data : []
-      } else if (result.list) {
-        apiData = result.list
-      }
-
-      // 映射字段
-      const processedData = apiData.map(processVideoData)
-      console.log('🔄 [分页] API返回原始数据长度:', apiData.length)
-      console.log('🔄 [分页] 视频映射后数据长度:', processedData.length)
-      console.log('🔄 [分页] DEFAULT_PAGE_SIZE:', DEFAULT_PAGE_SIZE)
-
-      // 🔥 目标：17条视频 + 3条广告 = 20条
-      // 移除最后3条视频（20-3=17），为广告腾出位置
-      if (processedData.length >= 20) {
-        processedData.splice(17) // 只保留前17条视频
-        console.log('🔄 [分页] 保留前17条视频，移除后的数据长度:', processedData.length)
-      }
-
-      // 直接使用之前保存的广告位置插入广告
-      const adsToUse = listAds.value.slice(0, 3)
-
-      // 确保广告数据可用
-      if (adsToUse.length > 0) {
-        for (let i = 0; i < Math.min(adPositions.value.length, adsToUse.length); i++) {
-          const position = adPositions.value[i]
-          // 确保位置在有效范围内
-          if (position <= processedData.length) {
-            console.log(`🔄 [分页] 在位置${position}插入第${i + 1}个广告:`, adsToUse[i])
-            processedData.splice(position, 0, adsToUse[i])
-          } else {
-            console.warn(
-              `🔄 [分页] ⚠️ 位置${position}超出数据范围(${processedData.length})，跳过第${i + 1}个广告`,
-            )
-          }
-        }
-      }
-
-      // 更新视频数据
-      videoData.value = processedData
-
-      // 更新缓存
+      const apiData = parseVideoListResponse(result) as ApiVideoItem[]
+      videoData.value = applyFirstPageListAds(
+        apiData.map(processVideoData),
+        listAds.value.slice(0, 3),
+        1,
+      )
       updateTabCache(activeTypeId.value)
-
-      console.log('🔄 [分页] 最终数据长度:', videoData.value.length)
     })
     .catch((error) => {
       console.error('分页加载数据失败:', error)
@@ -793,9 +678,8 @@ const handlePageChange = (page: number) => {
   }
 
   // 发起请求获取新数据
-  ;(useFetch ? fetchRecommendVideos(params) : getRecommendVideos(params))
+  fetchRecommendVideos(params)
     .then((result: ApiResponse) => {
-      // 更新页码信息
       if (result.page) {
         currentPage.value = result.page
       }
@@ -803,60 +687,9 @@ const handlePageChange = (page: number) => {
         totalPages.value = result.pagecount
       }
 
-      // 处理API返回的数据
-      let apiData: ApiVideoItem[] = []
-
-      // 适应不同的数据结构
-      if (result.data && result.data.list) {
-        apiData = result.data.list
-      } else if (result.data) {
-        apiData = Array.isArray(result.data) ? result.data : []
-      } else if (result.list) {
-        apiData = result.list
-      }
-
-      // 映射字段
-      const processedData = apiData.map(processVideoData)
-      console.log('📄 [分页] API返回原始数据长度:', apiData.length)
-      console.log('📄 [分页] 视频映射后数据长度:', processedData.length)
-      console.log('📄 [分页] DEFAULT_PAGE_SIZE:', DEFAULT_PAGE_SIZE)
-
-      // 只有首页标签需要插入广告
-      if (isFirstTab && page === 1) {
-        // 🔥 目标：17条视频 + 3条广告 = 20条
-        // 移除最后3条视频（20-3=17），为广告腾出位置
-        if (processedData.length >= 20) {
-          processedData.splice(17) // 只保留前17条视频
-          console.log('📄 [分页] 保留前17条视频，移除后的数据长度:', processedData.length)
-        }
-
-        // 直接使用之前保存的广告位置插入广告
-        const adsToUse = listAds.value.slice(0, 3)
-
-        // 确保广告数据可用
-        if (adsToUse.length > 0) {
-          for (let i = 0; i < Math.min(adPositions.value.length, adsToUse.length); i++) {
-            const position = adPositions.value[i]
-            // 确保位置在有效范围内
-            if (position <= processedData.length) {
-              console.log(`📄 [分页] 在位置${position}插入第${i + 1}个广告:`, adsToUse[i])
-              processedData.splice(position, 0, adsToUse[i])
-            } else {
-              console.warn(
-                `📄 [分页] ⚠️ 位置${position}超出数据范围(${processedData.length})，跳过第${i + 1}个广告`,
-              )
-            }
-          }
-        }
-      }
-
-      // 更新视频数据
-      videoData.value = processedData
-
-      // 更新缓存
+      const apiData = parseVideoListResponse(result) as ApiVideoItem[]
+      videoData.value = apiData.map(processVideoData)
       updateTabCache(activeTypeId.value)
-
-      console.log('📄 [分页] 最终数据长度:', videoData.value.length)
     })
     .catch((error) => {
       console.error('分页加载数据失败:', error)
@@ -1197,7 +1030,7 @@ onMounted(async () => {
   }
 
   // 首先执行游客登录（如果需要的话）
-  await performTouristLogin()
+  await performTouristLogin({ route })
 
   // 获取类型列表数据
   await fetchTypesData()
@@ -1258,8 +1091,6 @@ onMounted(async () => {
     console.log('🔥 onMounted加载数据 - isFirstTab:', isFirstTab, 'tidToUse:', tidToUse)
     fetchRecommendVideosData(1, tidToUse)
   }
-
-  fetchTagsData()
 
   // 如果是首页标签，加载最新视频数据
   if (isFirstTab) {
@@ -1420,65 +1251,6 @@ const restoreSessionData = () => {
     console.error('恢复会话数据失败:', error)
   }
   return false
-}
-
-// 游客登录函数
-const performTouristLogin = async () => {
-  console.log('=== 首页游客登录开始 ===')
-
-  // 检查本地是否已有用户信息
-  const localUserInfo = getUserInfo()
-
-  if (localUserInfo) {
-    console.log('✅ 本地已有用户信息，跳过游客登录')
-    return
-  }
-
-  // 检查是否已登录
-  if (isLoggedIn()) {
-    console.log('✅ 用户已登录，跳过游客登录')
-    return
-  }
-
-  try {
-    console.log('🔄 开始游客登录流程...')
-
-    const deviceIMEI = getDeviceIMEI()
-    console.log('📱 使用设备IMEI进行游客登录:', deviceIMEI)
-
-    const recCode = resolveInviteCode(route) || undefined
-    if (recCode) {
-      console.log('📝 检测到邀请码，将在游客登录时传递:', recCode)
-    }
-
-    const result = await touristLogin(deviceIMEI, recCode)
-    console.log('📥 游客登录API响应:', result)
-
-    if (result.code === 1 && result.data) {
-      // 游客登录成功，保存用户信息
-      console.log('✅ 游客登录成功，用户信息已保存到本地')
-
-      showToast({
-        message: '已获取游客信息',
-        duration: 1000,
-      })
-    } else {
-      // 游客登录失败
-      console.error('❌ 游客登录失败:', result)
-      showToast({
-        message: '获取游客信息失败',
-        duration: 2000,
-      })
-    }
-  } catch (error) {
-    console.error('❌ 游客登录异常:', error)
-    showToast({
-      message: '获取游客信息失败',
-      duration: 2000,
-    })
-  }
-
-  console.log('=== 首页游客登录结束 ===')
 }
 </script>
 
