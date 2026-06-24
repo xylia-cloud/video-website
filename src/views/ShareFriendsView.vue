@@ -2,9 +2,10 @@
 import { ref, onMounted, computed, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import HeaderNav from '@/components/HeaderNav.vue'
-import { getUserInfo, isLoggedIn } from '@/api/fetch-api'
+import { useUserStore } from '@/stores/user'
 
 const router = useRouter()
+const userStore = useUserStore()
 
 // 用户信息
 interface UserInfo {
@@ -17,14 +18,11 @@ const qrCodeDataUrl = ref<string>('')
 
 // 获取用户信息
 const fetchUserInfo = () => {
-  if (!isLoggedIn()) {
+  if (!userStore.isLoggedIn) {
+    router.push('/login')
     return
   }
-
-  const info = getUserInfo()
-  if (info) {
-    userInfo.value = info
-  }
+  userInfo.value = userStore.profile
 }
 
 // 弹出分享面板控制

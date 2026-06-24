@@ -6,15 +6,15 @@ import { Icon } from 'vant/es/icon'
 import HeaderNav from '@/components/HeaderNav.vue'
 import BalanceInfoCard from '@/components/BalanceInfoCard.vue'
 import {
-    getUserInfo,
-    type UserInfo,
     createAuthHeaders,
-    refreshUserPoints as syncUserPoints,
     checkApiAuthError,
+    type UserInfo,
 } from '@/api/fetch-api'
+import { useUserStore } from '@/stores/user'
 import { BASE_URL } from '@/utils/config'
 
 const router = useRouter()
+const userStore = useUserStore()
 
 // 选项卡状态
 const activeTab = ref('video'); // 'game' 或 'video'
@@ -80,7 +80,7 @@ const vipStatusText = computed(() => {
 
 // 获取用户信息
 const fetchUserInfo = () => {
-    const localUserInfo = getUserInfo()
+    const localUserInfo = userStore.profile
     if (localUserInfo && localUserInfo.token) {
         isUserLoggedIn.value = true
         userInfo.value = localUserInfo
@@ -194,7 +194,7 @@ const confirmCharge = async () => {
         console.log('🔍 充值接口请求URL:', buyUrl)
 
         // 获取用户信息
-        const userInfo = getUserInfo()
+        const userInfo = userStore.profile
         if (!userInfo) {
             closeToast()
             showToast({
@@ -328,7 +328,7 @@ const applyPointsDataToView = (data: {
     endtime?: string | number
     coin?: number | string
 }) => {
-    const localUserInfo = getUserInfo()
+    const localUserInfo = userStore.profile
     if (localUserInfo) {
         userInfo.value = localUserInfo
     }
@@ -358,7 +358,7 @@ const refreshUserPoints = async () => {
             icon: 'loading',
         })
 
-        const pointsResult = await syncUserPoints({ force: true, loading: true })
+        const pointsResult = await userStore.refreshPoints({ force: true, loading: true })
         closeToast()
 
         if (pointsResult.code === 1 && pointsResult.data) {
@@ -397,7 +397,7 @@ onMounted(async () => {
     fetchChargeOptions()
 
     try {
-        const pointsResult = await syncUserPoints()
+        const pointsResult = await userStore.refreshPoints()
         if (pointsResult.code === 1 && pointsResult.data) {
             applyPointsDataToView(pointsResult.data)
             console.log('✅ 页面加载时积分信息获取成功:', pointsResult.data)

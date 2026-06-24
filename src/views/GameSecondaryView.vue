@@ -3,11 +3,12 @@ import { ref, onMounted, onUnmounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { NEW_API_BASE_URL } from '@/utils/config'
 import HeaderNav from '@/components/HeaderNav.vue'
-import { getUserInfo } from '@/api/fetch-api'
+import { useUserStore } from '@/stores/user'
 
 // 路由相关
 const route = useRoute()
 const router = useRouter()
+const userStore = useUserStore()
 
 // 从路由参数获取信息
 const topCategoryId = ref(route.params.topCategoryId as string)
@@ -92,7 +93,7 @@ const fetchFavoriteGames = async () => {
 
   try {
     // 检查用户登录状态
-    const userInfo = getUserInfo()
+    const userInfo = userStore.profile
     if (!userInfo || !userInfo.token) {
       showToast('请先登录')
       isLoadingFavorites.value = false
@@ -160,7 +161,7 @@ const toggleFavoriteGame = async (game: Game, event: Event, isFavorited: boolean
 
   try {
     // 检查用户登录状态
-    const userInfo = getUserInfo()
+    const userInfo = userStore.profile
     if (!userInfo || !userInfo.token) {
       showToast('请先登录')
       return
@@ -422,7 +423,7 @@ const searchGames = async (keyword: string) => {
     console.log('🔍 开始搜索游戏，关键词:', keyword)
 
     // 获取用户信息
-    const userInfo = getUserInfo()
+    const userInfo = userStore.profile
     const uid =
       userInfo && (userInfo.user_id || userInfo.id) ? String(userInfo.user_id || userInfo.id) : '0'
     const token = userInfo?.token || ''
@@ -554,7 +555,7 @@ const fetchGamesData = async (page: number = 1, isLoadMore: boolean = false) => 
 
   try {
     // 获取用户信息
-    const userInfo = getUserInfo()
+    const userInfo = userStore.profile
     const uid =
       userInfo && (userInfo.user_id || userInfo.id) ? String(userInfo.user_id || userInfo.id) : '0'
     const token = userInfo?.token || ''
@@ -717,7 +718,7 @@ const handleGameClick = async (game: Game) => {
 
   try {
     // 检查用户登录状态
-    const userInfo = getUserInfo()
+    const userInfo = userStore.profile
     if (!userInfo || !userInfo.token) {
       showToast('请先登录再进入游戏')
       return

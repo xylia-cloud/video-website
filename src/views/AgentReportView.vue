@@ -1,8 +1,10 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
 import HeaderNav from '@/components/HeaderNav.vue'
-import { getUserInfo } from '@/api/fetch-api'
 import { NEW_API_BASE_URL } from '@/utils/config'
+import { useUserStore } from '@/stores/user'
+
+const userStore = useUserStore()
 
 const reportCards = ref([
   { title: '佣金收入', value: '0.00' },
@@ -15,16 +17,12 @@ const reportCards = ref([
 
 const isLoading = ref(false)
 
-// 获取统计数据（Daili.index）- 用于获取投注人数和充值人数
 const fetchStats = async () => {
   try {
-    const currentUserInfo = getUserInfo()
-    if (!currentUserInfo) return
+    const auth = userStore.getAuthParams()
+    if (!auth) return
 
-    const uid = currentUserInfo.user_id || currentUserInfo.id
-    const token = currentUserInfo.token
-
-    if (!uid || !token) return
+    const { uid, token } = auth
 
     const queryParams = new URLSearchParams()
     queryParams.append('service', 'Daili.index')
@@ -82,13 +80,10 @@ const fetchReportData = async (page: number = 1) => {
 
   try {
     isLoading.value = true
-    const currentUserInfo = getUserInfo()
-    if (!currentUserInfo) return
+    const auth = userStore.getAuthParams()
+    if (!auth) return
 
-    const uid = currentUserInfo.user_id || currentUserInfo.id
-    const token = currentUserInfo.token
-
-    if (!uid || !token) return
+    const { uid, token } = auth
 
     const queryParams = new URLSearchParams()
     queryParams.append('service', 'Daili.coin')

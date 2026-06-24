@@ -2,10 +2,11 @@
 import { ref, onMounted, computed } from 'vue'
 import { useRouter } from 'vue-router'
 import HeaderNav from '@/components/HeaderNav.vue'
-import { getUserInfo, isLoggedIn } from '@/api/fetch-api'
 import { NEW_API_BASE_URL } from '@/utils/config'
+import { useUserStore } from '@/stores/user'
 
 const router = useRouter()
+const userStore = useUserStore()
 
 type UserInfo = {
   rec_code?: string
@@ -45,7 +46,7 @@ const getCurrentDomain = () => {
 
 // 获取用户信息
 const fetchUserInfo = () => {
-  if (!isLoggedIn()) {
+  if (!userStore.isLoggedIn) {
     showToast({
       message: '请先登录',
       duration: 2000,
@@ -55,10 +56,7 @@ const fetchUserInfo = () => {
     return
   }
 
-  const info = getUserInfo()
-  if (info) {
-    userInfo.value = info as UserInfo
-  }
+  userInfo.value = userStore.profile as UserInfo
 }
 
 // 生成邀请链接
@@ -195,13 +193,10 @@ const claimCommission = () => {
 // 获取代理数据
 const fetchAgentData = async () => {
   try {
-    const currentUserInfo = getUserInfo()
-    if (!currentUserInfo) return
+    const auth = userStore.getAuthParams()
+    if (!auth) return
 
-    const uid = currentUserInfo.user_id || currentUserInfo.id
-    const token = currentUserInfo.token
-
-    if (!uid || !token) return
+    const { uid, token } = auth
 
     // 构建请求URL - 调用 Daili.index 接口
     const queryParams = new URLSearchParams()

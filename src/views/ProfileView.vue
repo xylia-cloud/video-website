@@ -4,11 +4,8 @@ import { ref, onMounted, computed, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import {
   userLogout,
-  getUserInfo,
-  isLoggedIn,
   fetchAds,
   fetchNotices,
-  isGuestUser,
   applyAgent,
   type NoticeGroup,
 } from '@/api/fetch-api'
@@ -374,7 +371,7 @@ onMounted(async () => {
   const localUserInfo = userStore.profile
 
   // 🔥 根据本地存储判断是否为游客用户
-  const isGuest = isGuestUser()
+  const isGuest = userStore.isGuest
 
   console.log('📦 本地用户信息检查:', {
     hasLocalUserInfo: !!localUserInfo,
@@ -552,13 +549,11 @@ const goToWatchHistory = () => {
 
 // 跳转到游戏记录页面
 const goToGameRecord = () => {
-  // 检查登录状态
-  if (!isLoggedIn()) {
+  if (!userStore.isLoggedIn) {
     showToast('请先登录')
     return
   }
 
-  // 跳转到游戏记录页面
   router.push('/game-record')
 }
 
@@ -570,8 +565,7 @@ const goToGameRecord = () => {
 // 跳转到人工客服
 // 跳转到我的代理页面
 const goToMyAgent = () => {
-  // 检查登录状态
-  if (!isLoggedIn()) {
+  if (!userStore.isLoggedIn) {
     showToast({
       message: '请先登录后再访问代理页面',
       duration: 2000,
@@ -579,7 +573,6 @@ const goToMyAgent = () => {
     return
   }
 
-  // 跳转到我的代理页面
   router.push('/my-agent')
 }
 

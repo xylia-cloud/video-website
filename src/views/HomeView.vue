@@ -32,6 +32,9 @@ import { resolveInviteCode } from '@/utils/invite'
 const router = useRouter()
 const route = useRoute()
 
+// KeepAlive 下首次进入时 onMounted 与 onActivated 同轮触发，避免重复拉取视频列表
+const isFirstActivation = ref(true)
+
 // 定义视频数据接口
 interface VideoItem {
   id: number
@@ -1098,6 +1101,20 @@ onMounted(async () => {
 // 从其他页面返回时激活的钩子（用于处理从详情页返回的情况）
 onActivated(() => {
   console.log('首页被重新激活')
+
+  if (isFirstActivation.value) {
+    isFirstActivation.value = false
+
+    const savedScrollPosition = sessionStorage.getItem('homeScrollPosition')
+    if (savedScrollPosition) {
+      const scrollPosition = parseInt(savedScrollPosition)
+      setTimeout(() => {
+        window.scrollTo(0, scrollPosition)
+        sessionStorage.removeItem('homeScrollPosition')
+      }, 50)
+    }
+    return
+  }
 
   // 尝试恢复完整的首页状态（包括分类状态）
   const restoredFromSession = restoreSessionData()

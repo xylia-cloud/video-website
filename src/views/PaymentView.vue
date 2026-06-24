@@ -34,10 +34,11 @@
 <script setup lang="ts">
 import { ref, onMounted, onBeforeUnmount } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { refreshUserPoints } from '@/api/fetch-api'
+import { useUserStore } from '@/stores/user'
 
 const route = useRoute()
 const router = useRouter()
+const userStore = useUserStore()
 
 const payUrl = ref('')
 const isLoading = ref(true)
@@ -65,7 +66,7 @@ const refreshUserBalance = async () => {
       duration: 1000,
     })
 
-    const result = await refreshUserPoints({ force: true, loading: true })
+    const result = await userStore.refreshPoints({ force: true, loading: true })
 
     if (result.code === 1 && result.data) {
       showToast({

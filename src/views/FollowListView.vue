@@ -2,9 +2,11 @@
 import { ref, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import HeaderNav from '@/components/HeaderNav.vue'
-import { fetchFollowsList, getUserInfo, isLoggedIn, type FollowItem } from '@/api/fetch-api'
+import { fetchFollowsList, type FollowItem } from '@/api/fetch-api'
+import { useUserStore } from '@/stores/user'
 
 const router = useRouter()
+const userStore = useUserStore()
 
 // 响应式数据
 const followList = ref<FollowItem[]>([])
@@ -18,14 +20,14 @@ const isLoadingMore = ref(false)
 // 获取关注列表数据
 const fetchFollowsData = async (page = 1, loadMore = false) => {
     // 检查登录状态
-    if (!isLoggedIn()) {
+    if (!userStore.isLoggedIn) {
         showToast('请先登录')
         router.push('/login')
         return
     }
 
-    const userInfo = getUserInfo()
-    if (!userInfo || !userInfo.user_id) {
+    const uid = userStore.uid
+    if (!uid) {
         showToast('用户信息异常，请重新登录')
         router.push('/login')
         return
@@ -41,8 +43,8 @@ const fetchFollowsData = async (page = 1, loadMore = false) => {
 
     try {
         const result = await fetchFollowsList({
-            uid: userInfo.user_id.toString(),
-            touid: userInfo.user_id.toString(), // 获取自己的关注列表
+            uid: String(uid),
+            touid: String(uid), // 获取自己的关注列表
             p: page
         })
 

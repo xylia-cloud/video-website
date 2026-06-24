@@ -2,8 +2,8 @@
 import { ref, onMounted, onUnmounted, computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import HeaderNav from '@/components/HeaderNav.vue'
-import { getUserInfo, fetchUserBalance } from '@/api/fetch-api'
 import { NEW_API_BASE_URL } from '@/utils/config'
+import { useUserStore } from '@/stores/user'
 
 defineOptions({
   inheritAttrs: false,
@@ -14,6 +14,7 @@ defineOptions({
 // ==========================================
 const route = useRoute()
 const router = useRouter()
+const userStore = useUserStore()
 
 // 从路由参数获取信息
 const primaryCategoryId = ref(route.params.primaryCategoryId as string)
@@ -256,7 +257,7 @@ const fetchCountdown = async () => {
 // 查询中奖记录
 const checkWinning = async () => {
   try {
-    const userInfo = getUserInfo()
+    const userInfo = userStore.profile
     if (!userInfo || !userInfo.user_id) return
 
     // 先重置中奖状态
@@ -307,8 +308,8 @@ const checkWinning = async () => {
           showWinningModal.value = true
 
           // 刷新余额
-          fetchUserBalance().then((res) => {
-            if (res.code === 1 && res.data) userBalance.value = res.data.coin
+          userStore.refreshPoints({ force: true }).then((res) => {
+            if (res.code === 1 && res.data) userBalance.value = parseFloat(String(res.data.coin || '0'))
           })
         } else {
           console.log('❎ 未中奖: 名单中没有当前用户')
@@ -457,7 +458,7 @@ const submitBetting = async () => {
 
   isBetting.value = true
   try {
-    const userInfo = getUserInfo()
+    const userInfo = userStore.profile
     if (!userInfo) return showToast('获取用户信息失败')
 
     // 获取当前页面显示的所有选项列表
@@ -515,8 +516,8 @@ const submitBetting = async () => {
       selectedNumbers.value = [] // 清空选项
 
       // 刷新余额
-      fetchUserBalance().then((res) => {
-        if (res.code === 1 && res.data) userBalance.value = res.data.coin
+      userStore.refreshPoints({ force: true }).then((res) => {
+        if (res.code === 1 && res.data) userBalance.value = parseFloat(String(res.data.coin || '0'))
       })
     } else {
       errorMessage.value = result?.data?.msg || '投注失败，请重试'
@@ -566,12 +567,13 @@ const formatCountdown = (seconds: number): string => {
 // ==========================================
 onMounted(() => {
   // 加载余额
-  fetchUserBalance()
+  userStore
+    .refreshPoints()
     .then((res) => {
-      if (res.code === 1 && res.data) userBalance.value = res.data.coin
+      if (res.code === 1 && res.data) userBalance.value = parseFloat(String(res.data.coin || '0'))
     })
     .catch(() => {
-      const u = getUserInfo()
+      const u = userStore.profile
       if (u) userBalance.value = u.coin || 0
     })
 

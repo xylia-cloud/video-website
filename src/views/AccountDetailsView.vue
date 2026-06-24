@@ -2,9 +2,11 @@
 import { ref, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import HeaderNav from '@/components/HeaderNav.vue'
-import { fetchAccountDetails, type AccountDetail, getUserInfo, isLoggedIn } from '@/api/fetch-api'
+import { fetchAccountDetails, type AccountDetail } from '@/api/fetch-api'
+import { useUserStore } from '@/stores/user'
 
 const router = useRouter()
+const userStore = useUserStore()
 
 // 数据状态
 const accountDetails = ref<AccountDetail[]>([])
@@ -53,12 +55,6 @@ const getTypeIcon = (type: string) => {
 
 // 检查登录状态并加载数据
 onMounted(() => {
-  if (!isLoggedIn()) {
-    showToast('请先登录')
-    router.push('/login')
-    return
-  }
-
   loadAccountDetails()
 })
 </script>

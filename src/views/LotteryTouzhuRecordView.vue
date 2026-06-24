@@ -2,12 +2,12 @@
 import { ref, onMounted, nextTick, onBeforeUnmount, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import HeaderNav from '@/components/HeaderNav.vue'
-import { getUserInfo } from '@/api/fetch-api'
+import { useUserStore } from '@/stores/user'
 import { NEW_API_BASE_URL } from '@/utils/config'
 
-// 路由
 const route = useRoute()
 const router = useRouter()
+const userStore = useUserStore()
 
 // 从路由参数获取 biaoshi
 const biaoshi = ref((route.query.biaoshi as string) || 'f3k3')
@@ -46,19 +46,17 @@ const fetchTouzhuRecords = async (page: number = 1) => {
     hasError.value = false
     errorMessage.value = ''
 
-    // 获取用户信息
-    const userInfo = getUserInfo()
-    if (!userInfo) {
+    const auth = userStore.getAuthParams()
+    if (!auth) {
       showToast('请先登录')
       router.push({ name: 'login' })
       return
     }
 
-    // 构建查询参数
     const queryParams = new URLSearchParams({
       service: 'Lottery.Touzhurecord',
       lang: 'zh_cn',
-      uid: userInfo.user_id?.toString() || '',
+      uid: auth.uid.toString(),
       biaoshi: biaoshi.value,
       page: page.toString(),
     })

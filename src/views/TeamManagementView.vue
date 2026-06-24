@@ -1,8 +1,10 @@
 <script setup lang="ts">
 import { computed, ref, onMounted } from 'vue'
 import HeaderNav from '@/components/HeaderNav.vue'
-import { getUserInfo } from '@/api/fetch-api'
 import { NEW_API_BASE_URL } from '@/utils/config'
+import { useUserStore } from '@/stores/user'
+
+const userStore = useUserStore()
 
 // 统计数据
 const stats = ref([
@@ -38,13 +40,10 @@ const filteredTeamMembers = computed(() => {
 // 获取统计数据（Daili.index）
 const fetchStats = async () => {
   try {
-    const currentUserInfo = getUserInfo()
-    if (!currentUserInfo) return
+    const auth = userStore.getAuthParams()
+    if (!auth) return
 
-    const uid = currentUserInfo.user_id || currentUserInfo.id
-    const token = currentUserInfo.token
-
-    if (!uid || !token) return
+    const { uid, token } = auth
 
     const queryParams = new URLSearchParams()
     queryParams.append('service', 'Daili.index')
@@ -89,13 +88,10 @@ const fetchTeamMembers = async (page: number = 1) => {
 
   try {
     isLoading.value = true
-    const currentUserInfo = getUserInfo()
-    if (!currentUserInfo) return
+    const auth = userStore.getAuthParams()
+    if (!auth) return
 
-    const uid = currentUserInfo.user_id || currentUserInfo.id
-    const token = currentUserInfo.token
-
-    if (!uid || !token) return
+    const { uid, token } = auth
 
     const queryParams = new URLSearchParams()
     queryParams.append('service', 'Daili.agent')

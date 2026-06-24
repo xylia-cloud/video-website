@@ -25,7 +25,10 @@ export const useUserStore = defineStore('user', () => {
   const videoNums = computed(() => Number(profile.value?.video_nums ?? 0))
   const isVip = computed(() => profile.value?.is_vip ?? 0)
   const vipEndtime = computed(() => profile.value?.endtime ?? '')
-  const isGuest = computed(() => isGuestUser())
+  const isGuest = computed(() => {
+    void profile.value
+    return isGuestUser()
+  })
   const isLoggedIn = computed(() => checkLoggedIn() && profile.value?.token)
   const isVipUser = computed(() => checkVipActive(vipEndtime.value, isVip.value))
   const nickName = computed(
@@ -44,6 +47,13 @@ export const useUserStore = defineStore('user', () => {
     const result = await refreshUserPoints(options)
     hydrateFromStorage()
     return result
+  }
+
+  function getAuthParams(): { uid: number; token: string } | null {
+    const uid = profile.value?.user_id || profile.value?.id
+    const token = profile.value?.token
+    if (!uid || !token) return null
+    return { uid: Number(uid), token }
   }
 
   function logoutLocal() {
@@ -67,6 +77,7 @@ export const useUserStore = defineStore('user', () => {
     avatar,
     hydrateFromStorage,
     refreshPoints,
+    getAuthParams,
     logoutLocal,
   }
 })

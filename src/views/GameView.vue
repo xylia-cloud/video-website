@@ -3,13 +3,15 @@ import { ref, onMounted, computed } from 'vue'
 import { NEW_API_BASE_URL } from '@/utils/config'
 import { useUserStore } from '@/stores/user'
 import {
-  getUserInfo,
-  isLoggedIn,
   clearAllCache,
   checkApiAuthError,
 } from '@/api/fetch-api'
 import { useRouter, useRoute } from 'vue-router'
 import BottomTabbar from '@/components/BottomTabbar.vue'
+
+const router = useRouter()
+const route = useRoute()
+const userStore = useUserStore()
 
 // 顶级游戏分类接口
 interface TopGameCategory {
@@ -101,23 +103,9 @@ const GAME_HALL_COLLECT_FLAG = 'game_hall_collect_on_return'
 const collectHintText = ref('')
 
 // 用户信息计算属性
-const displayUserName = computed(() => {
-  const userInfo = getUserInfo()
-  if (!userInfo) return '未知用户'
-  
-  return userInfo.user_nick_name || 
-         userInfo.user_name || 
-         userInfo.user_login || 
-         userInfo.id || 
-         '未知用户'
-})
+const displayUserName = computed(() => userStore.nickName || '未知用户')
 
-const displayUserId = computed(() => {
-  const userInfo = getUserInfo()
-  if (!userInfo) return ''
-  
-  return userInfo.user_id || userInfo.id || ''
-})
+const displayUserId = computed(() => String(userStore.uid || ''))
 
 // 用户登录状态
 const isUserLoggedIn = ref(false)
@@ -524,10 +512,6 @@ const fetchGamesForSubCategory = async (
   }
 }
 
-const router = useRouter()
-const route = useRoute()
-const userStore = useUserStore()
-
 // 处理顶级分类点击
 const handleTopCategoryClick = (categoryId: string) => {
   console.log('点击顶级分类:', categoryId)
@@ -766,13 +750,11 @@ const goToWithdraw = () => {
 }
 
 const goToGameRecord = () => {
-  // 检查登录状态
-  if (!isLoggedIn()) {
+  if (!userStore.isLoggedIn) {
     showToast('请先登录')
     return
   }
 
-  // 跳转到游戏记录页面
   router.push('/game-record')
 }
 
@@ -805,8 +787,7 @@ const goToRegister = () => {
 
 // 获取用户余额和登录状态
 const loadGameBalance = async () => {
-  const userInfo = getUserInfo()
-  if (!userInfo?.token) {
+  if (!userStore.isLoggedIn) {
     isUserLoggedIn.value = false
     userBalance.value = 0
     gameBalance.value = 0
@@ -821,8 +802,8 @@ const loadGameBalance = async () => {
     gameBalance.value = coin
   } catch (error) {
     console.error('获取余额失败:', error)
-    userBalance.value = userInfo.coin || 0
-    gameBalance.value = userInfo.coin || 0
+    userBalance.value = userStore.coin
+    gameBalance.value = userStore.coin
   }
 }
 
@@ -835,11 +816,10 @@ const collectGameBalanceIfNeeded = async (options?: { force?: boolean; silent?: 
   // 默认策略：用户已登录且余额为0时，进入游戏大厅触发一次余额归集
   if (!force && Number(userBalance.value) !== 0) return
 
-  const userInfo = getUserInfo()
-  if (!userInfo || !userInfo.token) return
+  const auth = userStore.getAuthParams()
+  if (!auth) return
 
-  const uid = userInfo.user_id || userInfo.id
-  if (!uid) return
+  const { uid, token } = auth
 
   if (!force) {
     hasTriedBalanceCollect.value = true
@@ -852,7 +832,7 @@ const collectGameBalanceIfNeeded = async (options?: { force?: boolean; silent?: 
 
     const formData = new URLSearchParams({
       uid: String(uid),
-      token: String(userInfo.token),
+      token: String(token),
     })
 
     const response = await fetch(`${NEW_API_BASE_URL}/?${queryParams.toString()}`, {

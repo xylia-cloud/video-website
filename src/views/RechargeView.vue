@@ -6,9 +6,8 @@ import {
   fetchPayChannels,
   fetchChargeRules,
   createChargeOrder,
-  getUserInfo,
-  refreshUserPoints,
 } from '@/api/fetch-api'
+import { useUserStore } from '@/stores/user'
 import HeaderNav from '@/components/HeaderNav.vue'
 import BalanceInfoCard from '@/components/BalanceInfoCard.vue'
 import { openCustomerServiceModal } from '@/utils/customerService'
@@ -71,6 +70,7 @@ interface ChargeRulesDisplay {
 }
 
 const router = useRouter()
+const userStore = useUserStore()
 const route = useRoute()
 
 // 温馨提醒弹窗状态
@@ -871,15 +871,13 @@ const amountRangePlaceholder = computed(() => {
 
 // 获取用户钻石余额
 const loadUserBalance = () => {
-  const userInfo = getUserInfo()
+  const userInfo = userStore.profile
   if (userInfo && userInfo.coin !== undefined) {
     diamondBalance.value = userInfo.coin
   }
-  // 获取用户视频观看次数
   if (userInfo && userInfo.video_nums !== undefined) {
     userVideoNums.value = userInfo.video_nums
   }
-  // 获取用户VIP状态
   if (userInfo && userInfo.is_vip !== undefined) {
     isVip.value = userInfo.is_vip
   }
@@ -893,7 +891,7 @@ const refreshUserBalance = async () => {
 
   isRefreshingBalance.value = true
   try {
-    const result = await refreshUserPoints({ force: true })
+    const result = await userStore.refreshPoints({ force: true })
     if (result.code === 1 && result.data) {
       diamondBalance.value = parseFloat(String(result.data.coin || '0'))
       userVideoNums.value = result.data.video_nums || 0

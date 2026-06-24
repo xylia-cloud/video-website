@@ -2655,6 +2655,27 @@ export const fetchAccountDetails = async () => {
   }
 }
 
+/**
+ * 获取提现记录（从账目明细中筛选提现相关条目）
+ */
+export const fetchWithdrawRecords = async () => {
+  const result = await fetchAccountDetails()
+  if (result.code !== 1) {
+    return result
+  }
+
+  const list = (result.data || []).filter((item: AccountDetail) => {
+    const action = item.action || ''
+    return /提现|提款|取现/i.test(action)
+  })
+
+  return {
+    code: 1,
+    data: list,
+    msg: result.msg || '获取成功',
+  }
+}
+
 // 关注列表相关接口和类型
 export interface FollowItem {
   uid: string

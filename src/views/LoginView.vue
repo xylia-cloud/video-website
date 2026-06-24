@@ -2,13 +2,15 @@
 import { ref, computed, onMounted } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { Icon as VanIcon } from 'vant/es/icon'
-import { userLogin, isLoggedIn, touristLogin } from '@/api/fetch-api'
+import { userLogin, touristLogin } from '@/api/fetch-api'
+import { useUserStore } from '@/stores/user'
 import { getDeviceIMEI } from '@/utils/device'
 import { resolveInviteCode, captureInviteCode } from '@/utils/invite'
 import bgImage from '@/assets/img/img-live.jpg'
 
 const router = useRouter()
 const route = useRoute()
+const userStore = useUserStore()
 const username = ref('')
 const password = ref('')
 const showPassword = ref(false)
@@ -50,6 +52,7 @@ const handleLogin = async () => {
     })
 
     if (result && result.code === 1) {
+      userStore.hydrateFromStorage()
       console.log('登录成功，准备跳转到:', redirectUrl.value)
       showToast({
         message: '登录成功',
@@ -142,6 +145,7 @@ const handleGuestLogin = async () => {
     console.log('📥 游客登录API响应:', result)
 
     if (result.code === 1 && result.data) {
+      userStore.hydrateFromStorage()
       // 游客登录成功
       console.log('✅ 游客登录成功，用户信息已保存到本地')
 
@@ -181,7 +185,7 @@ const handleGuestLogin = async () => {
 // 检查是否已登录
 onMounted(() => {
   // 如果已经登录，直接跳转到重定向地址或首页
-  if (isLoggedIn()) {
+  if (userStore.isLoggedIn) {
     router.push(redirectUrl.value)
     return
   }

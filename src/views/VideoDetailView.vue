@@ -7,17 +7,15 @@ import {
   updateVideoHits,
   updateVideoDigg,
   updateUserLog,
-  getUserInfo,
-  isLoggedIn,
   setUserInfo,
   fetchAds,
   userLogin,
   registerUser,
   createAuthHeaders,
-  refreshUserPoints as syncUserPoints,
   checkApiAuthError,
 } from '@/api/fetch-api'
 import type { VideoDetail } from '@/api/fetch-api'
+import { useUserStore } from '@/stores/user'
 import { BASE_URL } from '@/utils/config'
 import { resolveInviteCode, captureInviteCode } from '@/utils/invite'
 import { performTouristLogin } from '@/composables/useTouristLogin'
@@ -56,6 +54,7 @@ interface ListAd {
 
 const route = useRoute()
 const router = useRouter()
+const userStore = useUserStore()
 const inviteCode = computed(() => resolveInviteCode(route))
 const videoId = ref(route.params.id as string)
 const isLoading = ref(true)
@@ -498,7 +497,8 @@ const applyPointsDataToView = (data: {
   is_vip?: number | string
   endtime?: string | number
 }) => {
-  const localUserInfo = getUserInfo()
+  userStore.hydrateFromStorage()
+  const localUserInfo = userStore.profile
   if (localUserInfo) {
     userInfo.value = localUserInfo
   }
@@ -526,7 +526,7 @@ const refreshUserPoints = async () => {
       icon: 'loading',
     })
 
-    const pointsResult = await syncUserPoints({ force: true, loading: true })
+    const pointsResult = await userStore.refreshPoints({ force: true, loading: true })
     closeToast()
 
     if (pointsResult.code === 1 && pointsResult.data) {
@@ -577,7 +577,7 @@ const handleRefreshBalance = async () => {
   try {
     console.log('🔄 手动刷新余额和观看次数...')
 
-    const pointsResult = await syncUserPoints({ force: true, loading: true })
+    const pointsResult = await userStore.refreshPoints({ force: true, loading: true })
 
     if (pointsResult.code === 1 && pointsResult.data) {
       applyPointsDataToView(pointsResult.data)
@@ -653,9 +653,8 @@ const confirmCharge = async () => {
     const buyUrl = `${BASE_URL}/index.php/ajax/buy.html`
     console.log('🔍 充值接口请求URL:', buyUrl)
 
-    // 获取用户信息
-    const userInfo = getUserInfo()
-    if (!userInfo) {
+    const auth = userStore.getAuthParams()
+    if (!auth) {
       closeToast()
       showToast({
         message: '用户信息不存在，请刷新页面重试',
@@ -667,19 +666,7 @@ const confirmCharge = async () => {
       return
     }
 
-    // 兼容游客用户和正式用户的数据结构
-    const uid = userInfo.user_id || userInfo.id
-    if (!uid) {
-      closeToast()
-      showToast({
-        message: '用户ID不存在，请重新登录',
-        position: 'top',
-        duration: 3000,
-        className: 'custom-toast-error',
-        icon: 'cross',
-      })
-      return
-    }
+    const uid = auth.uid
 
     // 获取包含认证信息的请求头（token和reqTime会在请求头中）
     const authHeaders = createAuthHeaders(true) as any
@@ -1141,7 +1128,7 @@ const handleVideoEnded = () => {
 // 获取用户实时信息
 const getUserRealTimeInfo = async () => {
   // 获取用户信息（游客用户也可以获取）
-  const currentUserInfo = getUserInfo()
+  const currentUserInfo = userStore.profile
   if (!currentUserInfo) {
     console.log('没有用户信息，无法获取实时信息')
     return null
@@ -1156,23 +1143,23 @@ const getUserRealTimeInfo = async () => {
   isLoadingUserInfo.value = true
 
   try {
-    const result = await syncUserPoints({ force: true })
-    console.log('获取用户实时信息结果:', result)
+    const pointsResult = await userStore.refreshPoints({ force: true })
+    console.log('获取用户实时信息结果:', pointsResult)
 
-    if (result && result.code === 1 && result.data) {
-      applyPointsDataToView(result.data)
+    if (pointsResult && pointsResult.code === 1 && pointsResult.data) {
+      applyPointsDataToView(pointsResult.data)
 
       console.log(
         '✅ 更新用户实时信息成功 - 积分:',
-        result.data.points,
+        pointsResult.data.points,
         '观看次数:',
-        result.data.video_nums,
+        pointsResult.data.video_nums,
       )
-      return result.data
+      return pointsResult.data
     } else {
-      console.error('获取用户实时信息失败:', result)
+      console.error('获取用户实时信息失败:', pointsResult)
       // 如果API失败，使用本地用户信息
-      const localUserInfo = getUserInfo()
+      const localUserInfo = userStore.profile
       if (localUserInfo) {
         userInfo.value = localUserInfo
         return localUserInfo
@@ -1182,7 +1169,7 @@ const getUserRealTimeInfo = async () => {
   } catch (error) {
     console.error('获取用户实时信息请求失败:', error)
     // 出错时使用本地用户信息
-    const localUserInfo = getUserInfo()
+    const localUserInfo = userStore.profile
     if (localUserInfo) {
       userInfo.value = localUserInfo
       return localUserInfo
@@ -1896,7 +1883,7 @@ const refreshRecommends = () => {
 // 分享方法
 const shareVideo = () => {
   // 检查登录状态
-  if (!isLoggedIn()) {
+  if (!userStore.isLoggedIn) {
     showDialog({
       title: '提示',
       message: '分享功能需要登录，是否前往登录？',
@@ -2190,7 +2177,7 @@ const fetchUserInfo = async () => {
   })
 
   // 首先从本地获取用户信息
-  const info = getUserInfo()
+  const info = userStore.profile
   if (info) {
     userInfo.value = info
     console.log('视频详情页获取本地用户信息:', info)
@@ -2218,7 +2205,7 @@ const fetchLatestPointsInfo = async () => {
       forbidClick: true,
     })
 
-    const pointsResult = await syncUserPoints({ loading: true })
+    const pointsResult = await userStore.refreshPoints({ loading: true })
     if (pointsResult.code === 1 && pointsResult.data) {
       applyPointsDataToView(pointsResult.data)
       console.log('✅ 视频详情页积分信息获取成功:', pointsResult.data)
@@ -2676,10 +2663,10 @@ const handleAdClick = (ad: ListAd) => {
         <!-- 观看限制提示 -->
         <div class="watch-limit-box">
           <div class="watch-info-wrapper">
-            <div class="watch-text" v-if="isLoggedIn()">{{ vipStatusDisplay }}</div>
+            <div class="watch-text" v-if="userStore.isLoggedIn">{{ vipStatusDisplay }}</div>
             <div class="watch-text" v-else>登录后查看积分</div>
             <button
-              v-if="isLoggedIn()"
+              v-if="userStore.isLoggedIn"
               class="balance-refresh-btn"
               @click="handleRefreshBalance"
               :disabled="isRefreshing"
@@ -2688,7 +2675,7 @@ const handleAdClick = (ad: ListAd) => {
               <span v-else>刷新</span>
             </button>
           </div>
-          <div class="share-btn" @click="shareVideo" v-if="isLoggedIn()">分享免费观看2部</div>
+          <div class="share-btn" @click="shareVideo" v-if="userStore.isLoggedIn">分享免费观看2部</div>
           <div class="share-btn" @click="goToLogin" v-else>登录</div>
         </div>
 

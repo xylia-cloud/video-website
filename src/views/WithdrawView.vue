@@ -10,11 +10,11 @@ import {
   addUserAccount,
   deleteUserAccount,
   submitWithdraw,
-  getUserInfo,
-  refreshUserPoints,
 } from '@/api/fetch-api'
+import { useUserStore } from '@/stores/user'
 
 const router = useRouter()
+const userStore = useUserStore()
 
 // 数据接口定义
 interface WithdrawType {
@@ -291,7 +291,7 @@ const handleWithdraw = async () => {
 // 刷新用户余额
 const refreshUserBalance = async () => {
   try {
-    await refreshUserPoints({ force: true })
+    await userStore.refreshPoints({ force: true })
   } catch (error) {
     console.error('刷新余额失败:', error)
   }
@@ -315,8 +315,7 @@ const getAccountDisplayInfo = (account: UserAccount) => {
 
 // 检查登录状态
 const checkLoginStatus = () => {
-  const userInfo = getUserInfo()
-  if (!userInfo || !userInfo.token) {
+  if (!userStore.isLoggedIn) {
     showDialog({
       title: '未登录',
       message: '请先登录后再进行提现操作',

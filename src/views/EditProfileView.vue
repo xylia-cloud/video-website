@@ -276,10 +276,12 @@
 <script setup lang="ts">
 import { ref, onMounted, onBeforeUnmount, onActivated, onDeactivated, computed } from 'vue'
 import { useRouter } from 'vue-router'
-import { updateUserInfo, getUserInfo, isLoggedIn, updateUserPortrait, userLogout, setUserInfo, isGuestUser } from '@/api/fetch-api'
+import { updateUserInfo, updateUserPortrait, userLogout, setUserInfo } from '@/api/fetch-api'
+import { useUserStore } from '@/stores/user'
 import { BASE_URL } from '@/utils/config'
 
 const router = useRouter()
+const userStore = useUserStore()
 const nickname = ref('')
 const avatarUrl = ref('')
 const fileInput = ref<HTMLInputElement | null>(null)
@@ -310,22 +312,21 @@ const tempMonth = ref(new Date().getMonth() + 1)
 const tempDay = ref(new Date().getDate())
 
 // 计算属性：是否为游客
-const isGuest = computed(() => isGuestUser())
+const isGuest = computed(() => userStore.isGuest)
 
 const markUserAsRegistered = () => {
-  const currentUserInfo = getUserInfo()
+  const currentUserInfo = userStore.profile
   if (currentUserInfo) {
     setUserInfo(currentUserInfo, { isGuest: false })
+    userStore.hydrateFromStorage()
     console.log('✅ 用户状态已更新为非游客')
   }
 }
 
-// 计算属性：显示的用户名（用于密码弹窗）
 const displayUsername = computed(() => {
-  const userInfo = getUserInfo()
+  const userInfo = userStore.profile
   if (!userInfo) return '未设置'
-  
-  // 优先显示 user_name，其次 user_id，最后 user_nick_name
+
   return String(userInfo.user_name || userInfo.user_id || userInfo.user_nick_name || '未设置')
 })
 
@@ -949,19 +950,17 @@ const changePassword = async () => {
 const loadUserInfo = () => {
   console.log('🔄 开始加载用户信息...')
 
-  // 从localStorage获取用户资料（支持游客和正式用户）
-  const userInfo = getUserInfo()
-  const isGuestUser = localStorage.getItem('isGuest') === 'true'
+  userStore.hydrateFromStorage()
+  const userInfo = userStore.profile
 
   console.log('📋 编辑资料页面 - 用户信息:', {
     hasUserInfo: !!userInfo,
-    isGuest: isGuestUser,
-    isLoggedIn: isLoggedIn(),
+    isGuest: userStore.isGuest,
+    isLoggedIn: userStore.isLoggedIn,
     userInfo: userInfo,
   })
 
-  // 如果既没有用户信息也没有登录，则跳转到登录页
-  if (!userInfo && !isLoggedIn()) {
+  if (!userInfo && !userStore.isLoggedIn) {
     showToast({
       message: '请先登录',
       duration: 2000,
@@ -971,10 +970,9 @@ const loadUserInfo = () => {
   }
 
   if (userInfo) {
-    console.log('👤 加载用户信息 - 类型:', isGuestUser ? '游客' : '正式用户')
+    console.log('👤 加载用户信息 - 类型:', userStore.isGuest ? '游客' : '正式用户')
 
-    // 根据用户类型处理信息
-    if (isGuestUser) {
+    if (userStore.isGuest) {
       // 游客：设置空值（账号输入框为空，允许用户输入）
       userId.value = ''
       nickname.value = ''
@@ -1016,7 +1014,7 @@ const loadUserInfo = () => {
     }
 
     console.log('✅ 用户信息加载完成:', {
-      userType: isGuestUser ? '游客' : '正式用户',
+      userType: userStore.isGuest ? '游客' : '正式用户',
       userId: userId.value,
       nickname: nickname.value,
       sex: sex.value,
@@ -1028,7 +1026,7 @@ const loadUserInfo = () => {
     avatarUrl.value = '/src/assets/img/icon-avatar-default.svg'
   }
 
-  console.log('✅ 页面加载完成，用户类型:', isGuestUser ? '游客' : '正式用户')
+  console.log('✅ 页面加载完成，用户类型:', userStore.isGuest ? '游客' : '正式用户')
 }
 
 // 处理头像加载错误

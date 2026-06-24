@@ -1,4 +1,4 @@
-import { getUserInfo, isLoggedIn, touristLogin } from '@/api/fetch-api'
+import { touristLogin } from '@/api/fetch-api'
 import { useUserStore } from '@/stores/user'
 import { getDeviceIMEI } from '@/utils/device'
 import { resolveInviteCode } from '@/utils/invite'
@@ -15,7 +15,8 @@ export async function performTouristLogin({
   onSuccess,
   showFailureToast = true,
 }: TouristLoginOptions): Promise<void> {
-  if (getUserInfo() || isLoggedIn()) {
+  const userStore = useUserStore()
+  if (userStore.isLoggedIn || userStore.profile) {
     return
   }
 
