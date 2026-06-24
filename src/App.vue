@@ -1,14 +1,93 @@
 <script setup lang="ts">
 import { RouterView } from 'vue-router'
-import { onMounted } from 'vue'
+import { defineAsyncComponent, nextTick, onBeforeUnmount, onMounted, ref } from 'vue'
 import { isLoggedIn, isTokenExpired, syncTokenExpiryWatcher } from '@/api/fetch-api'
 import TopLoading from '@/components/TopLoading.vue'
 import CustomerServiceButton from '@/components/CustomerServiceButton.vue'
-import GlobalAuthModal from '@/components/GlobalAuthModal.vue'
-import GlobalCustomerServiceModal from '@/components/GlobalCustomerServiceModal.vue'
+import {
+  CUSTOMER_SERVICE_MODAL_EVENT,
+  type CustomerServiceModalDetail,
+} from '@/utils/customerService'
+
+const GlobalAuthModal = defineAsyncComponent(() => import('@/components/GlobalAuthModal.vue'))
+const GlobalCustomerServiceModal = defineAsyncComponent(
+  () => import('@/components/GlobalCustomerServiceModal.vue'),
+)
+
+type AuthTab = 'login' | 'register'
+
+interface AuthModalDetail {
+  tab?: AuthTab
+  message?: string
+}
+
+const mountAuthModal = ref(false)
+const mountCustomerServiceModal = ref(false)
+const authModalReady = ref(false)
+const customerServiceModalReady = ref(false)
+
+let pendingAuthDetail: AuthModalDetail | undefined
+let pendingCustomerServiceDetail: CustomerServiceModalDetail | undefined
+
+const dispatchAuthModalOpen = (detail?: AuthModalDetail) => {
+  window.dispatchEvent(
+    new CustomEvent<AuthModalDetail>('open-global-auth-modal', { detail }),
+  )
+}
+
+const dispatchCustomerServiceOpen = (detail?: CustomerServiceModalDetail) => {
+  window.dispatchEvent(
+    new CustomEvent<CustomerServiceModalDetail>(CUSTOMER_SERVICE_MODAL_EVENT, {
+      detail: detail ?? {},
+    }),
+  )
+}
+
+const handleAuthModalOpen = (event: Event) => {
+  if (authModalReady.value) {
+    return
+  }
+
+  const customEvent = event as CustomEvent<AuthModalDetail>
+  pendingAuthDetail = customEvent.detail
+  mountAuthModal.value = true
+}
+
+const handleCustomerServiceOpen = (event: Event) => {
+  if (customerServiceModalReady.value) {
+    return
+  }
+
+  const customEvent = event as CustomEvent<CustomerServiceModalDetail>
+  pendingCustomerServiceDetail = customEvent.detail
+  mountCustomerServiceModal.value = true
+}
+
+const onAuthModalMounted = async () => {
+  await nextTick()
+  authModalReady.value = true
+
+  if (pendingAuthDetail !== undefined) {
+    dispatchAuthModalOpen(pendingAuthDetail)
+    pendingAuthDetail = undefined
+  }
+}
+
+const onCustomerServiceModalMounted = async () => {
+  await nextTick()
+  customerServiceModalReady.value = true
+
+  if (pendingCustomerServiceDetail !== undefined) {
+    dispatchCustomerServiceOpen(pendingCustomerServiceDetail)
+    pendingCustomerServiceDetail = undefined
+  }
+}
 
 // 应用启动时同步登录过期监听
 onMounted(() => {
+  window.addEventListener('open-global-auth-modal', handleAuthModalOpen as EventListener)
+  window.addEventListener(CUSTOMER_SERVICE_MODAL_EVENT, handleCustomerServiceOpen as EventListener)
+
   console.log('应用启动，检查TOKEN状态...')
   syncTokenExpiryWatcher()
 
@@ -23,6 +102,11 @@ onMounted(() => {
     }
   }, 1000)
 })
+
+onBeforeUnmount(() => {
+  window.removeEventListener('open-global-auth-modal', handleAuthModalOpen as EventListener)
+  window.removeEventListener(CUSTOMER_SERVICE_MODAL_EVENT, handleCustomerServiceOpen as EventListener)
+})
 </script>
 
 <template>
@@ -36,8 +120,11 @@ onMounted(() => {
         />
       </KeepAlive>
     </RouterView>
-    <GlobalAuthModal />
-    <GlobalCustomerServiceModal />
+    <GlobalAuthModal v-if="mountAuthModal" @vue:mounted="onAuthModalMounted" />
+    <GlobalCustomerServiceModal
+      v-if="mountCustomerServiceModal"
+      @vue:mounted="onCustomerServiceModalMounted"
+    />
     <CustomerServiceButton />
   </div>
 </template>
