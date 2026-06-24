@@ -1,49 +1,6 @@
 import { createRouter, createWebHashHistory } from 'vue-router'
 import { captureInviteCode } from '@/utils/invite'
 import HomeView from '../views/HomeView.vue'
-import GameView from '../views/GameView.vue'
-import GameSecondaryView from '../views/GameSecondaryView.vue'
-import LotteryDetailView from '../views/LotteryDetailView.vue'
-import LotteryTouzhuRecordView from '../views/LotteryTouzhuRecordView.vue'
-import LotteryHistoryView from '../views/LotteryHistoryView.vue'
-import LiveView from '../views/LiveView.vue'
-import ProfileView from '../views/ProfileView.vue'
-import TagsView from '../views/TagsView.vue'
-import TagDetailsView from '../views/TagDetailsView.vue'
-import VideoDetailView from '../views/VideoDetailView.vue'
-import RechargeView from '../views/RechargeView.vue'
-import RechargeCallbackView from '../views/RechargeCallbackView.vue'
-import VipRechargeView from '../views/VipRechargeView.vue'
-import WithdrawView from '../views/WithdrawView.vue'
-import EditProfileView from '../views/EditProfileView.vue'
-import ShareFriendsView from '../views/ShareFriendsView.vue'
-import WalletView from '../views/WalletView.vue'
-import AccountDetailsView from '../views/AccountDetailsView.vue'
-import RechargeRecordView from '../views/RechargeRecordView.vue'
-import WithdrawRecordView from '../views/WithdrawRecordView.vue'
-import BankCardView from '../views/BankCardView.vue'
-import FootprintView from '../views/FootprintView.vue'
-import SettingsView from '../views/SettingsView.vue'
-import LoginView from '../views/LoginView.vue'
-import RegisterView from '../views/RegisterView.vue'
-import SearchView from '../views/SearchView.vue'
-import AboutUsView from '../views/AboutUsView.vue'
-import PrivacyPolicyView from '../views/PrivacyPolicyView.vue'
-import GameRecordView from '../views/GameRecordView.vue'
-import GamePlayView from '../views/GamePlayView.vue'
-import FollowListView from '../views/FollowListView.vue'
-import CollectionView from '../views/CollectionView.vue'
-import WatchHistoryView from '../views/WatchHistoryView.vue'
-import PromotionRecordView from '../views/PromotionRecordView.vue'
-import MyAgentView from '../views/MyAgentView.vue'
-import TeamManagementView from '../views/TeamManagementView.vue'
-import AgentReportView from '../views/AgentReportView.vue'
-import CustomerServiceView from '../views/CustomerServiceView.vue'
-import AgentRecruitmentView from '../views/AgentRecruitmentView.vue'
-import BonusDescriptionView from '../views/BonusDescriptionView.vue'
-import CreativeLibraryView from '../views/CreativeLibraryView.vue'
-import TutorialDetailView from '../views/TutorialDetailView.vue'
-import PaymentView from '../views/PaymentView.vue'
 
 const router = createRouter({
   history: createWebHashHistory(import.meta.env.BASE_URL),
@@ -51,12 +8,12 @@ const router = createRouter({
     {
       path: '/login',
       name: 'login',
-      component: LoginView,
+      component: () => import('../views/LoginView.vue'),
     },
     {
       path: '/register',
       name: 'register',
-      component: RegisterView,
+      component: () => import('../views/RegisterView.vue'),
       props: (route) => {
         console.log('注册路由Props:', route.query)
 
@@ -81,69 +38,69 @@ const router = createRouter({
     {
       path: '/search',
       name: 'search',
-      component: SearchView,
+      component: () => import('../views/SearchView.vue'),
     },
     {
       path: '/game',
       name: 'game',
-      component: GameView,
+      component: () => import('../views/GameView.vue'),
     },
     {
       path: '/game/:topCategoryId/:primaryCategoryId',
       name: 'game-secondary',
-      component: GameSecondaryView,
+      component: () => import('../views/GameSecondaryView.vue'),
       props: true,
     },
     {
       path: '/game-play',
       name: 'game-play',
-      component: GamePlayView,
+      component: () => import('../views/GamePlayView.vue'),
     },
     {
       path: '/lottery/:primaryCategoryId',
       name: 'lottery-detail',
-      component: LotteryDetailView,
+      component: () => import('../views/LotteryDetailView.vue'),
       props: true,
     },
     {
       path: '/lottery-touzhu-record',
       name: 'lotteryTouzhuRecord',
-      component: LotteryTouzhuRecordView,
+      component: () => import('../views/LotteryTouzhuRecordView.vue'),
     },
     {
       path: '/lottery-history',
       name: 'lotteryHistory',
-      component: LotteryHistoryView,
+      component: () => import('../views/LotteryHistoryView.vue'),
     },
     {
       path: '/game-record',
       name: 'gameRecord',
-      component: GameRecordView,
+      component: () => import('../views/GameRecordView.vue'),
     },
     {
       path: '/live',
       name: 'live',
-      component: LiveView,
+      component: () => import('../views/LiveView.vue'),
     },
     {
       path: '/profile',
       name: 'profile',
-      component: ProfileView,
+      component: () => import('../views/ProfileView.vue'),
     },
     {
       path: '/tags',
       name: 'tags',
-      component: TagsView,
+      component: () => import('../views/TagsView.vue'),
     },
     {
       path: '/tag/:id',
       name: 'tagDetails',
-      component: TagDetailsView,
+      component: () => import('../views/TagDetailsView.vue'),
     },
     {
       path: '/video/:id',
       name: 'videoDetail',
-      component: VideoDetailView,
+      component: () => import('../views/VideoDetailView.vue'),
       props: (route) => ({
         ...route.params,
         invite: route.query.invite,
@@ -152,32 +109,32 @@ const router = createRouter({
     {
       path: '/recharge',
       name: 'recharge',
-      component: RechargeView,
+      component: () => import('../views/RechargeView.vue'),
     },
     {
       path: '/recharge-callback',
       name: 'rechargeCallback',
-      component: RechargeCallbackView,
+      component: () => import('../views/RechargeCallbackView.vue'),
     },
     {
       path: '/payment',
       name: 'payment',
-      component: PaymentView,
+      component: () => import('../views/PaymentView.vue'),
     },
     {
       path: '/customer-service',
       name: 'customerService',
-      component: CustomerServiceView,
+      component: () => import('../views/CustomerServiceView.vue'),
     },
     {
       path: '/vip-recharge',
       name: 'vipRecharge',
-      component: VipRechargeView,
+      component: () => import('../views/VipRechargeView.vue'),
     },
     {
       path: '/withdraw',
       name: 'withdraw',
-      component: WithdrawView,
+      component: () => import('../views/WithdrawView.vue'),
     },
     {
       path: '/points-record',
@@ -192,77 +149,77 @@ const router = createRouter({
     {
       path: '/edit-profile',
       name: 'editProfile',
-      component: EditProfileView,
+      component: () => import('../views/EditProfileView.vue'),
     },
     {
       path: '/share-friends',
       name: 'shareFriends',
-      component: ShareFriendsView,
+      component: () => import('../views/ShareFriendsView.vue'),
     },
     {
       path: '/wallet',
       name: 'wallet',
-      component: WalletView,
+      component: () => import('../views/WalletView.vue'),
     },
     {
       path: '/recharge-record',
       name: 'rechargeRecord',
-      component: RechargeRecordView,
+      component: () => import('../views/RechargeRecordView.vue'),
     },
     {
       path: '/withdraw-record',
       name: 'withdrawRecord',
-      component: WithdrawRecordView,
+      component: () => import('../views/WithdrawRecordView.vue'),
     },
     {
       path: '/bank-card',
       name: 'bankCard',
-      component: BankCardView,
+      component: () => import('../views/BankCardView.vue'),
     },
     {
       path: '/footprint',
       name: 'footprint',
-      component: FootprintView,
+      component: () => import('../views/FootprintView.vue'),
     },
     {
       path: '/settings',
       name: 'settings',
-      component: SettingsView,
+      component: () => import('../views/SettingsView.vue'),
     },
     {
       path: '/about-us',
       name: 'aboutUs',
-      component: AboutUsView,
+      component: () => import('../views/AboutUsView.vue'),
     },
     {
       path: '/privacy-policy',
       name: 'privacyPolicy',
-      component: PrivacyPolicyView,
+      component: () => import('../views/PrivacyPolicyView.vue'),
     },
     {
       path: '/follow-list',
       name: 'followList',
-      component: FollowListView,
+      component: () => import('../views/FollowListView.vue'),
     },
     {
       path: '/collection',
       name: 'collection',
-      component: CollectionView,
+      component: () => import('../views/CollectionView.vue'),
     },
     {
       path: '/watch-history',
       name: 'watchHistory',
-      component: WatchHistoryView,
+      component: () => import('../views/WatchHistoryView.vue'),
     },
     {
       path: '/account-details',
       name: 'accountDetails',
-      component: AccountDetailsView,
+      component: () => import('../views/AccountDetailsView.vue'),
     },
     {
       path: '/promotion-record',
       name: 'promotionRecord',
-      component: PromotionRecordView,
+      component: () => import('../views/PromotionRecordView.vue'),
     },
     {
       path: '/activity/:id',
@@ -272,37 +229,37 @@ const router = createRouter({
     {
       path: '/my-agent',
       name: 'myAgent',
-      component: MyAgentView,
+      component: () => import('../views/MyAgentView.vue'),
     },
     {
       path: '/team-management',
       name: 'teamManagement',
-      component: TeamManagementView,
+      component: () => import('../views/TeamManagementView.vue'),
     },
     {
       path: '/agent-report',
       name: 'agentReport',
-      component: AgentReportView,
+      component: () => import('../views/AgentReportView.vue'),
     },
     {
       path: '/agent-recruitment',
       name: 'agentRecruitment',
-      component: AgentRecruitmentView,
+      component: () => import('../views/AgentRecruitmentView.vue'),
     },
     {
       path: '/bonus-description',
       name: 'bonusDescription',
-      component: BonusDescriptionView,
+      component: () => import('../views/BonusDescriptionView.vue'),
     },
     {
       path: '/creative-library',
       name: 'creativeLibrary',
-      component: CreativeLibraryView,
+      component: () => import('../views/CreativeLibraryView.vue'),
     },
     {
       path: '/tutorial-detail/:id',
       name: 'tutorialDetail',
-      component: TutorialDetailView,
+      component: () => import('../views/TutorialDetailView.vue'),
     },
   ],
 })
