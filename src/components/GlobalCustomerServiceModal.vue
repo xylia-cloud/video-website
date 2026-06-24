@@ -29,7 +29,6 @@
 
 <script setup lang="ts">
 import { onBeforeUnmount, onMounted, ref, watch } from 'vue'
-import { showToast } from 'vant'
 import { generateCustomerServiceUrl } from '@/utils/rsa'
 import {
   CUSTOMER_SERVICE_MODAL_EVENT,

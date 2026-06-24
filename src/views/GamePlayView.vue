@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref, onMounted, onUnmounted, nextTick } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { Icon, showDialog, showToast } from 'vant'
+import { Icon } from 'vant/es/icon'
 
 const route = useRoute()
 const router = useRouter()

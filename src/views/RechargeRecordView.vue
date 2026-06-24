@@ -1,6 +1,9 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue';
-import { Icon, Loading, Tabs, Tab, showToast } from 'vant';
+import { Icon } from 'vant/es/icon'
+import { Loading } from 'vant/es/loading'
+import { Tabs } from 'vant/es/tabs'
+import { Tab } from 'vant/es/tab'
 import { useRouter } from 'vue-router';
 import { fetchVideoChargeLog, fetchGameChargeLog } from '@/api/fetch-api';
 

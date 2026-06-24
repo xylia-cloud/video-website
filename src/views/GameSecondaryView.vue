@@ -2,7 +2,6 @@
 import { ref, onMounted, onUnmounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { NEW_API_BASE_URL } from '@/utils/config'
-import { showToast, closeToast } from 'vant'
 import HeaderNav from '@/components/HeaderNav.vue'
 import { getUserInfo } from '@/api/fetch-api'
 

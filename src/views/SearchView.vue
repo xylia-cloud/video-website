@@ -6,7 +6,8 @@ import { fetchSearchVideos } from '@/api/fetch-api';
 import { DEFAULT_PAGE_SIZE, BASE_URL } from '@/utils/config';
 import { parseVideoListResponse } from '@/utils/videoList';
 // 导入Vant组件
-import { Icon, Loading } from 'vant';
+import { Icon } from 'vant/es/icon'
+import { Loading } from 'vant/es/loading'
 
 // 定义视频数据接口
 interface VideoItem {

@@ -1,4 +1,3 @@
-import { showToast } from 'vant'
 import { getUserInfo, isLoggedIn, touristLogin } from '@/api/fetch-api'
 import { getDeviceIMEI } from '@/utils/device'
 import { resolveInviteCode } from '@/utils/invite'

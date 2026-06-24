@@ -111,7 +111,6 @@
 <script setup lang="ts">
 import { ref, computed } from 'vue'
 import { useRouter } from 'vue-router'
-import { showToast, showImagePreview } from 'vant'
 
 const router = useRouter()
 const activeTab = ref('video') // 默认选中视频素材

@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
-import { Icon as VanIcon, showToast, showLoadingToast, closeToast, showDialog } from 'vant'
+import { Icon as VanIcon } from 'vant/es/icon'
 import { userLogin, isLoggedIn, touristLogin } from '@/api/fetch-api'
 import { getDeviceIMEI } from '@/utils/device'
 import { resolveInviteCode, captureInviteCode } from '@/utils/invite'

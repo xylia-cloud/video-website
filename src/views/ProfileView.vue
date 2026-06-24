@@ -1,7 +1,6 @@
 <script setup lang="ts">
 // 个人中心页面逻辑
 import { ref, onMounted, computed, watch } from 'vue'
-import { showToast } from 'vant'
 import { useRouter } from 'vue-router'
 import {
   userLogout,

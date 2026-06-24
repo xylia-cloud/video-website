@@ -1,6 +1,11 @@
 <script setup lang="ts">
 import { ref } from 'vue';
-import { Icon, Popup, Form, Field, CellGroup, Button, showToast } from 'vant';
+import { Icon } from 'vant/es/icon'
+import { Popup } from 'vant/es/popup'
+import { Form } from 'vant/es/form'
+import { Field } from 'vant/es/field'
+import { CellGroup } from 'vant/es/cell-group'
+import { Button } from 'vant/es/button'
 import { useRouter } from 'vue-router';
 
 const router = useRouter();

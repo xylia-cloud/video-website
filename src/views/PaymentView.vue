@@ -34,7 +34,6 @@
 <script setup lang="ts">
 import { ref, onMounted, onBeforeUnmount } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { showDialog, showToast } from 'vant'
 import { fetchUserPoints, getUserInfo, setUserInfo } from '@/api/fetch-api'
 
 const route = useRoute()

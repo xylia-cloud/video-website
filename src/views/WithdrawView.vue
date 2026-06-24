@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { useRouter } from 'vue-router'
-import { Icon, showToast, showDialog, showLoadingToast, closeToast } from 'vant'
+import { Icon } from 'vant/es/icon'
 import HeaderNav from '@/components/HeaderNav.vue'
 import {
   fetchWithdrawTypes,

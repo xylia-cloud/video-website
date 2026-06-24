@@ -22,7 +22,8 @@ import { BASE_URL } from '@/utils/config'
 import { resolveInviteCode, captureInviteCode } from '@/utils/invite'
 import { performTouristLogin } from '@/composables/useTouristLogin'
 // 导入Vant组件
-import { Icon, Loading, showToast, showDialog, closeToast } from 'vant'
+import { Icon } from 'vant/es/icon'
+import { Loading } from 'vant/es/loading'
 import type Hls from 'hls.js'
 // 导入视频列表组件
 import VideoList from '@/components/VideoList.vue'

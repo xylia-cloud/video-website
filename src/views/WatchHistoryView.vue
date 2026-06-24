@@ -3,7 +3,7 @@ import { ref, onMounted } from 'vue';
 import { useRouter } from 'vue-router';
 import { fetchUserLogList, checkApiAuthError } from '@/api/fetch-api';
 import { BASE_URL } from '@/utils/config';
-import { Icon as VanIcon, showToast, showLoadingToast, closeToast } from 'vant';
+import { Icon as VanIcon } from 'vant/es/icon'
 import HeaderNav from '@/components/HeaderNav.vue';
 
 const router = useRouter();

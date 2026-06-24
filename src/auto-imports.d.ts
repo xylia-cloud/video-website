@@ -6,5 +6,39 @@
 // biome-ignore lint: disable
 export {}
 declare global {
-
+  const API_PREFIX: typeof import('./utils/config').API_PREFIX
+  const APP_CONFIG: typeof import('./utils/config').APP_CONFIG
+  const BASE_URL: typeof import('./utils/config').BASE_URL
+  const CUSTOMER_SERVICE_MODAL_EVENT: typeof import('./utils/customerService').CUSTOMER_SERVICE_MODAL_EVENT
+  const DEFAULT_PAGE_SIZE: typeof import('./utils/config').DEFAULT_PAGE_SIZE
+  const LIST_AD_POSITIONS: typeof import('./utils/videoList').LIST_AD_POSITIONS
+  const NEW_API_BASE_URL: typeof import('./utils/config').NEW_API_BASE_URL
+  const VIDEO_CATEGORIES: typeof import('./utils/config').VIDEO_CATEGORIES
+  const applyFirstPageListAds: typeof import('./utils/videoList').applyFirstPageListAds
+  const captureInviteCode: typeof import('./utils/invite').captureInviteCode
+  const closeToast: typeof import('vant/es').closeToast
+  const generateCustomerServiceUrl: typeof import('./utils/rsa').generateCustomerServiceUrl
+  const generateIMEI: typeof import('./utils/device').generateIMEI
+  const getCurrentUserId: typeof import('./utils/rsa').getCurrentUserId
+  const getDeviceIMEI: typeof import('./utils/device').getDeviceIMEI
+  const getInviteFromRoute: typeof import('./utils/invite').getInviteFromRoute
+  const getLoadingCount: typeof import('./utils/topLoading').getLoadingCount
+  const getStoredInviteCode: typeof import('./utils/invite').getStoredInviteCode
+  const hideTopLoading: typeof import('./utils/topLoading').hideTopLoading
+  const insertListAds: typeof import('./utils/videoList').insertListAds
+  const isCustomerServiceModalOpen: typeof import('./utils/customerService').isCustomerServiceModalOpen
+  const openCustomerServiceModal: typeof import('./utils/customerService').openCustomerServiceModal
+  const parseInviteFromUrl: typeof import('./utils/invite').parseInviteFromUrl
+  const parseVideoListResponse: typeof import('./utils/videoList').parseVideoListResponse
+  const performTouristLogin: typeof import('./composables/useTouristLogin').performTouristLogin
+  const persistInviteCode: typeof import('./utils/invite').persistInviteCode
+  const resetTopLoading: typeof import('./utils/topLoading').resetTopLoading
+  const resolveInviteCode: typeof import('./utils/invite').resolveInviteCode
+  const showDialog: typeof import('vant/es').showDialog
+  const showImagePreview: typeof import('vant/es').showImagePreview
+  const showLoadingToast: typeof import('vant/es').showLoadingToast
+  const showToast: typeof import('vant/es').showToast
+  const showTopLoading: typeof import('./utils/topLoading').showTopLoading
+  const trimVideosForAdSlots: typeof import('./utils/videoList').trimVideosForAdSlots
+  const validateIMEI: typeof import('./utils/device').validateIMEI
 }

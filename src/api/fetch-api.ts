@@ -7,7 +7,7 @@ import {
   NEW_API_BASE_URL,
 } from '@/utils/config'
 import { showTopLoading, hideTopLoading } from '@/utils/topLoading'
-import { showToast } from 'vant'
+import { showToast } from 'vant/es/toast'
 
 // 定义参数接口
 interface VideoParams {

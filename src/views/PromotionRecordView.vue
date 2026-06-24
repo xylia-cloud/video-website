@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ref, onMounted, onUnmounted } from 'vue'
-import { Icon, Loading } from 'vant'
+import { Icon } from 'vant/es/icon'
+import { Loading } from 'vant/es/loading'
 import { useRouter } from 'vue-router'
 import { fetchPromotionRecord } from '@/api/fetch-api'
 

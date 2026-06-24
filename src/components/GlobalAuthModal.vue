@@ -1,6 +1,5 @@
 <script setup lang="ts">
 import { onBeforeUnmount, onMounted, ref } from 'vue'
-import { closeToast, showToast } from 'vant'
 import { registerUser, userLogin } from '@/api/fetch-api'
 import { captureInviteCode, resolveInviteCode } from '@/utils/invite'
 

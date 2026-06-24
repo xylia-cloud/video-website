@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref } from 'vue';
 import { useRouter } from 'vue-router';
-import { Icon as VanIcon, showToast } from 'vant';
+import { Icon as VanIcon } from 'vant/es/icon'
 
 const router = useRouter();
 

@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { useRouter } from 'vue-router';
-import { Icon as VanIcon } from 'vant';
+import { Icon as VanIcon } from 'vant/es/icon'
 
 const router = useRouter();
 

@@ -276,7 +276,6 @@
 <script setup lang="ts">
 import { ref, onMounted, onBeforeUnmount, onActivated, onDeactivated, computed } from 'vue'
 import { useRouter } from 'vue-router'
-import { showToast, showLoadingToast, closeToast, showDialog } from 'vant'
 import { updateUserInfo, getUserInfo, isLoggedIn, updateUserPortrait, userLogout } from '@/api/fetch-api'
 import { BASE_URL } from '@/utils/config'
 

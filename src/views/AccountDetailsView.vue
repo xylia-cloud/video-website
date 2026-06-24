@@ -1,7 +1,6 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
-import { showToast } from 'vant'
 import HeaderNav from '@/components/HeaderNav.vue'
 import { fetchAccountDetails, type AccountDetail, getUserInfo, isLoggedIn } from '@/api/fetch-api'
 

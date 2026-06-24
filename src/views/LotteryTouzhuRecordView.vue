@@ -3,7 +3,6 @@ import { ref, onMounted, nextTick, onBeforeUnmount, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import HeaderNav from '@/components/HeaderNav.vue'
 import { getUserInfo } from '@/api/fetch-api'
-import { showToast } from 'vant'
 import { NEW_API_BASE_URL } from '@/utils/config'
 
 // 路由

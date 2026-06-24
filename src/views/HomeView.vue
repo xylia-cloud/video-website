@@ -26,7 +26,6 @@ import {
 } from '@/utils/videoList'
 import { performTouristLogin } from '@/composables/useTouristLogin'
 import { useRouter, useRoute } from 'vue-router'
-import { showToast } from 'vant'
 import { resolveInviteCode } from '@/utils/invite'
 
 // 使用路由

@@ -92,7 +92,6 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
-import { showToast } from 'vant'
 import { fetchGameRecord, type GameRecord } from '@/api/fetch-api'
 
 const router = useRouter()

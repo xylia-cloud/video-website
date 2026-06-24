@@ -1,7 +1,8 @@
 <script setup lang="ts">
 import { ref, onMounted, computed } from 'vue'
 import { useRouter } from 'vue-router'
-import { showToast, closeToast, Loading, Icon } from 'vant'
+import { Loading } from 'vant/es/loading'
+import { Icon } from 'vant/es/icon'
 import HeaderNav from '@/components/HeaderNav.vue'
 import BalanceInfoCard from '@/components/BalanceInfoCard.vue'
 import {

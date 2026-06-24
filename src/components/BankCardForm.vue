@@ -59,14 +59,12 @@
 
 <script setup lang="ts">
 import { ref, watch } from 'vue';
-import { 
-  Icon as VanIcon, 
-  Popup as VanPopup, 
-  Form as VanForm, 
-  Field as VanField, 
-  CellGroup as VanCellGroup,
-  Button as VanButton
-} from 'vant';
+import { Icon as VanIcon } from 'vant/es/icon'
+import { Popup as VanPopup } from 'vant/es/popup'
+import { Form as VanForm } from 'vant/es/form'
+import { Field as VanField } from 'vant/es/field'
+import { CellGroup as VanCellGroup } from 'vant/es/cell-group'
+import { Button as VanButton } from 'vant/es/button'
 
 interface BankCardFormData {
   name: string;

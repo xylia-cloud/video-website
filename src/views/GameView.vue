@@ -9,7 +9,6 @@ import {
   checkApiAuthError,
 } from '@/api/fetch-api'
 import { useRouter, useRoute } from 'vue-router'
-import { showToast } from 'vant'
 import BottomTabbar from '@/components/BottomTabbar.vue'
 
 // 顶级游戏分类接口

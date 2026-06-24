@@ -1,7 +1,6 @@
 <script setup lang="ts">
 import { ref, onMounted, computed } from 'vue'
 import { useRouter } from 'vue-router'
-import { showToast } from 'vant'
 import HeaderNav from '@/components/HeaderNav.vue'
 import { getUserInfo, isLoggedIn } from '@/api/fetch-api'
 import QRCode from 'qrcode'

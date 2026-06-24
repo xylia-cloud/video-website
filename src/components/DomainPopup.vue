@@ -60,7 +60,6 @@
 
 <script setup lang="ts">
 import { ref, watch } from 'vue'
-import { showToast } from 'vant'
 import bgGameImg from '@/assets/img/bg-game.png'
 import yjymTopImg from '@/assets/img/img-yjym.webp'
 

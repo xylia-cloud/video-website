@@ -52,7 +52,8 @@
 
 <script setup lang="ts">
 import { ref } from 'vue';
-import { Icon as VanIcon, Popup as VanPopup, showToast } from 'vant';
+import { Icon as VanIcon } from 'vant/es/icon'
+import { Popup as VanPopup } from 'vant/es/popup'
 import BankCardForm from './BankCardForm.vue';
 
 interface BankCard {

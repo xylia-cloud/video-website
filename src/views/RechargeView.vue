@@ -1,7 +1,6 @@
 <script setup lang="ts">
 // 充值页面逻辑
 import { ref, onMounted, computed, onActivated, onUnmounted } from 'vue'
-import { showToast, showDialog } from 'vant'
 import { useRouter, useRoute } from 'vue-router'
 import {
   fetchPayChannels,

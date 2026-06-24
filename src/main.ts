@@ -2,7 +2,7 @@ import './assets/main.css'
 
 import { createApp } from 'vue'
 import { createPinia } from 'pinia'
-import { Lazyload } from 'vant'
+import { Lazyload } from 'vant/es/lazyload'
 
 import App from './App.vue'
 import router from './router'
