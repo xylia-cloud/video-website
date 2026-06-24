@@ -1028,11 +1028,14 @@ onMounted(async () => {
     console.log('首页检测到邀请码:', invite)
   }
 
-  // 首先执行游客登录（如果需要的话）
-  await performTouristLogin({ route })
-
-  // 获取类型列表数据
-  await fetchTypesData()
+  // 并行冷启动：登录、分类、广告互不依赖，缩短首屏等待
+  await Promise.all([
+    performTouristLogin({ route }),
+    fetchTypesData(),
+    fetchBannerAds(),
+    fetchSingleAd(),
+    fetchListAds(),
+  ])
 
   // 只有在页面内导航时才恢复选项卡状态，关闭页面后重新打开应该重置为默认选项卡
   const isPageRefreshed = !sessionStorage.getItem('pageSessionActive')
@@ -1066,13 +1069,6 @@ onMounted(async () => {
   const firstTypeId = typesList.value.length > 0 ? typesList.value[0].type_id : 1
   const isFirstTab = activeTypeId.value === firstTypeId
 
-  // 先获取广告数据
-  await Promise.all([
-    fetchBannerAds(),
-    fetchSingleAd(),
-    fetchListAds(), // 根据当前标签类型获取对应广告
-  ])
-
   // 检查当前标签是否有有效的缓存数据
   const currentTabCache = tabStates.value[activeTypeId.value]
   if (shouldUseCache(currentTabCache)) {
@@ -1091,7 +1087,7 @@ onMounted(async () => {
     fetchRecommendVideosData(1, tidToUse)
   }
 
-  // 如果是首页标签，加载最新视频数据
+  // 如果是首页标签，与推荐列表并行加载最新视频
   if (isFirstTab) {
     fetchLatestVideosData()
   }
