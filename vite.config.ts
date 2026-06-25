@@ -46,6 +46,11 @@ export default defineConfig(({ mode }) => ({
     rollupOptions: {
       output: {
         manualChunks(id) {
+          if (id.includes('src/api/modules/')) {
+            const name = id.split('src/api/modules/')[1]?.split('.')[0]
+            if (name) return `api-${name}`
+          }
+          if (id.includes('src/api/core/auth-session')) return 'api-auth'
           if (!id.includes('node_modules')) return
 
           if (id.includes('vant')) return 'vant'

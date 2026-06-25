@@ -1,6 +1,6 @@
 import { createRouter, createWebHashHistory } from 'vue-router'
 import { captureInviteCode } from '@/utils/invite'
-import { isLoggedIn } from '@/api/fetch-api'
+import { isLoggedIn } from '@/api/session'
 
 const router = createRouter({
   history: createWebHashHistory(import.meta.env.BASE_URL),

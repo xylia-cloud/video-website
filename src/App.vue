@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { RouterView } from 'vue-router'
 import { defineAsyncComponent, nextTick, onBeforeUnmount, onMounted, ref } from 'vue'
-import { isLoggedIn, isTokenExpired, syncTokenExpiryWatcher } from '@/api/fetch-api'
+import { isLoggedIn, isTokenExpired, syncTokenExpiryWatcher } from '@/api/session'
 import { registerUserStoreHydrate } from '@/api/user-store-sync'
 import { useUserStore } from '@/stores/user'
 import TopLoading from '@/components/TopLoading.vue'
