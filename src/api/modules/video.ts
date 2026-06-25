@@ -7,7 +7,7 @@ import {
   buildNewApiUrl,
 } from '@/utils/config'
 import { withTopLoading } from '../core/loading'
-import { typesListCache } from '../core/cache'
+import { typesListCache, getVideoDetailCache, getDetailRecommendCache } from '../core/cache'
 import {
   createAuthHeaders,
   getUserInfo,
@@ -17,49 +17,76 @@ import {
 } from '../core/auth-session'
 import type { VideoParams, SearchParams } from '../types'
 
+const buildVideoDetailCacheKey = (vodId: string | number) => {
+  const userInfo = getUserInfo()
+  const uid = userInfo?.user_id || userInfo?.id || 'guest'
+  return `${vodId}:${uid}`
+}
+
+const buildDetailRecommendCacheKey = (params: Record<string, unknown>) =>
+  `${params.id ?? ''}:${params.type_id ?? 1}:${params.page ?? 1}`
+
+const fetchVideoDetailRaw = async (vodId: string | number) => {
+  if (!vodId) {
+    throw new Error('视频ID不能为空')
+  }
+
+  console.log(`正在获取视频详情，ID: ${vodId}`)
+
+  const userInfo = getUserInfo()
+  let requestUrl = `${BASE_URL}/index.php/ajax/details.html?vod_id=${vodId}`
+
+  if (userInfo) {
+    const userId = userInfo.user_id || userInfo.id
+    const token = userInfo.token
+
+    if (userId && token) {
+      requestUrl += `&uid=${userId}&token=${token}`
+    }
+  }
+
+  const headers = createAuthHeaders(false)
+
+  const response = await fetch(requestUrl, {
+    method: 'GET',
+    headers,
+  })
+
+  if (!response.ok) {
+    const errorText = await response.text()
+    throw new Error(`HTTP error! Status: ${response.status}, Response: ${errorText}`)
+  }
+
+  return await response.json()
+}
+
 export const fetchVideoDetail = async (
   vodId: string | number,
-  options?: { loading?: boolean },
+  options?: { loading?: boolean; force?: boolean },
 ) => {
-  return withTopLoading(async () => {
-    if (!vodId) {
-      throw new Error('视频ID不能为空')
+  const cacheKey = buildVideoDetailCacheKey(vodId)
+  const cache = getVideoDetailCache(cacheKey)
+
+  if (!options?.force) {
+    const cached = cache.getIfValid()
+    if (cached) {
+      console.log(`使用视频详情缓存，ID: ${vodId}`)
+      return cached
     }
+    const inflight = cache.getInflight()
+    if (inflight) return inflight
+  }
 
-    console.log(`正在获取视频详情，ID: ${vodId}`)
+  const request = withTopLoading(() => fetchVideoDetailRaw(vodId), options?.loading ?? true)
+  cache.setInflight(request)
 
-    // 获取用户信息（游客用户也可以获取视频详情）
-    const userInfo = getUserInfo()
-
-    // 构建请求URL，如果有用户信息则添加用户参数
-    let requestUrl = `${BASE_URL}/index.php/ajax/details.html?vod_id=${vodId}`
-
-    if (userInfo) {
-      // 兼容游客用户和正式用户的数据结构
-      const userId = userInfo.user_id || userInfo.id
-      const token = userInfo.token
-
-      if (userId && token) {
-        requestUrl += `&uid=${userId}&token=${token}`
-      }
-    }
-
-    // 获取包含时间戳的请求头
-    const headers = createAuthHeaders(false)
-
-    // 发起GET请求
-    const response = await fetch(requestUrl, {
-      method: 'GET',
-      headers,
-    })
-
-    if (!response.ok) {
-      const errorText = await response.text()
-      throw new Error(`HTTP error! Status: ${response.status}, Response: ${errorText}`)
-    }
-
-    return await response.json()
-  }, options?.loading ?? true)
+  try {
+    const result = await request
+    cache.set(result)
+    return result
+  } finally {
+    cache.setInflight(null)
+  }
 }
 
 export const fetchTypesList = async () => {
@@ -182,22 +209,17 @@ export const fetchSearchVideos = async (params: SearchParams = {}) => {
   return await response.json()
 }
 
-export const fetchDetailRecommend = async (params: { [key: string]: any } = {}) => {
+const fetchDetailRecommendRaw = async (params: { [key: string]: any } = {}) => {
   console.log('正在获取详情页推荐视频...')
 
-  // 构建查询参数
   const queryParams = new URLSearchParams()
   for (const key in params) {
     queryParams.append(key, String(params[key]))
   }
 
-  // 构建URL
   const url = `${BASE_URL}/index.php/ajax/recommend.html${queryParams.toString() ? '?' + queryParams.toString() : ''}`
+  const headers = createAuthHeaders(false)
 
-  // 获取包含时间戳的请求头
-  const headers = createAuthHeaders()
-
-  // 发起GET请求
   const response = await fetch(url, {
     method: 'GET',
     headers,
@@ -209,6 +231,35 @@ export const fetchDetailRecommend = async (params: { [key: string]: any } = {}) 
   }
 
   return await response.json()
+}
+
+export const fetchDetailRecommend = async (
+  params: { [key: string]: any } = {},
+  options?: { force?: boolean },
+) => {
+  const cacheKey = buildDetailRecommendCacheKey(params)
+  const cache = getDetailRecommendCache(cacheKey)
+
+  if (!options?.force) {
+    const cached = cache.getIfValid()
+    if (cached) {
+      console.log(`使用详情推荐缓存，key: ${cacheKey}`)
+      return cached
+    }
+    const inflight = cache.getInflight()
+    if (inflight) return inflight
+  }
+
+  const request = fetchDetailRecommendRaw(params)
+  cache.setInflight(request)
+
+  try {
+    const result = await request
+    cache.set(result)
+    return result
+  } finally {
+    cache.setInflight(null)
+  }
 }
 
 export const updateVideoHits = async (params: {

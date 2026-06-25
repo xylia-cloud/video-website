@@ -1,7 +1,6 @@
 <script setup lang="ts">
 import { useRouter } from 'vue-router'
 
-// 使用路由
 const router = useRouter()
 
 interface VideoItem {
@@ -14,8 +13,8 @@ interface VideoItem {
   class?: string
   time?: string
   points?: number | string
-  link?: string // 广告链接
-  isAd?: boolean // 是否为广告
+  link?: string
+  isAd?: boolean
 }
 
 const props = defineProps({
@@ -29,113 +28,89 @@ const props = defineProps({
   },
 })
 
-// 添加调试信息
-console.log('VideoList组件接收到的视频数据:', props.videos)
-console.log('VideoList组件接收到的视频数量:', props.videos.length)
-if (props.videos.length > 0) {
-  console.log('VideoList组件第一个视频项:', props.videos[0])
-}
+const getItemKey = (item: VideoItem, index: number) =>
+  item.isAd || item.link
+    ? `ad-${item.id ?? item.link ?? index}`
+    : `video-${item.id ?? index}`
 
-// 格式化时间函数
 function formatTime(timeStr: string): string {
   if (!timeStr) return ''
   try {
     const date = new Date(timeStr)
     if (isNaN(date.getTime())) return timeStr
 
-    // 获取年、月、日
     const year = date.getFullYear()
     const month = date.getMonth() + 1
     const day = date.getDate()
-
-    // 当前年份
     const currentYear = new Date().getFullYear()
 
-    // 如果是未来日期，或者是模拟数据（比如2025年），直接显示日期
     if (year > currentYear) {
-      // 当前日期 (在API环境中是2025-05-19)
       const today = new Date()
       const todayDay = today.getDate()
       const todayMonth = today.getMonth() + 1
       const todayYear = today.getFullYear()
 
-      // 如果是今天（相同年月日）
       if (year === todayYear && month === todayMonth && day === todayDay) {
         return '今天'
       }
-
-      // 如果是昨天（日期差1天）
       if (year === todayYear && month === todayMonth && day === todayDay - 1) {
         return '昨天'
       }
-
-      // 如果是前天（日期差2天）
       if (year === todayYear && month === todayMonth && day === todayDay - 2) {
         return '前天'
       }
-
-      // 其他日期显示月-日
       return `${month}-${day}`
     }
 
-    // 当前日期
     const today = new Date()
-
-    // 如果是今天（相同年月日）
     if (date.toDateString() === today.toDateString()) {
       return '今天'
     }
 
-    // 昨天
     const yesterday = new Date(today)
     yesterday.setDate(yesterday.getDate() - 1)
     if (date.toDateString() === yesterday.toDateString()) {
       return '昨天'
     }
 
-    // 前天
     const dayBeforeYesterday = new Date(today)
     dayBeforeYesterday.setDate(dayBeforeYesterday.getDate() - 2)
     if (date.toDateString() === dayBeforeYesterday.toDateString()) {
       return '前天'
     }
 
-    // 其他日期，格式化为 MM-DD 或 YYYY-MM-DD
     if (year === currentYear) {
-      return `${month}-${day}` // 同一年只显示月-日
-    } else {
-      return `${year}-${month}-${day}` // 不同年显示年-月-日
+      return `${month}-${day}`
     }
+    return `${year}-${month}-${day}`
   } catch {
     return timeStr
   }
 }
 
-// 处理广告点击
 const handleAdClick = (video: VideoItem) => {
   if (video.link) {
-    console.log(`广告点击: ${video.title}, 链接: ${video.link}`)
     window.open(video.link, '_blank')
   }
 }
 
-// 处理视频点击，在跳转前保存滚动位置
 const handleVideoClick = (videoId: number) => {
-  // 保存当前滚动位置到sessionStorage
   const scrollPosition = window.scrollY || document.documentElement.scrollTop
   sessionStorage.setItem('homeScrollPosition', scrollPosition.toString())
-  console.log(`视频点击前保存滚动位置: ${scrollPosition}`)
-
-  // 跳转到视频详情页
   router.push(`/video/${videoId}?from=${props.returnPath}`)
+}
+
+const handleImageError = (e: Event) => {
+  const target = e.target as HTMLImageElement
+  if (!target) return
+  target.style.background = '#333'
+  target.alt = '图片加载失败'
 }
 </script>
 
 <template>
   <div class="video-grid">
-    <!-- 循环所有项目，根据isAd属性区分普通视频和广告 -->
-    <template v-for="(item, index) in videos" :key="index">
-      <!-- 普通视频项 -->
+    <template v-for="(item, index) in videos" :key="getItemKey(item, index)">
       <div
         v-if="!item.isAd && !item.link"
         class="video-item"
@@ -144,21 +119,9 @@ const handleVideoClick = (videoId: number) => {
         <div class="video-cover">
           <img
             v-lazy="item.coverUrl"
+            loading="lazy"
             alt="Video Cover"
-            @error="
-              (e) => {
-                console.error('图片加载失败:', item.coverUrl, e)
-                const target = e.target as HTMLImageElement
-                if (target) {
-                  target.style.background = '#333'
-                  target.style.display = 'flex'
-                  target.style.alignItems = 'center'
-                  target.style.justifyContent = 'center'
-                  target.alt = '图片加载失败'
-                }
-              }
-            "
-            @load="() => console.log('图片加载成功:', item.coverUrl)"
+            @error="handleImageError"
           />
           <div class="video-badge vip" v-if="item.isVip">
             <span class="vip-text">VIP</span>
@@ -173,28 +136,14 @@ const handleVideoClick = (videoId: number) => {
         </div>
       </div>
 
-      <!-- 广告项 -->
       <div v-else class="video-item ad-item" @click="handleAdClick(item)">
         <div class="video-cover">
-          <img 
-            v-lazy="item.coverUrl" 
+          <img
+            v-lazy="item.coverUrl"
+            loading="lazy"
             alt="Ad Cover"
-            @error="
-              (e) => {
-                console.error('广告图片加载失败:', item.coverUrl, e)
-                const target = e.target as HTMLImageElement
-                if (target) {
-                  target.style.background = '#333'
-                  target.style.display = 'flex'
-                  target.style.alignItems = 'center'
-                  target.style.justifyContent = 'center'
-                  target.alt = '广告图片加载失败'
-                }
-              }
-            "
-            @load="() => console.log('广告图片加载成功:', item.coverUrl)"
+            @error="handleImageError"
           />
-          <!-- <div class="video-badge ad">广告</div> -->
         </div>
         <div class="video-title">{{ item.title }}</div>
         <div class="video-info">
@@ -223,7 +172,6 @@ const handleVideoClick = (videoId: number) => {
   width: 100%;
   box-sizing: border-box;
   min-width: 0;
-  /* 防止内容溢出 */
 }
 
 .video-cover {
@@ -233,9 +181,7 @@ const handleVideoClick = (videoId: number) => {
   margin-bottom: 6px;
   width: 100%;
   aspect-ratio: 16 / 9;
-  /* 固定宽高比 */
   background-color: #333;
-  /* 占位背景 */
 }
 
 .video-cover img {
@@ -357,7 +303,6 @@ const handleVideoClick = (videoId: number) => {
   color: #fff;
 }
 
-/* 确保网格布局在所有设备上都能正常显示 */
 @media (max-width: 480px) {
   .video-grid {
     grid-template-columns: repeat(2, 1fr);
@@ -373,7 +318,6 @@ const handleVideoClick = (videoId: number) => {
   }
 }
 
-/* 处理超小屏幕 */
 @media (max-width: 360px) {
   .video-grid {
     gap: 6px;

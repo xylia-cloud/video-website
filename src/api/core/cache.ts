@@ -33,6 +33,55 @@ function createTtlCache<T>() {
 export const typesListCache = createTtlCache<any>()
 const adsCache = new Map<string, ReturnType<typeof createTtlCache<any>>>()
 
+/** 视频详情 / 详情推荐缓存 TTL（2 分钟） */
+export const VIDEO_DETAIL_TTL_MS = 2 * 60 * 1000
+
+export function createTtlCacheWithTtl<T>(ttlMs: number) {
+  let entry: TtlCacheEntry<T> | null = null
+  let inflight: Promise<T> | null = null
+
+  return {
+    getIfValid(): T | null {
+      if (!entry) return null
+      if (Date.now() - entry.cachedAt >= ttlMs) {
+        entry = null
+        return null
+      }
+      return entry.data
+    },
+    set(data: T) {
+      entry = { data, cachedAt: Date.now() }
+    },
+    getInflight() {
+      return inflight
+    },
+    setInflight(promise: Promise<T> | null) {
+      inflight = promise
+    },
+  }
+}
+
+const videoDetailCaches = new Map<string, ReturnType<typeof createTtlCacheWithTtl<any>>>()
+const detailRecommendCaches = new Map<string, ReturnType<typeof createTtlCacheWithTtl<any>>>()
+
+export const getVideoDetailCache = (key: string) => {
+  let cache = videoDetailCaches.get(key)
+  if (!cache) {
+    cache = createTtlCacheWithTtl<any>(VIDEO_DETAIL_TTL_MS)
+    videoDetailCaches.set(key, cache)
+  }
+  return cache
+}
+
+export const getDetailRecommendCache = (key: string) => {
+  let cache = detailRecommendCaches.get(key)
+  if (!cache) {
+    cache = createTtlCacheWithTtl<any>(VIDEO_DETAIL_TTL_MS)
+    detailRecommendCaches.set(key, cache)
+  }
+  return cache
+}
+
 export const getAdsCacheKey = (params: { ad_pos: number | string; ad_type?: number | string }) =>
   `${params.ad_pos}:${params.ad_type ?? 'all'}`
 

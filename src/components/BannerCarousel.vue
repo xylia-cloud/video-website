@@ -9,7 +9,12 @@
     >
       <van-swipe-item v-for="(ad, index) in bannerAds" :key="ad.id" @click="handleAdClick(ad)">
         <div v-show="currentBannerIndex === index">
-          <img :src="ad.imageUrl" :alt="ad.title" @error="handleImageError($event, ad)" />
+          <img
+            v-lazy="ad.imageUrl"
+            :loading="index === 0 ? 'eager' : 'lazy'"
+            :alt="ad.title"
+            @error="handleImageError($event, ad)"
+          />
         </div>
       </van-swipe-item>
     </van-swipe>

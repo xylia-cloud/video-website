@@ -91,7 +91,7 @@ export function useVideoRecommend(videoId: Ref<string>, videoDetail: Ref<VideoDe
         type_id: videoDetail.value?.type_id || 1,
       }
 
-      const result = await fetchDetailRecommend(params)
+      const result = await fetchDetailRecommend(params, { force: refresh })
       if (isStaleRecommendRequest(seq, requestedId)) return
 
       const videoList = extractVideoList(result)
