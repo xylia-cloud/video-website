@@ -58,14 +58,14 @@ export function useVideoDetailUser() {
     }
   }
 
-  const getUserRealTimeInfo = async () => {
+  const getUserRealTimeInfo = async (options?: { force?: boolean }) => {
     const currentUserInfo = userStore.profile
     if (!currentUserInfo) return null
     if (isLoadingUserInfo.value) return null
 
     isLoadingUserInfo.value = true
     try {
-      const pointsResult = await userStore.refreshPoints({ force: true })
+      const pointsResult = await userStore.refreshPoints({ force: options?.force ?? false })
       if (pointsResult?.code === 1 && pointsResult.data) {
         applyPointsDataToView(pointsResult.data)
         return pointsResult.data
@@ -88,8 +88,9 @@ export function useVideoDetailUser() {
     }
   }
 
-  const fetchUserInfo = async (options?: { silent?: boolean }) => {
+  const fetchUserInfo = async (options?: { silent?: boolean; force?: boolean }) => {
     const silent = options?.silent ?? false
+    const force = options?.force ?? false
     if (!silent) {
       showToast({ message: '加载中', duration: 0, forbidClick: true })
     }
@@ -102,7 +103,7 @@ export function useVideoDetailUser() {
       vipEndtime.value = String(info.endtime || '')
     }
 
-    await getUserRealTimeInfo()
+    await getUserRealTimeInfo({ force })
     if (!silent) {
       closeToast()
     }

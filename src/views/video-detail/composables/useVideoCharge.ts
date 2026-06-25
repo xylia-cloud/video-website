@@ -159,7 +159,7 @@ export function useVideoCharge(userApi: UserApi) {
             icon: 'success',
           })
           showChargeModal.value = false
-          await userApi.getUserRealTimeInfo()
+          await userApi.getUserRealTimeInfo({ force: true })
         }
       } else if (isLoginRequiredResult(result)) {
         showToast({

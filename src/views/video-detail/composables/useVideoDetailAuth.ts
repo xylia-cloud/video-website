@@ -22,7 +22,7 @@ export function useVideoDetailAuth(userApi: UserApi) {
   }
 
   const handleAuthSuccess = async () => {
-    await userApi.fetchUserInfo()
+    await userApi.fetchUserInfo({ force: true })
     if (pendingPlayAfterAuth) {
       pendingPlayAfterAuth = false
       await onPlayAfterAuth?.()

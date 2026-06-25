@@ -173,8 +173,7 @@ onMounted(async () => {
     silentSuccessToast: true,
   })
 
-  await fetchUserInfo({ silent: true })
-  await loadDetailPage()
+  await Promise.all([fetchUserInfo({ silent: true }), loadDetailPage()])
 
   window.addEventListener('scroll', handleScroll)
 })

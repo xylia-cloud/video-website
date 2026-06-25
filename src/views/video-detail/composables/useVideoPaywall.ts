@@ -96,14 +96,14 @@ export function useVideoPaywall(
     if (!played) return
     isWatched.value = true
     setTimeout(async () => {
-      await userApi.getUserRealTimeInfo()
+      await userApi.getUserRealTimeInfo({ force: true })
     }, 2000)
   }
 
   const continuePlay = async () => {
     showToast({ message: '加载中', duration: 0, forbidClick: true })
     try {
-      const latestUserInfo = await userApi.getUserRealTimeInfo()
+      const latestUserInfo = await userApi.getUserRealTimeInfo({ force: true })
       closeToast()
 
       if (isWatched.value) {
@@ -182,7 +182,7 @@ export function useVideoPaywall(
       if (isNeedPay.value && pointsNeeded.value > 0) {
         isWatched.value = true
         setTimeout(async () => {
-          await userApi.getUserRealTimeInfo()
+          await userApi.getUserRealTimeInfo({ force: true })
         }, 2000)
       }
     }
