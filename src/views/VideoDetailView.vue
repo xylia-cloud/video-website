@@ -118,7 +118,9 @@ const loadDetailPage = async () => {
 }
 
 const loadRecommendAsync = async () => {
+  const requestId = videoId.value
   await fetchListAds()
+  if (videoId.value !== requestId) return
   await fetchRecommendVideosData()
 }
 

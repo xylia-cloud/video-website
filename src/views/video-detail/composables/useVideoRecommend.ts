@@ -16,6 +16,11 @@ export function useVideoRecommend(videoId: Ref<string>, videoDetail: Ref<VideoDe
   const isRefreshingRecommends = ref(false)
   const listAds = ref<ListAd[]>([])
 
+  let recommendRequestSeq = 0
+
+  const isStaleRecommendRequest = (seq: number, requestedId: string) =>
+    seq !== recommendRequestSeq || videoId.value !== requestedId
+
   const mapApiVideo = (item: Record<string, unknown>): VideoItem => {
     const pointsPlay =
       item.vod_points_play !== undefined ? Number(item.vod_points_play) : 0
@@ -61,6 +66,7 @@ export function useVideoRecommend(videoId: Ref<string>, videoDetail: Ref<VideoDe
   }
 
   const resetRecommendState = () => {
+    recommendRequestSeq += 1
     recommendVideos.value = []
     isRecommendLoading.value = true
     hasRecommendError.value = false
@@ -68,6 +74,8 @@ export function useVideoRecommend(videoId: Ref<string>, videoDetail: Ref<VideoDe
   }
 
   const fetchRecommendVideosData = async (refresh = false) => {
+    const seq = ++recommendRequestSeq
+    const requestedId = videoId.value
     try {
       if (refresh) {
         isRefreshingRecommends.value = true
@@ -78,12 +86,14 @@ export function useVideoRecommend(videoId: Ref<string>, videoDetail: Ref<VideoDe
       recommendErrorMessage.value = ''
 
       const params = {
-        id: videoId.value,
+        id: requestedId,
         page: 1,
         type_id: videoDetail.value?.type_id || 1,
       }
 
       const result = await fetchDetailRecommend(params)
+      if (isStaleRecommendRequest(seq, requestedId)) return
+
       const videoList = extractVideoList(result)
 
       if (videoList.length > 0) {
@@ -92,12 +102,15 @@ export function useVideoRecommend(videoId: Ref<string>, videoDetail: Ref<VideoDe
         recommendVideos.value = []
       }
     } catch (error: unknown) {
+      if (isStaleRecommendRequest(seq, requestedId)) return
       hasRecommendError.value = true
       recommendErrorMessage.value =
         error instanceof Error ? error.message : '加载失败，请稍后再试'
     } finally {
-      isRecommendLoading.value = false
-      isRefreshingRecommends.value = false
+      if (seq === recommendRequestSeq) {
+        isRecommendLoading.value = false
+        isRefreshingRecommends.value = false
+      }
     }
   }
 

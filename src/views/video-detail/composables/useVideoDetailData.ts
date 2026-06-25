@@ -22,6 +22,7 @@ export function useVideoDetailData(
   const hasDetailError = ref(false)
   const detailErrorMessage = ref('')
 
+  let detailRequestSeq = 0
   let onGoBack: (() => void) | undefined
 
   const setGoBackHandler = (fn: () => void) => {
@@ -85,6 +86,8 @@ export function useVideoDetailData(
     },
     onLoaded?: () => void,
   ) => {
+    const seq = ++detailRequestSeq
+    const requestedId = videoId.value
     isLoading.value = true
     hasDetailError.value = false
     detailErrorMessage.value = ''
@@ -93,7 +96,9 @@ export function useVideoDetailData(
     resetPaywallState(paywall)
 
     try {
-      const result = await fetchVideoDetail(videoId.value, { loading: false })
+      const result = await fetchVideoDetail(requestedId, { loading: false })
+
+      if (seq !== detailRequestSeq || videoId.value !== requestedId) return
 
       if (isLoginRequiredResult(result)) {
         showDialog({
@@ -122,7 +127,9 @@ export function useVideoDetailData(
       detailErrorMessage.value =
         error instanceof Error ? error.message : '网络请求错误'
     } finally {
-      isLoading.value = false
+      if (seq === detailRequestSeq) {
+        isLoading.value = false
+      }
     }
   }
 
