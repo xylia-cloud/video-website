@@ -102,7 +102,10 @@ const withTopLoading = async <T>(
  * 获取视频详情
  * @param vodId 视频ID
  */
-export const fetchVideoDetail = async (vodId: string | number) => {
+export const fetchVideoDetail = async (
+  vodId: string | number,
+  options?: { loading?: boolean },
+) => {
   return withTopLoading(async () => {
     if (!vodId) {
       throw new Error('视频ID不能为空')
@@ -141,7 +144,7 @@ export const fetchVideoDetail = async (vodId: string | number) => {
     }
 
     return await response.json()
-  })
+  }, options?.loading ?? true)
 }
 
 const STATIC_DATA_TTL_MS = 5 * 60 * 1000
@@ -1162,7 +1165,11 @@ export const userLogin = async (params: {
  * @param rec_code 推荐码（可选）
  * @returns 游客登录结果
  */
-export const touristLogin = async (imei: string, rec_code?: string) => {
+export const touristLogin = async (
+  imei: string,
+  rec_code?: string,
+  options?: { loading?: boolean },
+) => {
   return withTopLoading(async () => {
     if (!imei) {
       throw new Error('IMEI不能为空')
@@ -1266,7 +1273,7 @@ export const touristLogin = async (imei: string, rec_code?: string) => {
         msg: result?.msg || '游客登录失败',
       }
     }
-  })
+  }, options?.loading ?? true)
 }
 
 /**

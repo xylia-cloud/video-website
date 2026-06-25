@@ -8,12 +8,18 @@ interface TouristLoginOptions {
   route: RouteLocationNormalizedLoaded
   onSuccess?: () => void | Promise<void>
   showFailureToast?: boolean
+  /** 不触发顶部线形进度条 / TopLoading Toast */
+  silentLoading?: boolean
+  /** 不弹出「已获取游客信息」提示 */
+  silentSuccessToast?: boolean
 }
 
 export async function performTouristLogin({
   route,
   onSuccess,
   showFailureToast = true,
+  silentLoading = false,
+  silentSuccessToast = false,
 }: TouristLoginOptions): Promise<void> {
   const userStore = useUserStore()
   if (userStore.isLoggedIn || userStore.profile) {
@@ -22,11 +28,15 @@ export async function performTouristLogin({
 
   try {
     const recCode = resolveInviteCode(route) || undefined
-    const result = await touristLogin(getDeviceIMEI(), recCode)
+    const result = await touristLogin(getDeviceIMEI(), recCode, {
+      loading: !silentLoading,
+    })
 
     if (result.code === 1 && result.data) {
       useUserStore().hydrateFromStorage()
-      showToast({ message: '已获取游客信息', duration: 1000 })
+      if (!silentSuccessToast) {
+        showToast({ message: '已获取游客信息', duration: 1000 })
+      }
       await onSuccess?.()
       return
     }

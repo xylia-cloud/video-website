@@ -92,6 +92,7 @@ const handleLogin = async () => {
         icon: 'success',
       })
       closeModal()
+      window.dispatchEvent(new CustomEvent('global-auth-success'))
     } else {
       authErrorMsg.value = result?.msg || '登录失败，请检查账号密码'
     }
