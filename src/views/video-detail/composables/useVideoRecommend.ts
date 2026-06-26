@@ -15,6 +15,7 @@ export function useVideoRecommend(videoId: Ref<string>, videoDetail: Ref<VideoDe
   const recommendErrorMessage = ref('')
   const isRefreshingRecommends = ref(false)
   const listAds = ref<ListAd[]>([])
+  const recommendPage = ref(1)
 
   let recommendRequestSeq = 0
 
@@ -68,6 +69,7 @@ export function useVideoRecommend(videoId: Ref<string>, videoDetail: Ref<VideoDe
   const resetRecommendState = () => {
     recommendRequestSeq += 1
     recommendVideos.value = []
+    recommendPage.value = 1
     isRecommendLoading.value = true
     hasRecommendError.value = false
     recommendErrorMessage.value = ''
@@ -76,19 +78,22 @@ export function useVideoRecommend(videoId: Ref<string>, videoDetail: Ref<VideoDe
   const fetchRecommendVideosData = async (refresh = false) => {
     const seq = ++recommendRequestSeq
     const requestedId = videoId.value
+    const typeId = videoDetail.value?.type_id || 1
     try {
       if (refresh) {
         isRefreshingRecommends.value = true
+        recommendPage.value += 1
       } else {
         isRecommendLoading.value = true
+        recommendPage.value = 1
       }
       hasRecommendError.value = false
       recommendErrorMessage.value = ''
 
       const params = {
         id: requestedId,
-        page: 1,
-        type_id: videoDetail.value?.type_id || 1,
+        page: recommendPage.value,
+        type_id: typeId,
       }
 
       const result = await fetchDetailRecommend(params, { force: refresh })

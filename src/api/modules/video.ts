@@ -33,18 +33,7 @@ const fetchVideoDetailRaw = async (vodId: string | number) => {
 
   console.log(`正在获取视频详情，ID: ${vodId}`)
 
-  const userInfo = getUserInfo()
-  let requestUrl = `${BASE_URL}/index.php/ajax/details.html?vod_id=${vodId}`
-
-  if (userInfo) {
-    const userId = userInfo.user_id || userInfo.id
-    const token = userInfo.token
-
-    if (userId && token) {
-      requestUrl += `&uid=${userId}&token=${token}`
-    }
-  }
-
+  const requestUrl = `${BASE_URL}/index.php/ajax/details.html?vod_id=${vodId}`
   const headers = createAuthHeaders(false)
 
   const response = await fetch(requestUrl, {
@@ -255,7 +244,9 @@ export const fetchDetailRecommend = async (
 
   try {
     const result = await request
-    cache.set(result)
+    if (!options?.force) {
+      cache.set(result)
+    }
     return result
   } finally {
     cache.setInflight(null)

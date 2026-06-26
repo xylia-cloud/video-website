@@ -1,6 +1,7 @@
 import { showToast } from 'vant/es/toast'
 import { notifyUserStoreHydrate } from '@/api/user-store-sync'
 import { invalidateUserPointsCache } from './points-cache'
+import { invalidateAllApiCaches } from './cache'
 import type { UserInfo } from '../types'
 
 // 本地存储的键名
@@ -252,6 +253,9 @@ export const clearAllCache = () => {
 
   // 清除用户信息
   clearUserInfo()
+
+  // 清除内存中的 API TTL 缓存（视频详情、推荐、栏目、广告等）
+  invalidateAllApiCaches()
 
   // 清除首页相关缓存
   localStorage.removeItem('lastActiveTabId')

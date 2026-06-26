@@ -27,6 +27,10 @@ function createTtlCache<T>() {
     setInflight(promise: Promise<T> | null) {
       inflight = promise
     },
+    clear() {
+      entry = null
+      inflight = null
+    },
   }
 }
 
@@ -57,6 +61,10 @@ export function createTtlCacheWithTtl<T>(ttlMs: number) {
     },
     setInflight(promise: Promise<T> | null) {
       inflight = promise
+    },
+    clear() {
+      entry = null
+      inflight = null
     },
   }
 }
@@ -92,4 +100,12 @@ export const getAdsCache = (key: string) => {
     adsCache.set(key, cache)
   }
   return cache
+}
+
+/** 登出 / token 失效时清空所有内存 API 缓存 */
+export const invalidateAllApiCaches = () => {
+  typesListCache.clear()
+  adsCache.clear()
+  videoDetailCaches.clear()
+  detailRecommendCaches.clear()
 }
