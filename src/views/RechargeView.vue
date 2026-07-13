@@ -2625,7 +2625,7 @@ const checkPaymentResult = async () => {
   background: linear-gradient(135deg, #1a1a1a 0%, #2d2d2d 100%);
   border-radius: 16px;
   width: 100%;
-  max-width: 400px;
+  max-width: 300px;
   box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
   border: 1px solid rgba(255, 149, 0, 0.3);
   animation: slideUp 0.3s ease;
@@ -2737,8 +2737,7 @@ const checkPaymentResult = async () => {
 /* 移动端适配 */
 @media (max-width: 480px) {
   .reminder-dialog {
-    max-width: none;
-    margin: 0 10px;
+    max-width: 300px;
   }
 
   .reminder-title {

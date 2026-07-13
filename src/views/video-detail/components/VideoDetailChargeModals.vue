@@ -26,9 +26,6 @@ const emit = defineEmits<{
     @click.self="showChargeModal = false"
   >
     <div class="charge-modal">
-      <a href="https://68.fo" target="_blank" class="charge-ad-banner">
-        <img src="@/assets/img/recharge-ad.webp" alt="充值广告" />
-      </a>
 
       <div class="charge-content">
         <div v-if="isLoadingChargeOptions" class="charge-loading">
@@ -100,24 +97,11 @@ const emit = defineEmits<{
 .charge-modal {
   border-radius: 16px;
   width: 100%;
-  max-width: 400px;
+  max-width: 300px;
   max-height: 70vh;
-  overflow-y: auto;
-}
-
-.charge-ad-banner {
-  width: 100%;
+  display: flex;
+  flex-direction: column;
   overflow: hidden;
-  border-radius: 16px 16px 0 0;
-  display: block;
-  text-decoration: none;
-}
-
-.charge-ad-banner img {
-  width: 100%;
-  height: auto;
-  display: block;
-  object-fit: cover;
 }
 
 .charge-content {
@@ -125,6 +109,9 @@ const emit = defineEmits<{
   background: linear-gradient(135deg, #1a1a1a 0%, #2d2d2d 100%);
   border-left: 1px solid rgba(255, 149, 0, 0.2);
   border-right: 1px solid rgba(255, 149, 0, 0.2);
+  border-radius: 16px 16px 0 0;
+  overflow-y: auto;
+  flex: 1;
 }
 
 .charge-loading,
@@ -182,10 +169,10 @@ const emit = defineEmits<{
 }
 
 .charge-footer {
-  padding: 8px 16px;
+  padding: 8px 12px;
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 10px;
+  gap: 8px;
   background: linear-gradient(135deg, #1a1a1a 0%, #2d2d2d 100%);
   border: 1px solid rgba(255, 149, 0, 0.2);
   border-radius: 0 0 16px 16px;
