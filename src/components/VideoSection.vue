@@ -26,37 +26,8 @@
       </div>
     </div>
 
-    <!-- 最新视频列表（仅首页标签显示） -->
-    <div v-if="isFirstTabActive">
-      <!-- 最新标题 -->
-      <div class="section-title">最新</div>
-      <div
-        v-if="(isLoadingLatest || latestVideoData.length === 0) && !isRefreshingLatest"
-        class="loading-state"
-      >
-        <van-loading type="spinner" color="#ff9500" />
-        <div class="loading-text">{{ isLoadingLatest ? '加载最新视频中...' : '加载中...' }}</div>
-      </div>
-      <div v-else-if="hasLatestError && latestVideoData.length === 0" class="error-state">
-        <van-icon name="warning-o" size="24" color="#ff9500" />
-        <div class="error-text">加载失败，请稍后再试</div>
-        <div v-if="latestErrorMessage" class="error-detail">{{ latestErrorMessage }}</div>
-      </div>
-
-      <div v-else>
-        <VideoList :videos="latestVideoData" />
-      </div>
-
-      <VideoPagination
-        v-if="latestVideoData.length > 0 && latestTotalPages > 1"
-        :current-page="latestCurrentPage"
-        :total-pages="latestTotalPages"
-        @page-change="handleLatestPageChange"
-      />
-    </div>
-
     <!-- 非首页标签的视频列表 -->
-    <div v-else>
+    <div v-if="!isFirstTabActive">
       <div v-if="isLoading && videoData.length === 0" class="loading-state">
         <van-loading type="spinner" color="#ff9500" />
         <div class="loading-text">加载中...</div>
@@ -99,28 +70,19 @@ interface VideoItem {
   link?: string // 广告链接
   isAd?: boolean // 是否为广告
 }
-
 interface Props {
   isFirstTabActive: boolean
   isLoading: boolean
   hasError: boolean
   errorMessage?: string
   videoData: VideoItem[]
-  isLoadingLatest: boolean
-  hasLatestError: boolean
-  latestErrorMessage?: string
-  latestVideoData: VideoItem[]
-  isRefreshingLatest?: boolean
   currentPage: number
   totalPages: number
-  latestCurrentPage: number
-  latestTotalPages: number
 }
 
 interface Emits {
   (e: 'page-change', page: number): void
   (e: 'hot-page-change', page: number): void
-  (e: 'latest-page-change', page: number): void
 }
 
 defineProps<Props>()
@@ -132,10 +94,6 @@ const handlePageChange = (page: number) => {
 
 const handleHotPageChange = (page: number) => {
   emit('hot-page-change', page)
-}
-
-const handleLatestPageChange = (page: number) => {
-  emit('latest-page-change', page)
 }
 </script>
 

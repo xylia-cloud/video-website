@@ -331,7 +331,6 @@ const switchType = (typeId: number) => {
     isFullScreenLoading.value = false
 
     if (isFirstTab) {
-      fetchLatestVideosData()
       scheduleDeferredListAds()
     }
     return
@@ -1144,9 +1143,8 @@ onMounted(async () => {
     fetchRecommendVideosData(1, tidToUse)
   }
 
-  // 如果是首页标签，与推荐列表并行加载最新视频
+  // 如果是首页标签，加载列表广告
   if (isFirstTab) {
-    fetchLatestVideosData()
     scheduleDeferredListAds()
   }
 
@@ -1204,7 +1202,6 @@ onActivated(async () => {
     const tidToUse = isFirstTab ? VIDEO_CATEGORIES.ALL : activeTypeId.value
     fetchRecommendVideosData(1, tidToUse)
     if (isFirstTab) {
-      fetchLatestVideosData()
       scheduleDeferredListAds()
     }
   }
@@ -1399,18 +1396,10 @@ const restoreSessionData = () => {
         :hasError="hasError"
         :errorMessage="errorMessage"
         :videoData="videoData"
-        :isLoadingLatest="isLoadingLatest"
-        :hasLatestError="hasLatestError"
-        :latestErrorMessage="latestErrorMessage"
-        :latestVideoData="latestVideoData"
-        :isRefreshingLatest="isLoadingLatest"
         :current-page="currentPage"
         :total-pages="totalPages"
-        :latest-current-page="latestCurrentPage"
-        :latest-total-pages="latestTotalPages"
         @page-change="handlePageChange"
         @hot-page-change="handleHotPageChange"
-        @latest-page-change="handleLatestPageChange"
       />
     </div>
 
