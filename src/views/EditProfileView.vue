@@ -31,18 +31,18 @@
 
       <!-- 账号信息 -->
       <div class="form-item">
-        <div class="item-label">账号：</div>
+        <div class="item-label">账号：<span class="required-mark">*</span></div>
         <div class="item-input" v-if="isGuest">
-          <input type="text" v-model="userId" placeholder="请输入手机号码" />
+          <input type="text" v-model="userId" placeholder="请输入手机号码" required />
         </div>
         <div class="item-value" v-else>{{ userId }}</div>
       </div>
 
       <!-- 昵称 -->
       <div class="form-item">
-        <div class="item-label">昵称：</div>
+        <div class="item-label">昵称：<span class="required-mark">*</span></div>
         <div class="item-input">
-          <input type="text" v-model="nickname" placeholder="如不修改则同步为手机号码" />
+          <input type="text" v-model="nickname" placeholder="请输入昵称" required />
         </div>
       </div>
 
@@ -638,6 +638,26 @@ const handleAvatarChange = async (event: Event) => {
 const saveProfile = async () => {
   if (loading.value) return
 
+  if (isGuest.value && !userId.value.trim()) {
+    showDialog({
+      title: '提示',
+      message: '请输入账号',
+      confirmButtonText: '确定',
+      confirmButtonColor: '#ff9500',
+    })
+    return
+  }
+
+  if (!nickname.value.trim()) {
+    showDialog({
+      title: '提示',
+      message: '请输入昵称',
+      confirmButtonText: '确定',
+      confirmButtonColor: '#ff9500',
+    })
+    return
+  }
+
   // 检查是否填写了密码字段
   const hasPasswordFields = !!(oldPwd.value || newPwd.value || repeatPwd.value)
   
@@ -1142,6 +1162,11 @@ onBeforeUnmount(() => {
   width: 80px;
   font-size: 16px;
   color: #ccc;
+}
+
+.required-mark {
+  color: #ff4d4f;
+  margin-left: 2px;
 }
 
 .item-value {

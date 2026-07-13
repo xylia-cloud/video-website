@@ -26,11 +26,18 @@ import {
 } from '@/utils/videoList'
 import { performTouristLogin } from '@/composables/useTouristLogin'
 import { useRouter, useRoute } from 'vue-router'
+import { useUserStore } from '@/stores/user'
 import { resolveInviteCode } from '@/utils/invite'
 
 // 使用路由
 const router = useRouter()
 const route = useRoute()
+
+type GuestSessionState = 'loading' | 'ready' | 'failed'
+
+const userStore = useUserStore()
+const guestSessionState = ref<GuestSessionState>('ready')
+let isRestoringGuestSession = false
 
 // KeepAlive 下首次进入时 onMounted 与 onActivated 同轮触发，避免重复拉取视频列表
 const isFirstActivation = ref(true)
@@ -1036,6 +1043,35 @@ const handlePageUnload = () => {
   // 不清除域名弹窗会话标记：同一次打开网站内仅弹一次
 }
 
+const ensureTouristSessionOnActivated = async () => {
+  if (isRestoringGuestSession) return
+
+  userStore.hydrateFromStorage()
+
+  if (userStore.profile) {
+    guestSessionState.value = 'ready'
+    return
+  }
+
+  isRestoringGuestSession = true
+  guestSessionState.value = 'loading'
+
+  try {
+    await performTouristLogin({
+      route,
+      silentLoading: true,
+      silentSuccessToast: true,
+    })
+
+    userStore.hydrateFromStorage()
+    guestSessionState.value = userStore.profile ? 'ready' : 'failed'
+  } catch {
+    guestSessionState.value = 'failed'
+  } finally {
+    isRestoringGuestSession = false
+  }
+}
+
 // 组件挂载时获取数据
 onMounted(async () => {
   // 添加页面关闭或刷新的事件监听
@@ -1118,7 +1154,7 @@ onMounted(async () => {
 })
 
 // 从其他页面返回时激活的钩子（用于处理从详情页返回的情况）
-onActivated(() => {
+onActivated(async () => {
   console.log('首页被重新激活')
 
   if (isFirstActivation.value) {
@@ -1134,6 +1170,8 @@ onActivated(() => {
     }
     return
   }
+
+  await ensureTouristSessionOnActivated()
 
   // 尝试恢复完整的首页状态（包括分类状态）
   const restoredFromSession = restoreSessionData()
@@ -1292,7 +1330,7 @@ const restoreSessionData = () => {
     />
 
     <!-- 顶部搜索栏 -->
-    <SearchBar :keyword="searchKeyword" @search="handleSearch" />
+    <SearchBar :keyword="searchKeyword" :guest-session-state="guestSessionState" @search="handleSearch" />
 
     <!-- 导航栏 -->
     <div class="nav-container">

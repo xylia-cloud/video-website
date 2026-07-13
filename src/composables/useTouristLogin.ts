@@ -14,6 +14,8 @@ interface TouristLoginOptions {
   silentSuccessToast?: boolean
 }
 
+let touristLoginInFlight: Promise<void> | null = null
+
 export async function performTouristLogin({
   route,
   onSuccess,
@@ -22,31 +24,43 @@ export async function performTouristLogin({
   silentSuccessToast = false,
 }: TouristLoginOptions): Promise<void> {
   const userStore = useUserStore()
+  userStore.hydrateFromStorage()
   if (userStore.isLoggedIn || userStore.profile) {
     return
   }
 
-  try {
-    const recCode = resolveInviteCode(route) || undefined
-    const result = await touristLogin(getDeviceIMEI(), recCode, {
-      loading: !silentLoading,
-    })
-
-    if (result.code === 1 && result.data) {
-      useUserStore().hydrateFromStorage()
-      if (!silentSuccessToast) {
-        showToast({ message: '已获取游客信息', duration: 1000 })
-      }
-      await onSuccess?.()
-      return
-    }
-
-    if (showFailureToast) {
-      showToast({ message: '获取游客信息失败', duration: 2000 })
-    }
-  } catch {
-    if (showFailureToast) {
-      showToast({ message: '获取游客信息失败', duration: 2000 })
-    }
+  if (touristLoginInFlight) {
+    await touristLoginInFlight
+    return
   }
+
+  touristLoginInFlight = (async () => {
+    try {
+      const recCode = resolveInviteCode(route) || undefined
+      const result = await touristLogin(getDeviceIMEI(), recCode, {
+        loading: !silentLoading,
+      })
+
+      if (result.code === 1 && result.data) {
+        useUserStore().hydrateFromStorage()
+        if (!silentSuccessToast) {
+          showToast({ message: '已获取游客信息', duration: 1000 })
+        }
+        await onSuccess?.()
+        return
+      }
+
+      if (showFailureToast) {
+        showToast({ message: '获取游客信息失败', duration: 2000 })
+      }
+    } catch {
+      if (showFailureToast) {
+        showToast({ message: '获取游客信息失败', duration: 2000 })
+      }
+    } finally {
+      touristLoginInFlight = null
+    }
+  })()
+
+  await touristLoginInFlight
 }

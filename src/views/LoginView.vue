@@ -2,9 +2,8 @@
 import { ref, computed, onMounted } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { Icon as VanIcon } from 'vant/es/icon'
-import { userLogin, touristLogin } from '@/api/fetch-api'
+import { userLogin } from '@/api/fetch-api'
 import { useUserStore } from '@/stores/user'
-import { getDeviceIMEI } from '@/utils/device'
 import { resolveInviteCode, captureInviteCode } from '@/utils/invite'
 import bgImage from '@/assets/img/img-live.jpg'
 
@@ -123,65 +122,6 @@ const goToForgotPassword = () => {
   router.push('/forgot-password')
 }
 
-// 游客登录
-const handleGuestLogin = async () => {
-  console.log('🎯 用户点击游客登录，开始执行游客登录流程')
-
-  try {
-    showLoadingToast({
-      message: '正在进入游客模式...',
-      forbidClick: true,
-    })
-
-    const deviceIMEI = getDeviceIMEI()
-    console.log('📱 使用设备IMEI进行游客登录:', deviceIMEI)
-
-    const recCode = resolveInviteCode(route) || undefined
-    if (recCode) {
-      console.log('📝 检测到邀请码，将在游客登录时传递:', recCode)
-    }
-
-    const result = await touristLogin(deviceIMEI, recCode)
-    console.log('📥 游客登录API响应:', result)
-
-    if (result.code === 1 && result.data) {
-      userStore.hydrateFromStorage()
-      // 游客登录成功
-      console.log('✅ 游客登录成功，用户信息已保存到本地')
-
-      closeToast()
-      showToast({
-        message: '游客登录成功',
-        duration: 1000,
-      })
-
-      // 登录成功后跳转到个人中心
-      setTimeout(() => {
-        router.push('/profile')
-      }, 1000)
-    } else {
-      // 游客登录失败
-      closeToast()
-      console.error('❌ 游客登录失败:', result)
-      showDialog({
-        title: '游客登录失败',
-        message: result?.msg || '无法获取游客信息，请稍后重试',
-        confirmButtonText: '确定',
-        confirmButtonColor: '#ff9500',
-      })
-    }
-  } catch (error) {
-    console.error('❌ 游客登录异常:', error)
-    closeToast()
-    showDialog({
-      title: '游客登录失败',
-      message: (error as Error).message || '网络连接失败，请稍后再试',
-      confirmButtonText: '确定',
-      confirmButtonColor: '#ff9500',
-    })
-  }
-}
-
 // 检查是否已登录
 onMounted(() => {
   // 如果已经登录，直接跳转到重定向地址或首页
@@ -214,15 +154,6 @@ onMounted(() => {
       <div class="background-overlay"></div>
     </div>
 
-    <!-- 应用图标和名称 -->
-    <div class="app-logo">
-      <div class="logo-container">
-        <div class="logo-bg">
-          <img src="@/assets/img/logo.png" alt="logo" class="logo-image" />
-        </div>
-      </div>
-    </div>
-
     <!-- 登录表单 -->
     <div class="login-form">
       <div class="input-group">
@@ -250,10 +181,6 @@ onMounted(() => {
     <div class="bottom-actions">
       <div class="action-item" @click="goToForgotPassword">
         <span class="action-text">忘记密码</span>
-      </div>
-
-      <div class="action-item guest-login" @click="handleGuestLogin">
-        <span class="action-text">游客登录</span>
       </div>
 
       <div class="action-item" @click="goToRegister">
@@ -321,38 +248,6 @@ onMounted(() => {
   z-index: 2;
 }
 
-/* 应用logo样式 */
-.app-logo {
-  z-index: 3;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-}
-
-.logo-container {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-}
-
-.logo-bg {
-  width: 343px;
-  background-color: #000;
-  border-radius: 20px;
-}
-
-.logo-bg img {
-  width: 100%;
-  border-radius: 20px;
-}
-
-.app-name {
-  color: #fff;
-  font-size: 20px;
-  font-weight: bold;
-  margin-top: 10px;
-}
-
 /* 登录表单样式 - 深色模式 */
 .login-form {
   width: 85%;
@@ -407,7 +302,7 @@ onMounted(() => {
 .bottom-actions {
   width: 100%;
   display: flex;
-  justify-content: space-around;
+  justify-content: space-between;
   padding: 0 10%;
   margin-top: 0;
   margin-bottom: 20px;
@@ -431,16 +326,6 @@ onMounted(() => {
   color: #ff9500;
   font-size: 16px;
   margin-top: 5px;
-}
-
-/* 游客登录按钮特殊样式 */
-.action-item.guest-login .action-text {
-  color: #00d4aa;
-  font-weight: 500;
-}
-
-.action-item.guest-login:hover .action-text {
-  color: #00b894;
 }
 
 /* 底部导航样式 */

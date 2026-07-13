@@ -1,5 +1,9 @@
 <template>
   <div class="search-bar">
+    <div class="app-download" @click="openAppDownload">
+      <img src="@/assets/img/icon-yjym.svg" alt="永久网址" />
+      永久网址
+    </div>
     <div class="search-input">
       <van-icon name="search" color="#999" />
       <input
@@ -17,23 +21,29 @@
         @click="clearSearch"
       />
     </div>
-    <div class="app-download" @click="openAppDownload">
-      <img src="@/assets/img/icon-yjym.svg" alt="永久域名" />
-      永久域名
+    <div class="app-download-btn" @click="handleAppDownload">
+      <img src="@/assets/img/icon-download.svg" alt="APP下载" />
+      <span>APP下载</span>
     </div>
   </div>
+
+  <GuestTipModal v-model:visible="showGuestTip" />
 </template>
 
 <script setup lang="ts">
 import { ref } from 'vue'
 import { useRouter } from 'vue-router'
+import { useUserStore } from '@/stores/user'
+import GuestTipModal from '@/components/GuestTipModal.vue'
 
 const router = useRouter()
+const userStore = useUserStore()
 
 const APP_DOWNLOAD_URL = 'https://download.jiji8.cc'
 
 interface Props {
   keyword?: string
+  guestSessionState?: 'loading' | 'ready' | 'failed'
 }
 
 interface Emits {
@@ -42,20 +52,41 @@ interface Emits {
 
 const props = withDefaults(defineProps<Props>(), {
   keyword: '',
+  guestSessionState: 'ready',
 })
 
 const emit = defineEmits<Emits>()
 
 const searchKeyword = ref(props.keyword)
+const showGuestTip = ref(false)
 
 const openAppDownload = () => {
   window.open(APP_DOWNLOAD_URL, '_blank')
 }
 
+const handleAppDownload = () => {
+  userStore.hydrateFromStorage()
+
+  if (props.guestSessionState === 'loading') {
+    showToast('正在恢复游客身份，请稍后再试')
+    return
+  }
+
+  if (props.guestSessionState === 'failed') {
+    showToast('游客身份初始化失败，请刷新后重试')
+    return
+  }
+
+  if (userStore.isGuest) {
+    showGuestTip.value = true
+  } else {
+    openAppDownload()
+  }
+}
+
 const handleSearch = () => {
   if (searchKeyword.value.trim()) {
     emit('search', searchKeyword.value.trim())
-    // 跳转到搜索页面，并传递搜索关键词作为查询参数
     router.push({
       name: 'search',
       query: { wd: searchKeyword.value.trim() },
@@ -84,7 +115,6 @@ const clearSearch = () => {
   background-color: #333;
   border-radius: 20px;
   padding: 8px 15px;
-  margin-right: 10px;
 }
 
 .search-field {
@@ -111,9 +141,29 @@ const clearSearch = () => {
   display: flex;
   flex-direction: column;
   align-items: center;
+  margin-right: 10px;
 }
 
 .app-download img {
   width: 24px;
 }
+
+.app-download-btn {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  color: #ff9500;
+  font-size: 10px;
+  margin-left: 10px;
+  cursor: pointer;
+}
+
+.app-download-btn img {
+  width: 24px;
+}
+
+.app-download-btn span {
+  margin-top: 2px;
+}
+
 </style>

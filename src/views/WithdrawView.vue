@@ -471,8 +471,8 @@ onUnmounted(() => {
             </div>
             <div class="tip-item">2.提现同账号每日累积提现上限总额为10000000元整；</div>
             <div class="tip-item">3.每次发起提现以后流水系统会自动清零流水；</div>
-            <div class="tip-item">4. 提现需投注金额达到充值金额的400%，否则无法完成提现。</div>
-            <div class="tip-item">（例如：充值100元，需投注400元方可提现。）</div>
+            <div class="tip-item">4. 提现需投注金额达到充值金额的300%，否则无法完成提现。</div>
+            <div class="tip-item">（例如：充值100元，需投注300元方可提现。）</div>
             <div class="tip-item">5. 请确保正确填写开户银行、银行卡号和持卡人姓名。</div>
             <div class="tip-item">
               6.
