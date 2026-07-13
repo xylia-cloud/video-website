@@ -617,13 +617,9 @@ const generateQRCode = async (url: string) => {
 
 // 跳转到账户凭证页面
 const goToAccountCredential = async () => {
-  // 生成当前时间戳作为防伪标识
-  const now = new Date()
-  credentialTimestamp.value = `${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, '0')}${String(now.getDate()).padStart(2, '0')}${String(now.getHours()).padStart(2, '0')}${String(now.getMinutes()).padStart(2, '0')}`
-
-  // 生成网址的二维码（可以根据实际需求修改网址）
-  const websiteUrl = window.location.origin || 'https://sese1188.cc'
-  await generateQRCode(websiteUrl)
+  const userId = userInfo.value?.user_id || userInfo.value?.id || ''
+  const shareUrl = `${window.location.origin}/?invite=${userId}`
+  await generateQRCode(shareUrl)
   showCredential.value = true
 }
 
@@ -643,11 +639,16 @@ const commonFunctions: CommonFunction[] = [
   { key: 'game-record', label: '消费记录', icon: new URL('@/assets/img/icon-tzjl.svg', import.meta.url).href, handler: goToGameRecord },
   { key: 'my-agent', label: '我的代理', icon: new URL('@/assets/img/icon-wddl.svg', import.meta.url).href, handler: goToMyAgent },
   { key: 'promotion-record', label: '推广记录', icon: new URL('@/assets/img/icon-tgjl.svg', import.meta.url).href, handler: goToPromotionRecord },
-  { key: 'credential', label: '账户凭证', icon: new URL('@/assets/img/icon-zhpz2.svg', import.meta.url).href, handler: goToAccountCredential },
+  { key: 'share-friends', label: '分享好友', icon: new URL('@/assets/img/icon-zhpz2.svg', import.meta.url).href, handler: goToAccountCredential },
 ]
 
 const goToCustomerService = () => {
   openCustomerServiceModal()
+}
+
+const copyWebsite = () => {
+  navigator.clipboard.writeText('365abc.cc')
+  showToast({ message: '已复制', duration: 1000 })
 }
 
 // 关闭申请代理弹窗
@@ -811,11 +812,11 @@ const confirmApplyAgent = async () => {
 
     <GuestTipModal v-model:visible="showGuestTip" />
 
-    <!-- 账户凭证弹窗 -->
+    <!-- 分享好友弹窗 -->
     <div class="credential-overlay" v-if="showCredential" @click.self="closeCredential">
       <div class="credential-container" id="credential-card">
         <div class="credential-header">
-          <h2>账户凭证</h2>
+          <h2>分享好友</h2>
           <div class="credential-close" @click="closeCredential">
             <van-icon name="cross" size="24" color="#fff" />
           </div>
@@ -833,10 +834,13 @@ const confirmApplyAgent = async () => {
             <div class="credential-username">{{ userName }}</div>
             <div class="credential-id">ID：{{ userInfo?.user_id || userInfo?.id || '未知' }}</div>
             <div class="credential-qrcode">
-              <!-- 使用本地二维码图片 -->
-              <img src="@/assets/img/qrcode-profile.png" alt="二维码" class="qrcode-img" />
+              <img v-if="qrcodeDataUrl" :src="qrcodeDataUrl" alt="二维码" class="qrcode-img" />
+              <span v-else class="qrcode-loading">生成中...</span>
             </div>
-            <div class="credential-website">永久网址: sese1188.cc</div>
+            <div class="credential-website">
+              <span>永久域名：365abc.cc</span>
+              <span class="copy-btn" @click="copyWebsite">复制</span>
+            </div>
             <div class="credential-desc">
               账户凭证为唯一防失联和恢复账户依据<br /><span style="color: #ff4d4f"
                 >请截图妥善保存</span
@@ -1272,10 +1276,10 @@ export default {
 }
 
 .credential-container {
-  width: 90%;
-  max-width: 360px;
+  width: 75%;
+  max-width: 280px;
   background-color: #222;
-  border-radius: 15px;
+  border-radius: 12px;
   overflow: hidden;
   display: flex;
   flex-direction: column;
@@ -1283,14 +1287,14 @@ export default {
 
 .credential-header {
   position: relative;
-  padding: 15px 0;
+  padding: 12px 0;
   text-align: center;
   border-bottom: 1px solid #333;
 }
 
 .credential-header h2 {
   margin: 0;
-  font-size: 18px;
+  font-size: 15px;
   font-weight: bold;
 }
 
@@ -1303,7 +1307,7 @@ export default {
 }
 
 .credential-content {
-  padding: 20px;
+  padding: 14px;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -1325,11 +1329,11 @@ export default {
 }
 
 .credential-avatar {
-  width: 70px;
-  height: 70px;
+  width: 50px;
+  height: 50px;
   border-radius: 50%;
   overflow: hidden;
-  margin-bottom: 15px;
+  margin-bottom: 10px;
 }
 
 .credential-avatar img {
@@ -1339,24 +1343,24 @@ export default {
 }
 
 .credential-user-id {
-  font-size: 20px;
+  font-size: 16px;
   font-weight: bold;
-  margin-bottom: 20px;
+  margin-bottom: 12px;
 }
 
 .credential-username {
-  font-size: 16px;
+  font-size: 14px;
   font-weight: bold;
 }
 
 .credential-id {
   text-align: center;
-  margin: 5px 0 15px;
-  font-size: 14px;
+  margin: 4px 0 10px;
+  font-size: 12px;
   color: rgba(255, 255, 255, 0.9);
   background: rgba(255, 255, 255, 0.1);
-  padding: 4px 12px;
-  border-radius: 15px;
+  padding: 3px 10px;
+  border-radius: 12px;
   display: inline-block;
   backdrop-filter: blur(4px);
   -webkit-backdrop-filter: blur(4px);
@@ -1364,12 +1368,12 @@ export default {
 }
 
 .credential-qrcode {
-  width: 180px;
-  height: 180px;
+  width: 130px;
+  height: 130px;
   background-color: #fff;
-  padding: 10px;
-  border-radius: 10px;
-  margin-bottom: 15px;
+  padding: 8px;
+  border-radius: 8px;
+  margin-bottom: 10px;
   display: flex;
   justify-content: center;
   align-items: center;
@@ -1392,14 +1396,25 @@ export default {
 }
 
 .credential-website {
-  font-size: 16px;
+  font-size: 13px;
   font-weight: bold;
-  margin-bottom: 10px;
+  margin-bottom: 8px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.copy-btn {
+  cursor: pointer;
+  color: #ff9500;
+  display: inline-flex;
+  align-items: center;
 }
 
 .credential-desc {
+  font-size: 12px;
   color: #999;
-  margin-bottom: 10px;
+  margin-bottom: 8px;
   text-align: center;
 }
 
@@ -1410,8 +1425,8 @@ export default {
 
 .credential-buttons {
   display: flex;
-  gap: 10px;
-  padding: 15px;
+  gap: 8px;
+  padding: 10px 14px 14px;
 }
 
 .credential-button {

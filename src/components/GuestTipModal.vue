@@ -101,9 +101,9 @@ const handleConfirm = () => {
 
 .guest-tip-container {
   width: 85%;
-  max-width: 360px;
+  max-width: 300px;
   background-color: #222;
-  border-radius: 15px;
+  border-radius: 12px;
   overflow: hidden;
   animation: slideUp 0.3s ease-out;
 }
@@ -121,47 +121,47 @@ const handleConfirm = () => {
 
 .guest-tip-header {
   position: relative;
-  padding: 20px;
+  padding: 14px;
   text-align: center;
   border-bottom: 1px solid #333;
 }
 
 .guest-tip-header h2 {
   margin: 0;
-  font-size: 18px;
+  font-size: 15px;
   font-weight: bold;
   color: #fff;
 }
 
 .guest-tip-close {
   position: absolute;
-  right: 15px;
+  right: 12px;
   top: 50%;
   transform: translateY(-50%);
   cursor: pointer;
 }
 
 .guest-tip-content {
-  padding: 30px 20px;
+  padding: 20px 16px;
   text-align: center;
 }
 
 .guest-tip-icon {
-  margin-bottom: 20px;
+  margin-bottom: 12px;
 }
 
 .guest-tip-title {
-  font-size: 20px;
+  font-size: 16px;
   font-weight: bold;
   color: #fff;
-  margin-bottom: 10px;
+  margin-bottom: 6px;
 }
 
 .guest-tip-desc {
-  font-size: 14px;
+  font-size: 13px;
   color: #999;
-  margin-bottom: 20px;
-  line-height: 1.6;
+  margin-bottom: 12px;
+  line-height: 1.5;
 }
 
 .guest-pwd-tip-box {
@@ -169,11 +169,11 @@ const handleConfirm = () => {
   align-items: center;
   justify-content: center;
   gap: 6px;
-  padding: 10px 15px;
-  margin-bottom: 20px;
+  padding: 8px 12px;
+  margin-bottom: 12px;
   background-color: rgba(255, 149, 0, 0.1);
   border-radius: 8px;
-  font-size: 13px;
+  font-size: 12px;
   color: #ff9500;
 }
 
@@ -189,9 +189,9 @@ const handleConfirm = () => {
 }
 
 .guest-tip-features li {
-  font-size: 14px;
+  font-size: 13px;
   color: #ccc;
-  padding: 8px 0;
+  padding: 6px 0;
   border-bottom: 1px solid #333;
 }
 
@@ -201,16 +201,16 @@ const handleConfirm = () => {
 
 .guest-tip-buttons {
   display: flex;
-  gap: 10px;
-  padding: 0 20px 20px;
+  gap: 8px;
+  padding: 0 16px 16px;
 }
 
 .guest-tip-btn {
   flex: 1;
-  padding: 12px 0;
+  padding: 10px 0;
   border: none;
   border-radius: 8px;
-  font-size: 16px;
+  font-size: 14px;
   font-weight: bold;
   cursor: pointer;
   transition: all 0.3s ease;
