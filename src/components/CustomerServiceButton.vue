@@ -1,45 +1,86 @@
 <template>
   <div
-    v-if="shouldShowButton"
-    ref="buttonRef"
-    class="customer-service-button"
-    :style="buttonStyle"
+    v-if="shouldShowMenu"
+    ref="containerRef"
+    class="floating-quick-menu"
+    :style="containerStyle"
     @touchstart="handleTouchStart"
     @touchmove="handleTouchMove"
     @touchend="handleTouchEnd"
     @mousedown="handleMouseDown"
   >
-    <img src="@/assets/img/kefu.png" alt="客服" />
+    <TransitionGroup name="quick-menu" tag="div" class="quick-menu-list">
+      <template v-for="(item, index) in menuItems" :key="item.key">
+        <div v-if="isExpanded" class="quick-menu-item" :style="{ '--menu-index': index }">
+          <button
+            type="button"
+            class="quick-menu-action"
+            :aria-label="item.ariaLabel"
+            @click="handleMenuAction(item)"
+          >
+            <van-icon :name="item.icon" aria-hidden="true" />
+          </button>
+          <span class="quick-menu-label">{{ item.label }}</span>
+        </div>
+      </template>
+    </TransitionGroup>
+
+    <button
+      type="button"
+      class="quick-menu-toggle"
+      :aria-expanded="isExpanded"
+      :aria-label="isExpanded ? '收起快捷菜单' : '展开快捷菜单'"
+      @click="onToggleClick"
+    >
+      <van-icon :name="isExpanded ? 'arrow-up' : 'arrow-left'" aria-hidden="true" />
+    </button>
   </div>
 </template>
 
 <script setup lang="ts">
-import { computed, ref, onMounted, onUnmounted } from 'vue'
-import { useRoute } from 'vue-router'
+import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
 import { isCustomerServiceModalOpen, openCustomerServiceModal } from '@/utils/customerService'
 
+type QuickMenuAction = 'route' | 'customer-service'
+
+interface QuickMenuItem {
+  key: 'game' | 'recharge' | 'customer-service' | 'home'
+  label: '大厅' | '充值' | '客服' | '视频'
+  icon: string
+  ariaLabel: string
+  action: QuickMenuAction
+  routeName?: 'game' | 'recharge' | 'home'
+}
+
 const route = useRoute()
-const buttonRef = ref<HTMLElement | null>(null)
+const router = useRouter()
+const isExpanded = ref(false)
+const isNavigating = ref(false)
+const containerRef = ref<HTMLElement | null>(null)
 
-// 按钮位置状态
-const position = ref({
-  x: 0,
-  y: 0,
+const position = ref({ x: 0, y: 0 })
+const hasMoved = ref(false)
+let isDragging = false
+let dragStartX = 0
+let dragStartY = 0
+let initialPosX = 0
+let initialPosY = 0
+let isTouch = false
+
+const menuItems: QuickMenuItem[] = [
+  { key: 'game', label: '大厅', icon: 'home-o', ariaLabel: '进入游戏大厅', action: 'route', routeName: 'game' },
+  { key: 'recharge', label: '充值', icon: 'gold-coin-o', ariaLabel: '进入充值页面', action: 'route', routeName: 'recharge' },
+  { key: 'customer-service', label: '客服', icon: 'service-o', ariaLabel: '打开在线客服', action: 'customer-service' },
+  { key: 'home', label: '视频', icon: 'play-circle-o', ariaLabel: '返回视频首页', action: 'route', routeName: 'home' },
+]
+
+const shouldShowMenu = computed(() => {
+  return route.name !== 'game-play' && !isCustomerServiceModalOpen.value
 })
 
-// 拖动状态
-const isDragging = ref(false)
-const dragStart = ref({ x: 0, y: 0 })
-const hasMoved = ref(false) // 标记是否发生了拖动
-
-const shouldShowButton = computed(() => {
-  return route.path !== '/game-play' && !isCustomerServiceModalOpen.value
-})
-
-// 计算按钮样式
-const buttonStyle = computed(() => {
+const containerStyle = computed(() => {
   if (position.value.x === 0 && position.value.y === 0) {
-    // 初始位置使用CSS定位
     return {}
   }
   return {
@@ -50,192 +91,256 @@ const buttonStyle = computed(() => {
   }
 })
 
-// 初始化位置
-onMounted(() => {
-  // 从localStorage读取上次保存的位置
-  const savedPosition = localStorage.getItem('customerServiceButtonPosition')
-  if (savedPosition) {
-    try {
-      const parsed = JSON.parse(savedPosition)
-      position.value = parsed
-    } catch (e) {
-      console.error('解析客服按钮位置失败:', e)
-    }
-  }
-})
-
-// 触摸开始
-const handleTouchStart = (e: TouchEvent) => {
-  isDragging.value = true
-  hasMoved.value = false
-  const touch = e.touches[0]
-  
-  if (position.value.x === 0 && position.value.y === 0 && buttonRef.value) {
-    // 首次拖动，获取当前位置
-    const rect = buttonRef.value.getBoundingClientRect()
-    position.value = {
-      x: rect.left,
-      y: rect.top,
-    }
-  }
-  
-  dragStart.value = {
-    x: touch.clientX - position.value.x,
-    y: touch.clientY - position.value.y,
-  }
-  
-  e.preventDefault()
+const closeMenu = () => {
+  isExpanded.value = false
 }
 
-// 触摸移动
-const handleTouchMove = (e: TouchEvent) => {
-  if (!isDragging.value) return
-  
-  hasMoved.value = true
-  const touch = e.touches[0]
-  
-  let newX = touch.clientX - dragStart.value.x
-  let newY = touch.clientY - dragStart.value.y
-  
-  // 限制在屏幕范围内
-  const buttonSize = buttonRef.value?.offsetWidth || 60
-  const maxX = window.innerWidth - buttonSize
-  const maxY = window.innerHeight - buttonSize
-  
-  newX = Math.max(0, Math.min(newX, maxX))
-  newY = Math.max(0, Math.min(newY, maxY))
-  
-  position.value = { x: newX, y: newY }
-  
-  e.preventDefault()
-}
-
-// 触摸结束
-const handleTouchEnd = () => {
-  isDragging.value = false
-  
-  // 如果没有拖动，触发点击
-  if (!hasMoved.value) {
-    handleClick()
-  }
-  
-  // 保存位置到localStorage
+const onToggleClick = () => {
   if (hasMoved.value) {
-    localStorage.setItem('customerServiceButtonPosition', JSON.stringify(position.value))
+    hasMoved.value = false
+    return
   }
-  
-  hasMoved.value = false
+  isExpanded.value = !isExpanded.value
 }
 
-// 鼠标拖动支持（PC端）
-const handleMouseDown = (e: MouseEvent) => {
-  isDragging.value = true
+const handleMenuAction = async (item: QuickMenuItem) => {
+  if (isNavigating.value) return
+
+  closeMenu()
+
+  if (item.action === 'customer-service') {
+    openCustomerServiceModal()
+    return
+  }
+
+  if (!item.routeName || route.name === item.routeName) return
+
+  isNavigating.value = true
+  try {
+    await router.push({ name: item.routeName })
+  } finally {
+    isNavigating.value = false
+  }
+}
+
+const savePosition = () => {
+  localStorage.setItem('floatingQuickMenuPosition', JSON.stringify(position.value))
+}
+
+const clampPosition = (x: number, y: number) => {
+  const size = 52
+  return {
+    x: Math.max(0, Math.min(x, window.innerWidth - size)),
+    y: Math.max(0, Math.min(y, window.innerHeight - size)),
+  }
+}
+
+const startDrag = (clientX: number, clientY: number) => {
+  if (isDragging) return
+  isDragging = true
   hasMoved.value = false
-  
-  if (position.value.x === 0 && position.value.y === 0 && buttonRef.value) {
-    const rect = buttonRef.value.getBoundingClientRect()
-    position.value = {
-      x: rect.left,
-      y: rect.top,
-    }
+
+  if (position.value.x === 0 && position.value.y === 0 && containerRef.value) {
+    const rect = containerRef.value.getBoundingClientRect()
+    position.value = { x: rect.left, y: rect.top }
   }
-  
-  dragStart.value = {
-    x: e.clientX - position.value.x,
-    y: e.clientY - position.value.y,
+
+  dragStartX = clientX - position.value.x
+  dragStartY = clientY - position.value.y
+  initialPosX = position.value.x
+  initialPosY = position.value.y
+}
+
+const moveDrag = (clientX: number, clientY: number) => {
+  if (!isDragging) return
+
+  const newX = clientX - dragStartX
+  const newY = clientY - dragStartY
+
+  if (Math.abs(newX - initialPosX) > 3 || Math.abs(newY - initialPosY) > 3) {
+    hasMoved.value = true
   }
-  
+
+  const clamped = clampPosition(newX, newY)
+  position.value.x = clamped.x
+  position.value.y = clamped.y
+}
+
+const endDrag = () => {
+  isDragging = false
+  if (hasMoved.value) {
+    savePosition()
+  }
+}
+
+const handleTouchStart = (e: TouchEvent) => {
+  isTouch = true
+  startDrag(e.touches[0].clientX, e.touches[0].clientY)
+}
+
+const handleTouchMove = (e: TouchEvent) => {
+  if (!isDragging) return
+  moveDrag(e.touches[0].clientX, e.touches[0].clientY)
+  e.preventDefault()
+}
+
+const handleTouchEnd = () => {
+  endDrag()
+}
+
+const handleMouseDown = (e: MouseEvent) => {
+  if (isTouch) {
+    isTouch = false
+    return
+  }
+  startDrag(e.clientX, e.clientY)
   document.addEventListener('mousemove', handleMouseMove)
   document.addEventListener('mouseup', handleMouseUp)
-  
   e.preventDefault()
 }
 
 const handleMouseMove = (e: MouseEvent) => {
-  if (!isDragging.value) return
-  
-  hasMoved.value = true
-  
-  let newX = e.clientX - dragStart.value.x
-  let newY = e.clientY - dragStart.value.y
-  
-  const buttonSize = buttonRef.value?.offsetWidth || 60
-  const maxX = window.innerWidth - buttonSize
-  const maxY = window.innerHeight - buttonSize
-  
-  newX = Math.max(0, Math.min(newX, maxX))
-  newY = Math.max(0, Math.min(newY, maxY))
-  
-  position.value = { x: newX, y: newY }
+  moveDrag(e.clientX, e.clientY)
 }
 
 const handleMouseUp = () => {
-  isDragging.value = false
-  
-  // 如果没有拖动，触发点击
-  if (!hasMoved.value) {
-    handleClick()
-  }
-  
-  // 保存位置到localStorage
-  if (hasMoved.value) {
-    localStorage.setItem('customerServiceButtonPosition', JSON.stringify(position.value))
-  }
-  
-  hasMoved.value = false
-  
+  endDrag()
   document.removeEventListener('mousemove', handleMouseMove)
   document.removeEventListener('mouseup', handleMouseUp)
 }
 
-// 清理事件监听
-onUnmounted(() => {
+const handleKeydown = (event: KeyboardEvent) => {
+  if (event.key === 'Escape' && isExpanded.value) closeMenu()
+}
+
+watch(() => route.fullPath, closeMenu)
+watch(isCustomerServiceModalOpen, (isOpen) => {
+  if (isOpen) closeMenu()
+})
+
+onMounted(() => {
+  const saved = localStorage.getItem('floatingQuickMenuPosition')
+  if (saved) {
+    try {
+      const parsed = JSON.parse(saved)
+      position.value = parsed
+    } catch {
+      // ignore
+    }
+  }
+  window.addEventListener('keydown', handleKeydown)
+})
+
+onBeforeUnmount(() => {
+  window.removeEventListener('keydown', handleKeydown)
   document.removeEventListener('mousemove', handleMouseMove)
   document.removeEventListener('mouseup', handleMouseUp)
 })
-
-const handleClick = () => {
-  openCustomerServiceModal()
-}
 </script>
 
 <style scoped>
-.customer-service-button {
+.floating-quick-menu {
   position: fixed;
-  right: 20px;
-  bottom: 80px;
-  width: 70px;
-  height: 70px;
-  cursor: pointer;
-  z-index: 9999;
-  transition: transform 0.2s ease;
-  touch-action: none;
+  right: max(12px, env(safe-area-inset-right));
+  bottom: calc(64px + env(safe-area-inset-bottom));
+  z-index: 1000;
+  width: 52px;
   user-select: none;
+  touch-action: none;
 }
 
-.customer-service-button:hover {
-  transform: scale(1.1);
+.quick-menu-toggle,
+.quick-menu-action {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 0;
+  color: #fff;
+  background: #ff9500;
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.28);
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
 }
 
-.customer-service-button:active {
-  transform: scale(0.95);
+.quick-menu-toggle {
+  position: relative;
+  z-index: 1;
+  width: 52px;
+  height: 52px;
+  border-radius: 50%;
+  font-size: 22px;
 }
 
-.customer-service-button img {
-  width: 100%;
-  height: 100%;
-  object-fit: contain;
-  display: block;
-  pointer-events: none;
+.quick-menu-toggle:active,
+.quick-menu-action:active {
+  transform: scale(0.96);
 }
 
-/* 移动端适配 */
-@media (max-width: 768px) {
-  .customer-service-button {
-    width: 60px;
-    height: 60px;
-    right: 15px;
-    bottom: 70px;
+.quick-menu-toggle:focus-visible,
+.quick-menu-action:focus-visible {
+  outline: 2px solid #fff;
+  outline-offset: 3px;
+}
+
+.quick-menu-list {
+  position: absolute;
+  right: 0;
+  bottom: 60px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  width: 108px;
+}
+
+.quick-menu-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-direction: row-reverse;
+}
+
+.quick-menu-action {
+  flex: 0 0 42px;
+  width: 42px;
+  height: 42px;
+  border-radius: 50%;
+  font-size: 20px;
+}
+
+.quick-menu-label {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 56px;
+  height: 26px;
+  border-radius: 13px;
+  color: #fff;
+  background: rgba(0, 0, 0, 0.86);
+  font-size: 13px;
+  font-weight: 500;
+  line-height: 1;
+}
+
+.quick-menu-enter-active {
+  transition: opacity 240ms ease-out, transform 240ms ease-out;
+  transition-delay: calc((3 - var(--menu-index)) * 40ms);
+}
+
+.quick-menu-leave-active {
+  transition: opacity 180ms ease-in, transform 180ms ease-in;
+  transition-delay: calc(var(--menu-index) * 40ms);
+}
+
+.quick-menu-enter-from,
+.quick-menu-leave-to {
+  opacity: 0;
+  transform: translateY(12px) scale(0.9);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .quick-menu-enter-active,
+  .quick-menu-leave-active {
+    transition: none;
   }
 }
 </style>
