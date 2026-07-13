@@ -33,7 +33,7 @@
       <div class="form-item">
         <div class="item-label">账号：<span class="required-mark">*</span></div>
         <div class="item-input" v-if="isGuest">
-          <input type="text" v-model="userId" placeholder="请输入手机号码" required />
+          <input type="text" v-model="userId" placeholder="请输入11位手机号" required />
         </div>
         <div class="item-value" v-else>{{ userId }}</div>
       </div>
@@ -79,7 +79,10 @@
       <div class="form-item">
         <div class="item-label">原密码：</div>
         <div class="item-input">
-          <input type="password" v-model="oldPwd" placeholder="不修改密码请留空" />
+          <div class="pwd-wrapper">
+            <input :type="showOldPwd ? 'text' : 'password'" v-model="oldPwd" placeholder="不修改密码请留空" />
+            <van-icon :name="showOldPwd ? 'eye' : 'closed-eye'" class="pwd-eye" @click="showOldPwd = !showOldPwd" />
+          </div>
         </div>
       </div>
 
@@ -87,15 +90,18 @@
       <div class="form-item">
         <div class="item-label">新密码：</div>
         <div class="item-input">
-          <input 
-            type="password" 
-            v-model="newPwd" 
-            placeholder="不修改密码请留空"
-            @input="onNewPwdInput"
-          />
+          <div class="pwd-wrapper">
+            <input
+              :type="showNewPwd ? 'text' : 'password'"
+              v-model="newPwd"
+              placeholder="不修改密码请留空"
+              @input="onNewPwdInput"
+            />
+          </div>
         </div>
         <div class="input-tip" v-if="newPwd && !pwdValidationMsg">
           密码需8位以上，包含大小写字母和数字
+          <van-icon :name="showNewPwd ? 'eye' : 'closed-eye'" class="pwd-eye" @click="showNewPwd = !showNewPwd" />
         </div>
         <div
           class="pwd-validation"
@@ -106,6 +112,7 @@
           v-if="pwdValidationMsg"
         >
           {{ pwdValidationMsg }}
+          <van-icon :name="showNewPwd ? 'eye' : 'closed-eye'" class="pwd-eye" @click="showNewPwd = !showNewPwd" />
         </div>
       </div>
 
@@ -113,7 +120,10 @@
       <div class="form-item">
         <div class="item-label">确认密码：</div>
         <div class="item-input">
-          <input type="password" v-model="repeatPwd" placeholder="不修改密码请留空" />
+          <div class="pwd-wrapper">
+            <input :type="showRepeatPwd ? 'text' : 'password'" v-model="repeatPwd" placeholder="不修改密码请留空" />
+            <van-icon :name="showRepeatPwd ? 'eye' : 'closed-eye'" class="pwd-eye" @click="showRepeatPwd = !showRepeatPwd" />
+          </div>
         </div>
       </div>
     </div>
@@ -148,18 +158,24 @@
             <span>游客默认密码为：12345678</span>
           </div>
           <div class="input-row">
-            <input v-model="oldPwd" type="password" class="pwd-input" placeholder="请输入原密码" />
+            <div class="pwd-wrapper">
+              <input v-model="oldPwd" :type="showOldPwd ? 'text' : 'password'" class="pwd-input" placeholder="请输入原密码" />
+              <van-icon :name="showOldPwd ? 'eye' : 'closed-eye'" class="pwd-eye" @click="showOldPwd = !showOldPwd" />
+            </div>
           </div>
           <div class="input-row">
-            <input
-              v-model="newPwd"
-              type="password"
-              class="pwd-input"
-              placeholder="请输入新密码"
-              @input="onNewPwdInput"
-            />
+            <div class="pwd-wrapper">
+              <input
+                v-model="newPwd"
+                :type="showNewPwd ? 'text' : 'password'"
+                class="pwd-input"
+                placeholder="请输入新密码"
+                @input="onNewPwdInput"
+              />
+            </div>
             <div class="input-tip" v-if="!pwdValidationMsg">
               密码需8位以上，包含大小写字母和数字
+              <van-icon :name="showNewPwd ? 'eye' : 'closed-eye'" class="pwd-eye" @click="showNewPwd = !showNewPwd" />
             </div>
             <div
               class="pwd-validation"
@@ -170,15 +186,19 @@
               v-if="pwdValidationMsg"
             >
               {{ pwdValidationMsg }}
+              <van-icon :name="showNewPwd ? 'eye' : 'closed-eye'" class="pwd-eye" @click="showNewPwd = !showNewPwd" />
             </div>
           </div>
           <div class="input-row">
-            <input
-              v-model="repeatPwd"
-              type="password"
-              class="pwd-input"
-              placeholder="请重复新密码"
-            />
+            <div class="pwd-wrapper">
+              <input
+                v-model="repeatPwd"
+                :type="showRepeatPwd ? 'text' : 'password'"
+                class="pwd-input"
+                placeholder="请重复新密码"
+              />
+              <van-icon :name="showRepeatPwd ? 'eye' : 'closed-eye'" class="pwd-eye" @click="showRepeatPwd = !showRepeatPwd" />
+            </div>
           </div>
           <div class="confirm-button" @click="changePassword">确定</div>
         </div>
@@ -298,6 +318,9 @@ const oldPwd = ref('')
 const newPwd = ref('')
 const repeatPwd = ref('')
 const pwdValidationMsg = ref('') // 密码验证提示信息
+const showOldPwd = ref(false)
+const showNewPwd = ref(false)
+const showRepeatPwd = ref(false)
 
 // 密码修改成功弹窗
 const showPasswordSuccessPopup = ref(false)
@@ -642,6 +665,16 @@ const saveProfile = async () => {
     showDialog({
       title: '提示',
       message: '请输入账号',
+      confirmButtonText: '确定',
+      confirmButtonColor: '#ff9500',
+    })
+    return
+  }
+
+  if (isGuest.value && !/^1\d{10}$/.test(userId.value.trim())) {
+    showDialog({
+      title: '提示',
+      message: '请输入正确的11位手机号',
       confirmButtonText: '确定',
       confirmButtonColor: '#ff9500',
     })
@@ -1197,11 +1230,36 @@ onBeforeUnmount(() => {
   outline: none;
 }
 
+.pwd-wrapper {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.pwd-wrapper input {
+  flex: 1;
+  background: transparent;
+  border: none;
+  color: #fff;
+  font-size: 16px;
+  outline: none;
+}
+
+.pwd-eye {
+  color: #999;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
 .input-tip {
   font-size: 12px;
   color: #888;
   margin-top: 5px;
   line-height: 1.4;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
 }
 
 .pwd-validation {
@@ -1209,6 +1267,10 @@ onBeforeUnmount(() => {
   margin-top: 5px;
   line-height: 1.4;
   transition: color 0.3s ease;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
 }
 
 .pwd-validation.valid {
