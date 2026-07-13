@@ -627,6 +627,25 @@ const goToAccountCredential = async () => {
   showCredential.value = true
 }
 
+interface CommonFunction {
+  key: string
+  label: string
+  icon: string
+  handler: () => void
+}
+
+const commonFunctions: CommonFunction[] = [
+  { key: 'purchased', label: '已购影片', icon: new URL('@/assets/img/icon-ygyp.svg', import.meta.url).href, handler: goToPurchasedVideos },
+  { key: 'agent-recruitment', label: '合营计划', icon: new URL('@/assets/img/icon-hjjh.svg', import.meta.url).href, handler: goToAgentRecruitment },
+  { key: 'creative-library', label: '创意素材库', icon: new URL('@/assets/img/icon-cysck.svg', import.meta.url).href, handler: goToCreativeLibrary },
+  { key: 'collection', label: '我的收藏', icon: new URL('@/assets/img/icon-wdsc.svg', import.meta.url).href, handler: goToMyCollection },
+  { key: 'recharge-record', label: '充值记录', icon: new URL('@/assets/img/icon-czjl.svg', import.meta.url).href, handler: goToRechargeRecord },
+  { key: 'game-record', label: '消费记录', icon: new URL('@/assets/img/icon-tzjl.svg', import.meta.url).href, handler: goToGameRecord },
+  { key: 'my-agent', label: '我的代理', icon: new URL('@/assets/img/icon-wddl.svg', import.meta.url).href, handler: goToMyAgent },
+  { key: 'promotion-record', label: '推广记录', icon: new URL('@/assets/img/icon-tgjl.svg', import.meta.url).href, handler: goToPromotionRecord },
+  { key: 'credential', label: '账户凭证', icon: new URL('@/assets/img/icon-zhpz2.svg', import.meta.url).href, handler: goToAccountCredential },
+]
+
 const goToCustomerService = () => {
   openCustomerServiceModal()
 }
@@ -709,55 +728,25 @@ const confirmApplyAgent = async () => {
       </div>
     </div>
 
-    <!-- u5e38u7528u529fu80fdu533au57df -->
+    <!-- 常用功能区 -->
     <div class="common-section">
       <div class="common-grid">
-        <!-- 隐藏的功能项 -->
-        <!-- <div class="common-item" @click="goToFollowList">
-          <div class="common-icon">
-            <img src="@/assets/img/icon-guanzhu.svg" alt="" />
-          </div>
-          <div class="common-name">关注</div>
-        </div>
-        <div class="common-item" @click="goToCollection">
-          <div class="common-icon">
-            <img src="@/assets/img/icon-shoucang.svg" alt="" />
-          </div>
-          <div class="common-name">收藏</div>
-        </div>
-        <div class="common-item" @click="goToWatchHistory">
-          <div class="common-icon">
-            <img src="@/assets/img/icon-wdzj.svg" alt="" />
-          </div>
-          <div class="common-name">看片足迹</div>
-        </div> -->
-
-        <div class="common-item" @click="goToVipRecharge">
+        <div class="common-item-plain" @click="goToVipRecharge">
           <div class="common-icon">
             <img src="@/assets/img/icon-user-chongzhi.png" alt="" />
           </div>
         </div>
-
-        <div class="common-item" @click="goToWithdraw">
+        <div class="common-item-plain" @click="goToWithdraw">
           <div class="common-icon">
             <img src="@/assets/img/icon-user-tixian.png" alt="" />
           </div>
         </div>
-
-        <div class="common-item" @click="goToShareFriends">
+        <div class="common-item-plain" @click="goToShareFriends">
           <div class="common-icon">
             <img src="@/assets/img/icon-user-tuiguang.png" alt="" />
           </div>
         </div>
-
-        <!-- <div class="common-item" @click="goToWallet">
-          <div class="common-icon">
-            <img src="@/assets/img/icon-zscz.svg" alt="" />
-          </div>
-          <div class="common-name">钱包</div>
-        </div> -->
-
-        <div class="common-item" @click="router.push('/creative-library')">
+        <div class="common-item-plain" @click="goToCreativeLibrary">
           <div class="common-icon">
             <img src="@/assets/img/icon-user-zaixiankefu.png" alt="" />
           </div>
@@ -777,95 +766,19 @@ const confirmApplyAgent = async () => {
       </div>
     </div>
 
-    <!-- 记录列表 -->
-    <div class="record-list-section">
-      <div class="record-item" @click="goToPurchasedVideos">
-        <div class="record-icon">
-          <img src="@/assets/img/icon-ygyp.svg" alt="已购影片" />
-        </div>
-        <div class="record-name">已购影片</div>
-        <div class="record-arrow">
-          <van-icon name="arrow" size="16" color="#ccc" />
-        </div>
-      </div>
-
-      <div class="record-item" @click="goToAgentRecruitment">
-        <div class="record-icon">
-          <img src="@/assets/img/icon-hjjh.svg" alt="合营计划" />
-        </div>
-        <div class="record-name">合营计划</div>
-        <div class="record-arrow">
-          <van-icon name="arrow" size="16" color="#ccc" />
-        </div>
-      </div>
-
-      <div class="record-item" @click="goToCreativeLibrary">
-        <div class="record-icon">
-          <img src="@/assets/img/icon-cysck.svg" alt="创意素材库" />
-        </div>
-        <div class="record-name">创意素材库</div>
-        <div class="record-arrow">
-          <van-icon name="arrow" size="16" color="#ccc" />
-        </div>
-      </div>
-
-      <div class="record-item" @click="goToMyCollection">
-        <div class="record-icon">
-          <img src="@/assets/img/icon-wdsc.svg" alt="我的收藏" />
-        </div>
-        <div class="record-name">我的收藏</div>
-        <div class="record-arrow">
-          <van-icon name="arrow" size="16" color="#ccc" />
-        </div>
-      </div>
-
-      <div class="record-item" @click="goToRechargeRecord">
-        <div class="record-icon">
-          <img src="@/assets/img/icon-czjl.svg" alt="充值记录" />
-        </div>
-        <div class="record-name">充值记录</div>
-        <div class="record-arrow">
-          <van-icon name="arrow" size="16" color="#ccc" />
-        </div>
-      </div>
-
-      <div class="record-item" @click="goToGameRecord">
-        <div class="record-icon">
-          <img src="@/assets/img/icon-tzjl.svg" alt="投注记录" />
-        </div>
-        <div class="record-name">消费记录</div>
-        <div class="record-arrow">
-          <van-icon name="arrow" size="16" color="#ccc" />
-        </div>
-      </div>
-
-      <div class="record-item" @click="goToMyAgent">
-        <div class="record-icon">
-          <img src="@/assets/img/icon-wddl.svg" alt="我的代理" />
-        </div>
-        <div class="record-name">我的代理</div>
-        <div class="record-arrow">
-          <van-icon name="arrow" size="16" color="#ccc" />
-        </div>
-      </div>
-
-      <div class="record-item" @click="goToPromotionRecord">
-        <div class="record-icon">
-          <img src="@/assets/img/icon-tgjl.svg" alt="推广记录" />
-        </div>
-        <div class="record-name">推广记录</div>
-        <div class="record-arrow">
-          <van-icon name="arrow" size="16" color="#ccc" />
-        </div>
-      </div>
-
-      <div class="record-item" @click="goToAccountCredential">
-        <div class="record-icon">
-          <img src="@/assets/img/icon-zhpz2.svg" alt="账户凭证" />
-        </div>
-        <div class="record-name">账户凭证</div>
-        <div class="record-arrow">
-          <van-icon name="arrow" size="16" color="#ccc" />
+    <!-- 九宫格功能区 -->
+    <div class="common-section">
+      <div class="common-grid-9">
+        <div
+          v-for="item in commonFunctions"
+          :key="item.key"
+          class="common-item"
+          @click="item.handler"
+        >
+          <div class="common-icon">
+            <img :src="item.icon" :alt="item.label" />
+          </div>
+          <div class="common-name">{{ item.label }}</div>
         </div>
       </div>
     </div>
@@ -1173,35 +1086,55 @@ export default {
   margin: 0 15px 10px;
 }
 
-.section-title {
-  font-size: 16px;
-  font-weight: bold;
-  margin-bottom: 15px;
-}
-
 .common-grid {
   display: grid;
   grid-template-columns: repeat(4, 1fr);
-  gap: 8px;
+  gap: 12px;
+}
+
+.common-grid-9 {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 12px;
+}
+
+.common-item-plain {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  cursor: pointer;
+}
+
+.common-item-plain .common-icon {
+  width: 100%;
+  height: auto;
+  display: block;
+}
+
+.common-item-plain .common-icon img {
+  width: 100%;
+  height: auto;
+  display: block;
 }
 
 .common-item {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 8px;
+  gap: 4px;
   border-radius: 8px;
   border: none;
-  background: transparent;
-  padding: 0px;
+  background: #222;
+  padding: 16px 8px;
+  cursor: pointer;
 }
 
 .common-icon {
-  width: 100%;
+  width: 36px;
+  height: 36px;
   display: flex;
   justify-content: center;
   align-items: center;
-  border-radius: 0;
 }
 
 .common-icon img {
@@ -1268,61 +1201,6 @@ export default {
   100% {
     transform: translateX(-100%);
   }
-}
-
-/* 记录列表样式 */
-.record-list-section {
-  background: #2c2c2c;
-  margin: 0 15px 10px;
-  border-radius: 8px;
-  overflow: hidden;
-}
-
-.record-item {
-  display: flex;
-  align-items: center;
-  padding: 12px 16px;
-  cursor: pointer;
-  transition: background-color 0.3s ease;
-  border-bottom: 1px solid #333;
-}
-
-.record-item:last-child {
-  border-bottom: none;
-}
-
-.record-item:hover {
-  background-color: rgba(255, 255, 255, 0.05);
-}
-
-.record-icon {
-  width: 28px;
-  height: 28px;
-  margin-right: 8px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border-radius: 8px;
-  flex-shrink: 0;
-}
-
-.record-icon img {
-  width: 20px;
-  height: 20px;
-  object-fit: contain;
-}
-
-.record-name {
-  flex: 1;
-  font-size: 14px;
-  color: #fff;
-  font-weight: 500;
-}
-
-.record-arrow {
-  display: flex;
-  align-items: center;
-  justify-content: center;
 }
 
 /* 退出登录前的广告位样式 */
