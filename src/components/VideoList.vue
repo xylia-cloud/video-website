@@ -1,5 +1,7 @@
 <script setup lang="ts">
 import { useRouter } from 'vue-router'
+import type { PropType } from 'vue'
+import type { HomeDetailReturnContext } from '@/utils/home-detail-return'
 
 const router = useRouter()
 
@@ -25,6 +27,10 @@ const props = defineProps({
   returnPath: {
     type: String,
     default: '/',
+  },
+  homeReturnContext: {
+    type: Object as PropType<HomeDetailReturnContext>,
+    default: undefined,
   },
 })
 
@@ -95,9 +101,29 @@ const handleAdClick = (video: VideoItem) => {
 }
 
 const handleVideoClick = (videoId: number) => {
-  const scrollPosition = window.scrollY || document.documentElement.scrollTop
-  sessionStorage.setItem('homeScrollPosition', scrollPosition.toString())
-  router.push(`/video/${videoId}?from=${props.returnPath}`)
+  const context = props.homeReturnContext
+  const scrollPosition = Math.max(
+    0,
+    Math.round(window.scrollY || document.documentElement.scrollTop),
+  )
+
+  if (context) {
+    router.push({
+      name: 'videoDetail',
+      params: { id: videoId },
+      query: {
+        from: 'home',
+        returnTypeId: String(context.typeId),
+        returnSubTypeId: context.subTypeId === null ? '' : String(context.subTypeId),
+        returnExpandedTypeId: context.expandedTypeId === null ? '' : String(context.expandedTypeId),
+        returnPage: String(Math.max(1, context.page)),
+        returnScroll: String(scrollPosition),
+      },
+    })
+  } else {
+    sessionStorage.setItem('homeScrollPosition', scrollPosition.toString())
+    router.push(`/video/${videoId}?from=${props.returnPath}`)
+  }
 }
 
 const handleImageError = (e: Event) => {

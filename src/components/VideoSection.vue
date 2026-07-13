@@ -15,8 +15,7 @@
       </div>
 
       <div v-else>
-        <VideoList :videos="videoData" />
-
+        <VideoList :videos="videoData" :home-return-context="returnContext" />
         <VideoPagination
           v-if="videoData.length > 0 && totalPages > 1"
           :current-page="currentPage"
@@ -39,8 +38,7 @@
       </div>
 
       <div v-else>
-        <VideoList :videos="videoData" />
-      </div>
+        <VideoList :videos="videoData" :home-return-context="returnContext" />      </div>
 
       <!-- 非首页标签分页控件 -->
       <VideoPagination
@@ -56,6 +54,7 @@
 <script setup lang="ts">
 import VideoList from '@/components/VideoList.vue'
 import VideoPagination from '@/components/VideoPagination.vue'
+import type { HomeDetailReturnContext } from '@/utils/home-detail-return'
 
 interface VideoItem {
   id?: number
@@ -67,8 +66,8 @@ interface VideoItem {
   class?: string
   time?: string
   points?: number | string
-  link?: string // 广告链接
-  isAd?: boolean // 是否为广告
+  link?: string
+  isAd?: boolean
 }
 interface Props {
   isFirstTabActive: boolean
@@ -78,6 +77,7 @@ interface Props {
   videoData: VideoItem[]
   currentPage: number
   totalPages: number
+  returnContext?: HomeDetailReturnContext
 }
 
 interface Emits {

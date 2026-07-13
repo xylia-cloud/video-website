@@ -3,6 +3,8 @@ import { nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import type { VideoDetail } from '@/api/fetch-api'
 import { captureInviteCode } from '@/utils/invite'
+import { saveHomeDetailReturnState } from '@/utils/home-detail-return'
+import type { HomeDetailReturnContext } from '@/utils/home-detail-return'
 import { performTouristLogin } from '@/composables/useTouristLogin'
 import BottomTabbar from '@/components/BottomTabbar.vue'
 import { Icon } from 'vant/es/icon'
@@ -133,10 +135,64 @@ const syncPlayerRefs = () => {
   videoEl.value = exposed.videoRef ?? null
 }
 
+const parseCategoryId = (value: unknown): number | null => {
+  const source = Array.isArray(value) ? value[0] : value
+  if (typeof source !== 'string' || !/^\d+$/.test(source)) return null
+  const parsed = Number(source)
+  return Number.isSafeInteger(parsed) && parsed >= 0 ? parsed : null
+}
+
+const parsePositiveInt = (value: unknown): number | null => {
+  const source = Array.isArray(value) ? value[0] : value
+  if (typeof source !== 'string' || !/^\d+$/.test(source)) return null
+  const parsed = Number(source)
+  return Number.isSafeInteger(parsed) && parsed > 0 ? parsed : null
+}
+
+const parseNonNegativeInt = (value: unknown): number | null => {
+  const source = Array.isArray(value) ? value[0] : value
+  if (typeof source !== 'string' || !/^\d+$/.test(source)) return null
+  const parsed = Number(source)
+  return Number.isSafeInteger(parsed) && parsed >= 0 ? parsed : null
+}
+
+const parseNullableCategoryId = (value: unknown): number | null => {
+  const source = Array.isArray(value) ? value[0] : value
+  if (source === '' || source === undefined) return null
+  return parseCategoryId(source)
+}
+
+const getHomeReturnContext = (): (HomeDetailReturnContext & { scrollPosition: number }) | null => {
+  if (route.query.from !== 'home') return null
+
+  const typeId = parseCategoryId(route.query.returnTypeId)
+  const page = parsePositiveInt(route.query.returnPage)
+  const scrollPosition = parseNonNegativeInt(route.query.returnScroll)
+  if (typeId === null || page === null || scrollPosition === null) return null
+
+  return {
+    typeId,
+    page,
+    subTypeId: parseNullableCategoryId(route.query.returnSubTypeId),
+    expandedTypeId: parseNullableCategoryId(route.query.returnExpandedTypeId),
+    scrollPosition,
+  }
+}
+
 const goBack = () => {
   if (isPlaying.value) {
     stopPlayback()
   }
+
+  const context = getHomeReturnContext()
+  if (context) {
+    saveHomeDetailReturnState({
+      source: 'home',
+      ...context,
+      createdAt: Date.now(),
+    })
+  }
+
   router.back()
 }
 

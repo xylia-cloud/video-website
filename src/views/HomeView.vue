@@ -10,7 +10,7 @@ import AdBanner from '@/components/AdBanner.vue'
 import VideoSection from '@/components/VideoSection.vue'
 import LoadingStates from '@/components/LoadingStates.vue'
 import BottomTabbar from '@/components/BottomTabbar.vue'
-import { ref, onMounted, onBeforeUnmount, computed, onActivated } from 'vue'
+import { ref, onMounted, onBeforeUnmount, computed, onActivated, onDeactivated, nextTick } from 'vue'
 import {
   fetchRecommendVideos,
   fetchTypesList,
@@ -28,6 +28,8 @@ import { performTouristLogin } from '@/composables/useTouristLogin'
 import { useRouter, useRoute } from 'vue-router'
 import { useUserStore } from '@/stores/user'
 import { resolveInviteCode } from '@/utils/invite'
+import { consumeHomeDetailReturnState } from '@/utils/home-detail-return'
+import type { HomeDetailReturnState, HomeDetailReturnContext } from '@/utils/home-detail-return'
 
 // 使用路由
 const router = useRouter()
@@ -195,7 +197,7 @@ const processVideoData = (item: ApiVideoItem): VideoItem => {
 
   return {
     id: item.id || item.vod_id || 0,
-    coverUrl: getFullImageUrl(item.vod_pic || item.vod_pic_thumb), // 💡 统一处理
+    coverUrl: getFullImageUrl(item.vod_pic || item.vod_pic_thumb || item.coverUrl), // 💡 统一处理
     title: item.vod_name || item.title || '',
     isVip,
     isFree: !isVip,
@@ -237,16 +239,17 @@ const handlePrimaryTypeClick = (type: TypeItem) => {
     return
   }
 
-  // 如果有子分类，则展开/收起子分类
+  // 如果有子分类，则展开/收起子分类并加载该分类数据
   if (type.child && type.child.length > 0) {
     if (expandedTypeId.value === type.type_id) {
       // 如果当前分类已展开，则收起
       expandedTypeId.value = null
       activeSubTypeId.value = null
     } else {
-      // 展开当前分类
+      // 展开当前分类并加载数据
       expandedTypeId.value = type.type_id
       activeSubTypeId.value = null
+      switchType(type.type_id)
     }
 
     // 保存分类状态
@@ -1042,6 +1045,51 @@ const handlePageUnload = () => {
   // 不清除域名弹窗会话标记：同一次打开网站内仅弹一次
 }
 
+const detailReturnContext = computed<HomeDetailReturnContext>(() => ({
+  typeId: activeTypeId.value,
+  subTypeId: activeSubTypeId.value,
+  expandedTypeId: expandedTypeId.value,
+  page: currentPage.value,
+}))
+
+const isKnownTypeId = (typeId: number) =>
+  typesList.value.some(
+    (type) => type.type_id === typeId || type.child?.some((child) => child.type_id === typeId),
+  )
+
+const applyHomeDetailReturnState = (state: HomeDetailReturnState): boolean => {
+  if (!isKnownTypeId(state.typeId)) return false
+  if (state.subTypeId !== null && !isKnownTypeId(state.subTypeId)) return false
+  if (state.expandedTypeId !== null && !typesList.value.some((type) => type.type_id === state.expandedTypeId)) {
+    return false
+  }
+
+  activeTypeId.value = state.typeId
+  activeSubTypeId.value = state.subTypeId
+  expandedTypeId.value = state.expandedTypeId
+  currentPage.value = state.page
+  return true
+}
+
+const restoreOrFetchActiveTab = async (preferredPage = 1) => {
+  const tabState = tabStates.value[activeTypeId.value]
+  if (shouldUseCache(tabState)) {
+    restoreTabFromCache(activeTypeId.value, tabState)
+    const firstTypeId = getFirstTypeId()
+    if (activeTypeId.value === firstTypeId && listAds.value.length === 0) {
+      scheduleDeferredListAds()
+    }
+    return
+  }
+
+  const firstTypeId = getFirstTypeId()
+  const tid = activeTypeId.value === firstTypeId ? VIDEO_CATEGORIES.ALL : activeTypeId.value
+  await fetchRecommendVideosData(preferredPage, tid)
+  if (activeTypeId.value === firstTypeId) {
+    scheduleDeferredListAds()
+  }
+}
+
 const ensureTouristSessionOnActivated = async () => {
   if (isRestoringGuestSession) return
 
@@ -1171,56 +1219,47 @@ onActivated(async () => {
 
   await ensureTouristSessionOnActivated()
 
-  // 尝试恢复完整的首页状态（包括分类状态）
-  const restoredFromSession = restoreSessionData()
+  // 1. 恢复一般缓存
+  restoreSessionData()
 
-  if (restoredFromSession) {
-    console.log('从详情页返回，已恢复分类状态:', {
-      activeTypeId: activeTypeId.value,
-      activeSubTypeId: activeSubTypeId.value,
-      expandedTypeId: expandedTypeId.value,
-    })
+  // 2. 消费详情返回快照（读后即删），有效时覆盖缓存恢复的分类
+  const returnState = consumeHomeDetailReturnState()
+  const appliedReturnState =
+    returnState && applyHomeDetailReturnState(returnState) ? returnState : null
+  if (appliedReturnState) {
+    console.log('应用详情返回快照，恢复分类:', appliedReturnState.typeId)
   }
 
-  // 尝试恢复当前标签的缓存数据
-  const currentTabCache = tabStates.value[activeTypeId.value]
-  const firstTypeId = getFirstTypeId()
-  const isFirstTab = activeTypeId.value === firstTypeId
+  // 3. 根据最终 activeTypeId 恢复或请求列表
+  const returnPage = appliedReturnState?.page ?? 1
+  await restoreOrFetchActiveTab(returnPage)
 
-  if (shouldUseCache(currentTabCache)) {
-    console.log(`从有效缓存恢复标签${activeTypeId.value}的数据`)
-    restoreTabFromCache(activeTypeId.value, currentTabCache)
-
-    if (isFirstTab && listAds.value.length === 0) {
-      scheduleDeferredListAds()
-    }
+  // 4. 恢复滚动位置
+  if (appliedReturnState) {
+    await nextTick()
+    requestAnimationFrame(() =>
+      window.scrollTo({ top: appliedReturnState.scrollPosition, behavior: 'auto' }),
+    )
   } else {
-    if (currentTabCache) {
-      clearStaleTabCache(activeTypeId.value)
-    }
-
-    const tidToUse = isFirstTab ? VIDEO_CATEGORIES.ALL : activeTypeId.value
-    fetchRecommendVideosData(1, tidToUse)
-    if (isFirstTab) {
-      scheduleDeferredListAds()
+    // 兜底：从 sessionStorage 恢复旧滚动位置
+    const savedScrollPosition = sessionStorage.getItem('homeScrollPosition')
+    if (savedScrollPosition) {
+      const scrollPosition = parseInt(savedScrollPosition)
+      setTimeout(() => {
+        window.scrollTo(0, scrollPosition)
+        sessionStorage.removeItem('homeScrollPosition')
+      }, 50)
     }
   }
 
-  // 检查是否有从详情页返回的滚动位置需要恢复
-  const savedScrollPosition = sessionStorage.getItem('homeScrollPosition')
-  if (savedScrollPosition) {
-    const scrollPosition = parseInt(savedScrollPosition)
-    console.log(`从详情页返回，恢复精确滚动位置: ${scrollPosition}`)
+  // 5. 保存最终正确状态
+  saveSessionData()
+})
 
-    setTimeout(() => {
-      window.scrollTo(0, scrollPosition)
-      sessionStorage.removeItem('homeScrollPosition')
-    }, 50)
-  }
-
-  // 所有标签都使用翻页模式，无需滚动监听
-
-  // 从详情页返回时不处理弹窗状态
+// 离开首页时保存当前标签状态（KeepAlive 缓存时也会触发）
+onDeactivated(() => {
+  saveCurrentTabState()
+  saveSessionData()
 })
 
 // 组件卸载时移除滚动事件监听
@@ -1277,9 +1316,9 @@ const restoreSessionData = () => {
           }
         }
         tabStates.value = validTabStates
-        activeTypeId.value = sessionData.activeTypeId || 1
-        activeSubTypeId.value = sessionData.activeSubTypeId || null
-        expandedTypeId.value = sessionData.expandedTypeId || null
+        activeTypeId.value = sessionData.activeTypeId ?? 1
+        activeSubTypeId.value = sessionData.activeSubTypeId ?? null
+        expandedTypeId.value = sessionData.expandedTypeId ?? null
 
         console.log('从sessionStorage恢复完整的首页状态:', {
           activeTypeId: activeTypeId.value,
@@ -1391,6 +1430,7 @@ const restoreSessionData = () => {
 
       <!-- 视频区域 -->
       <VideoSection
+        :return-context="detailReturnContext"
         :isFirstTabActive="isFirstTabActive"
         :isLoading="isLoading"
         :hasError="hasError"

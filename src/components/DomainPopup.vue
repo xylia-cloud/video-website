@@ -10,9 +10,6 @@
     @click-overlay="handleClose"
   >
     <div class="domain-popup-card">
-      <img class="domain-popup-top-image" :src="yjymTopImg" alt="永久域名" />
-      <button class="domain-popup-close" type="button" @click="handleClose">×</button>
-
       <!-- 内容区域 -->
       <div class="domain-popup-body">
         <!-- 域名列表 -->
@@ -55,13 +52,15 @@
         </button>
       </div>
     </div>
+    <button class="domain-popup-close" type="button" @click="handleClose">
+      <van-icon name="close" size="32" />
+    </button>
   </van-popup>
 </template>
 
 <script setup lang="ts">
 import { ref, watch } from 'vue'
 import bgGameImg from '@/assets/img/bg-game.png'
-import yjymTopImg from '@/assets/img/img-yjym.webp'
 
 interface Props {
   show: boolean
@@ -162,6 +161,7 @@ const downloadApp = () => {
 .domain-popup-card {
   width: min(84vw, 348px);
   border-radius: 12px;
+  padding: 12px;
   background:
     linear-gradient(#0d0c0b, #0d0c0b) padding-box,
     linear-gradient(180deg, #553713 0%, #f0e5a3 50%, #553713 100%) border-box;
@@ -172,29 +172,21 @@ const downloadApp = () => {
 }
 
 .domain-popup-close {
-  position: absolute;
-  top: 6px;
-  right: 8px;
-  width: 34px;
-  height: 34px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 12px auto 0;
+  width: 28px;
+  height: 28px;
   border: none;
   background: transparent;
   color: rgba(255, 255, 255, 0.9);
-  font-size: 28px;
-  line-height: 34px;
   cursor: pointer;
   z-index: 10;
 }
 
-.domain-popup-top-image {
-  width: 100%;
-  display: block;
-  object-fit: cover;
-  margin-top: -10px;
-}
-
 .domain-popup-body {
-  padding: 0 12px 0;
+  padding: 0;
 }
 
 .domain-list {
@@ -337,7 +329,7 @@ const downloadApp = () => {
   grid-template-columns: 1fr 1fr;
   gap: 10px;
   margin-top: 10px;
-  padding: 0 12px 10px;
+  padding: 0;
 }
 
 .domain-popup-btn {
