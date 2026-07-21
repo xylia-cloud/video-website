@@ -20,8 +20,8 @@
               <div class="domain-icon">
                 <img class="icon-logo" src="@/assets/img/icon-logo.webp" alt="365" />
               </div>
-              <div class="domain-text">365abc.cc</div>
-              <button class="copy-btn" type="button" @click="copyDomain('365abc.cc')">复制</button>
+              <div class="domain-text">tiw85.com</div>
+              <button class="copy-btn" type="button" @click="copyDomain('tiw85.com')">复制</button>
             </div>
           </div>
 
@@ -77,6 +77,7 @@ const visible = ref(props.show)
 
 // 域名列表
 const domains = ref([
+  '365abc.cc',
   '365abc.me',
   '365aaa.me',
   '365bbb.me',

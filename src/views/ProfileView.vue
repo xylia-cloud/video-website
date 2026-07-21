@@ -618,7 +618,7 @@ const generateQRCode = async (url: string) => {
 // 跳转到账户凭证页面
 const goToAccountCredential = async () => {
   const userId = userInfo.value?.user_id || userInfo.value?.id || ''
-  const shareUrl = `${window.location.origin}/?invite=${userId}`
+  const shareUrl = `${window.location.origin}/?invite=${userInfo.value?.rec_code || ''}`
   await generateQRCode(shareUrl)
   showCredential.value = true
 }
