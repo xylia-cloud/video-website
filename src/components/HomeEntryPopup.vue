@@ -21,7 +21,7 @@
         <div class="home-entry-popup-desc">
           <div>参与365直线代理计划 直招100位 官方直招</div>
           <div>教你引流赚钱 招募下级 强者从不抱怨环境</div>
-          <div>365娱乐、金满楼、186、带你解锁未来！</div>
+           <div>球球大作战、金满楼、186、带你解锁未来！</div>
           <div>联系方式复制下方telegram号</div>
         </div>
       </div>

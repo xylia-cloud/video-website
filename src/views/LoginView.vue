@@ -154,6 +154,9 @@ onMounted(() => {
       <div class="background-overlay"></div>
     </div>
 
+    <!-- 永久域名 -->
+    <div class="domain-text">永久域名tiw85.com</div>
+
     <!-- 登录表单 -->
     <div class="login-form">
       <div class="input-group">
@@ -246,6 +249,15 @@ onMounted(() => {
   left: 0;
   background-color: rgba(0, 0, 0, 0.7);
   z-index: 2;
+}
+
+.domain-text {
+  position: relative;
+  z-index: 3;
+  color: rgba(255, 255, 255, 0.8);
+  font-size: 16px;
+  margin-bottom: 20px;
+  letter-spacing: 1px;
 }
 
 /* 登录表单样式 - 深色模式 */

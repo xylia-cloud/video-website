@@ -41,7 +41,7 @@ import DomainPopup from '@/components/DomainPopup.vue'
 const router = useRouter()
 const userStore = useUserStore()
 
-const APP_DOWNLOAD_URL = 'https://download.jiji8.cc'
+const APP_DOWNLOAD_URL = 'https://app.jiji8.vip'
 
 interface Props {
   keyword?: string

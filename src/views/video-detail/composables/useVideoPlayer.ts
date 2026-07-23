@@ -14,12 +14,13 @@ export function useVideoPlayer(videoDetail: Ref<VideoDetailRef>, videoSrc: Ref<s
   const isVideoPlayed = ref(false)
 
   let playbackSetupTimer: ReturnType<typeof setTimeout> | null = null
+  let playbackSession = 0
 
   const canShowDownload = computed(
     () => isPlaying.value && !!videoSrc.value && !hasVideoError.value,
   )
 
-  const cleanupVideoPlayer = () => {
+  const releaseVideoResources = () => {
     if (playbackSetupTimer !== null) {
       clearTimeout(playbackSetupTimer)
       playbackSetupTimer = null
@@ -35,14 +36,30 @@ export function useVideoPlayer(videoDetail: Ref<VideoDetailRef>, videoSrc: Ref<s
     }
   }
 
+  // 使所有尚未完成的异步播放器初始化失效，防止旧视频在切换后重新开始播放。
+  const cleanupVideoPlayer = () => {
+    playbackSession += 1
+    releaseVideoResources()
+  }
+
   const stopPlayback = () => {
     cleanupVideoPlayer()
     isPlaying.value = false
   }
 
-  const setupVideoSource = async (src: string) => {
-    cleanupVideoPlayer()
-    if (!videoEl.value) return
+  const isCurrentPlayback = (
+    session: number,
+    media?: HTMLVideoElement | null,
+    player?: Hls,
+  ) =>
+    session === playbackSession &&
+    isPlaying.value &&
+    (!media || videoEl.value === media) &&
+    (!player || hls.value === player)
+
+  const setupVideoSource = async (src: string, session = playbackSession) => {
+    const media = videoEl.value
+    if (!media || !isCurrentPlayback(session, media)) return
 
     let videoUrl = src
     if (!videoUrl.startsWith('http') && !videoUrl.startsWith('/')) {
@@ -54,21 +71,23 @@ export function useVideoPlayer(videoDetail: Ref<VideoDetailRef>, videoSrc: Ref<s
 
     isVideoPlayed.value = false
 
-    videoEl.value.setAttribute('playsinline', 'true')
-    videoEl.value.setAttribute('webkit-playsinline', 'true')
-    videoEl.value.setAttribute('x5-playsinline', 'true')
-    videoEl.value.setAttribute('x5-video-player-type', 'h5')
-    videoEl.value.setAttribute('x5-video-player-fullscreen', 'false')
+    media.setAttribute('playsinline', 'true')
+    media.setAttribute('webkit-playsinline', 'true')
+    media.setAttribute('x5-playsinline', 'true')
+    media.setAttribute('x5-video-player-type', 'h5')
+    media.setAttribute('x5-video-player-fullscreen', 'false')
 
     if (videoUrl.includes('.m3u8')) {
-      if (videoEl.value.canPlayType('application/vnd.apple.mpegurl')) {
-        videoEl.value.src = videoUrl
+      if (media.canPlayType('application/vnd.apple.mpegurl')) {
+        media.src = videoUrl
         return
       }
 
       const { default: HlsLib } = await import('hls.js')
+      if (!isCurrentPlayback(session, media)) return
+
       if (!HlsLib.isSupported()) {
-        videoEl.value.src = videoUrl
+        media.src = videoUrl
         hasVideoError.value = true
         videoErrorMessage.value = '您的浏览器不支持当前视频格式'
         return
@@ -83,9 +102,14 @@ export function useVideoPlayer(videoDetail: Ref<VideoDetailRef>, videoSrc: Ref<s
           xhr.timeout = 10000
         },
       })
+      if (!isCurrentPlayback(session, media)) {
+        newHls.destroy()
+        return
+      }
       hls.value = newHls
 
       newHls.on(HlsLib.Events.ERROR, (_event, data) => {
+        if (!isCurrentPlayback(session, media, newHls)) return
         if (!data.fatal) return
         switch (data.type) {
           case HlsLib.ErrorTypes.NETWORK_ERROR:
@@ -107,28 +131,36 @@ export function useVideoPlayer(videoDetail: Ref<VideoDetailRef>, videoSrc: Ref<s
             hasVideoError.value = true
             videoErrorMessage.value = '视频播放失败，格式可能不受支持'
             newHls.destroy()
+            hls.value = null
         }
       })
 
       try {
         newHls.loadSource(videoUrl)
-        newHls.attachMedia(videoEl.value)
+        newHls.attachMedia(media)
         newHls.on(HlsLib.Events.MANIFEST_PARSED, () => {
-          videoEl.value?.play().catch(() => {})
+          if (isCurrentPlayback(session, media, newHls)) {
+            media.play().catch(() => {})
+          }
         })
       } catch (error: unknown) {
+        if (!isCurrentPlayback(session, media, newHls)) return
         hasVideoError.value = true
         videoErrorMessage.value =
           '加载视频源失败: ' + (error instanceof Error ? error.message : '未知错误')
       }
     } else {
-      videoEl.value.src = videoUrl
+      media.src = videoUrl
     }
   }
 
   const beginPlayback = async (recordWatchHistory: () => Promise<boolean>) => {
+    const session = ++playbackSession
+    releaseVideoResources()
+    isPlaying.value = false
+
     const canPlay = await recordWatchHistory()
-    if (!canPlay) return false
+    if (!canPlay || session !== playbackSession) return false
 
     hasVideoError.value = false
     videoErrorMessage.value = ''
@@ -136,7 +168,9 @@ export function useVideoPlayer(videoDetail: Ref<VideoDetailRef>, videoSrc: Ref<s
 
     playbackSetupTimer = setTimeout(() => {
       playbackSetupTimer = null
-      void setupVideoSource(videoSrc.value)
+      if (session === playbackSession && isPlaying.value) {
+        void setupVideoSource(videoSrc.value, session)
+      }
     }, 100)
 
     return true

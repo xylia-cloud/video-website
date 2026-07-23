@@ -141,7 +141,7 @@ const saveImage = () => {
 
 // 下载APP
 const downloadApp = () => {
-  const appDownloadUrl = 'https://download.jiji8.cc'
+  const appDownloadUrl = 'https://app.jiji8.vip'
   window.open(appDownloadUrl, '_blank')
 }
 </script>

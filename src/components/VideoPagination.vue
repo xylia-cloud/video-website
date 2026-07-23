@@ -37,12 +37,15 @@
       <span class="jump-label">跳转</span>
       <input
         v-model="jumpPageInput"
-        type="number"
+        type="text"
         class="jump-input"
         :min="1"
         :max="totalPages"
-        @keyup.enter="handleJumpPage"
-        @blur="handleJumpPage"
+        inputmode="numeric"
+        pattern="[0-9]*"
+        enterkeyhint="done"
+        aria-label="跳转页码"
+        @keydown.enter.prevent="handleJumpPage"
         placeholder=""
       />
       <span class="jump-total">页</span>
@@ -259,16 +262,6 @@ watch(
 .jump-input:focus {
   border-color: #ff9500;
   background: rgba(255, 149, 0, 0.1);
-}
-
-.jump-input::-webkit-inner-spin-button,
-.jump-input::-webkit-outer-spin-button {
-  -webkit-appearance: none;
-  margin: 0;
-}
-
-.jump-input[type='number'] {
-  -moz-appearance: textfield;
 }
 
 /* 移动端优化 */

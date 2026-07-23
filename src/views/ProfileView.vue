@@ -647,7 +647,7 @@ const goToCustomerService = () => {
 }
 
 const copyWebsite = () => {
-  navigator.clipboard.writeText('365abc.cc')
+  navigator.clipboard.writeText('tiw85.com')
   showToast({ message: '已复制', duration: 1000 })
 }
 
@@ -838,7 +838,7 @@ const confirmApplyAgent = async () => {
               <span v-else class="qrcode-loading">生成中...</span>
             </div>
             <div class="credential-website">
-              <span>永久域名：365abc.cc</span>
+              <span>永久域名：tiw85.com</span>
               <span class="copy-btn" @click="copyWebsite">复制</span>
             </div>
             <div class="credential-desc">

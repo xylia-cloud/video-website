@@ -226,6 +226,9 @@ onMounted(() => {
       <div class="background-overlay"></div>
     </div>
 
+    <!-- 永久域名 -->
+    <div class="domain-text">永久域名tiw85.com</div>
+
     <!-- 应用图标和名称 -->
     <div class="app-logo">
       <div class="logo-container">
@@ -307,6 +310,15 @@ onMounted(() => {
   left: 0;
   background-color: rgba(0, 0, 0, 0.7);
   z-index: 2;
+}
+
+.domain-text {
+  position: relative;
+  z-index: 3;
+  color: rgba(255, 255, 255, 0.8);
+  font-size: 16px;
+  margin-bottom: 10px;
+  letter-spacing: 1px;
 }
 
 /* 应用logo样式 */

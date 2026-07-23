@@ -589,6 +589,9 @@ const handleHotPageChange = (page: number) => {
     forbidClick: true,
   })
 
+  // 首页分页与分类列表分页保持一致，切页后从页面顶部开始浏览。
+  window.scrollTo(0, 0)
+
   // 设置临时加载状态
   isLoading.value = true
 
