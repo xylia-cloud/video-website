@@ -1,7 +1,7 @@
 <?php
 /**
  * 完美PHP代理方案 - 统一处理所有API接口
- * 支持视频API(jiji1.tv)和用户API(live.88tv.co)
+ * 支持视频API(jiji1.tv)和用户API(sese1188.cc)
  * 无需NGINX配置，纯PHP解决方案
  */
 
@@ -146,7 +146,7 @@ function detectApiType() {
 function buildTargetUrl($apiInfo) {
     $targets = [
         'video' => 'https://jiji1.tv',
-        'user' => 'https://live.88tv.co/appapi/'
+        'user' => 'https://sese1188.cc/appapi/'
     ];
     
     if (!isset($targets[$apiInfo['type']])) {

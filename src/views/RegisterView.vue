@@ -226,17 +226,8 @@ onMounted(() => {
       <div class="background-overlay"></div>
     </div>
 
-    <!-- 永久域名 -->
-    <div class="domain-text">永久域名tiw85.com</div>
-
-    <!-- 应用图标和名称 -->
-    <div class="app-logo">
-      <div class="logo-container">
-        <div class="logo-bg">
-          <img src="@/assets/img/logo.png" alt="logo" class="logo-image">
-        </div>
-      </div>
-    </div>
+    <!-- 永久域名图片 -->
+    <img src="@/assets/img/img-login.webp" alt="永久域名" class="domain-image" />
 
     <!-- 注册表单 -->
     <div class="register-form">
@@ -312,41 +303,12 @@ onMounted(() => {
   z-index: 2;
 }
 
-.domain-text {
+.domain-image {
   position: relative;
   z-index: 3;
-  color: rgba(255, 255, 255, 0.8);
-  font-size: 16px;
+  width: 85%;
   margin-bottom: 10px;
-  letter-spacing: 1px;
 }
-
-/* 应用logo样式 */
-.app-logo {
-  z-index: 3;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-}
-
-.logo-container {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-}
-
-.logo-bg {
-  width: 343px;
-  background-color: #000;
-  border-radius: 20px;
-}
-
-.logo-bg img {
-  width: 100%;
-  border-radius: 20px;
-}
-
-
 
 /* 注册表单样式 - 深色模式 */
 .register-form {

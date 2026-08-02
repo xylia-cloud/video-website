@@ -154,8 +154,8 @@ onMounted(() => {
       <div class="background-overlay"></div>
     </div>
 
-    <!-- 永久域名 -->
-    <div class="domain-text">永久域名tiw85.com</div>
+    <!-- 永久域名图片 -->
+    <img src="@/assets/img/img-login.webp" alt="永久域名" class="domain-image" />
 
     <!-- 登录表单 -->
     <div class="login-form">
@@ -251,13 +251,11 @@ onMounted(() => {
   z-index: 2;
 }
 
-.domain-text {
+.domain-image {
   position: relative;
   z-index: 3;
-  color: rgba(255, 255, 255, 0.8);
-  font-size: 16px;
+  width: 85%;
   margin-bottom: 20px;
-  letter-spacing: 1px;
 }
 
 /* 登录表单样式 - 深色模式 */

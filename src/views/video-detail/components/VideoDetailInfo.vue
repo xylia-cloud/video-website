@@ -45,6 +45,20 @@ const emit = defineEmits<{
       <div v-else class="share-btn" @click="emit('login')">登录</div>
     </div>
 
+    <div class="network-tip">
+      <svg
+        class="wifi-icon"
+        viewBox="0 0 24 24"
+        width="16"
+        height="16"
+        fill="currentColor"
+        aria-hidden="true"
+      >
+        <path d="M12 18.5a1.5 1.5 0 1 0 0 3 1.5 1.5 0 0 0 0-3zM8.9 15.6a3.9 3.9 0 0 1 6.2 0l-1.6 1.6a2.1 2.1 0 0 0-3 0l-1.6-1.6zM5.9 12.7a8 8 0 0 1 12.2 0l-1.6 1.6a6 6 0 0 0-9 0l-1.6-1.6zM3 9.8a11.4 11.4 0 0 1 18 0l-1.6 1.6a9.4 9.4 0 0 0-14.8 0L3 9.8z" />
+      </svg>
+      <span>因部分地区网络管控 如无法打开视频请连接wifi观看</span>
+    </div>
+
     <h1 class="main-video-title">{{ videoDetail.vod_name }}</h1>
     <div class="video-meta-tag">
       <div v-if="videoTagType === 'purchased'" class="meta-tag purchased">已购买</div>
@@ -159,6 +173,24 @@ const emit = defineEmits<{
   cursor: pointer;
   min-width: 80px;
   text-align: center;
+}
+
+.network-tip {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 12px;
+  margin-bottom: 12px;
+  background: rgba(255, 149, 0, 0.12);
+  border: 1px solid rgba(255, 149, 0, 0.5);
+  border-radius: 8px;
+  color: #ffb54d;
+  font-size: 13px;
+  line-height: 1.4;
+}
+
+.wifi-icon {
+  flex-shrink: 0;
 }
 
 .main-video-title {

@@ -20,7 +20,7 @@ export const BASE_URL = (() => {
 // API代理前缀 - 与BASE_URL保持一致
 export const API_PREFIX = BASE_URL
 
-// 👤 用户相关API - 使用NGINX反向代理（生产：live.88tv.co/appapi）
+// 👤 用户相关API - 使用NGINX反向代理（生产：sese1188.cc/appapi）
 export const NEW_API_BASE_URL = (() => {
   // 所有环境都使用NGINX反向代理（注意结尾有斜杠，避免301重定向）
   const proxyUrl = '/livevideo/'
@@ -39,7 +39,7 @@ export const buildNewApiUrl = (query: URLSearchParams | string): string => {
 // 🔧 调试信息（开发和生产环境都显示）
 console.log('🌍 API配置信息:')
 console.log('  📺 视频API (jiji1.tv):', BASE_URL)
-console.log('  👤 用户API (live.88tv.co):', NEW_API_BASE_URL)
+console.log('  👤 用户API (sese1188.cc):', NEW_API_BASE_URL)
 console.log('  🔄 环境:', import.meta.env.DEV ? '开发环境' : '生产环境')
 console.log('  🎯 代理方式:', import.meta.env.DEV ? 'Vite代理' : 'NGINX反向代理')
 if (typeof window !== 'undefined' && window.location) {

@@ -1,11 +1,13 @@
 <script setup lang="ts">
-import { RouterView } from 'vue-router'
-import { defineAsyncComponent, nextTick, onBeforeUnmount, onMounted, ref } from 'vue'
+import { RouterView, useRoute } from 'vue-router'
+import { defineAsyncComponent, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { isLoggedIn, isTokenExpired, syncTokenExpiryWatcher } from '@/api/session'
 import { registerUserStoreHydrate } from '@/api/user-store-sync'
 import { useUserStore } from '@/stores/user'
 import TopLoading from '@/components/TopLoading.vue'
 import CustomerServiceButton from '@/components/CustomerServiceButton.vue'
+import InstallBanner from '@/components/InstallBanner.vue'
+import DailyDomainPopup from '@/components/DailyDomainPopup.vue'
 import {
   CUSTOMER_SERVICE_MODAL_EVENT,
   type CustomerServiceModalDetail,
@@ -27,6 +29,7 @@ const mountAuthModal = ref(false)
 const mountCustomerServiceModal = ref(false)
 const authModalReady = ref(false)
 const customerServiceModalReady = ref(false)
+const showDailyDomainPopup = ref(false)
 
 let pendingAuthDetail: AuthModalDetail | undefined
 let pendingCustomerServiceDetail: CustomerServiceModalDetail | undefined
@@ -85,6 +88,50 @@ const onCustomerServiceModalMounted = async () => {
   }
 }
 
+const DAILY_DOMAIN_POPUP_KEY = 'daily_domain_popup_last_shown'
+
+const handleDailyDomainPopupClose = () => {
+  try {
+    localStorage.setItem(DAILY_DOMAIN_POPUP_KEY, getTodayDateString())
+  } catch {
+    // 忽略存储失败
+  }
+  showDailyDomainPopup.value = false
+}
+
+const getTodayDateString = () => {
+  const now = new Date()
+  const year = now.getFullYear()
+  const month = String(now.getMonth() + 1).padStart(2, '0')
+  const day = String(now.getDate()).padStart(2, '0')
+  return `${year}-${month}-${day}`
+}
+
+const shouldShowDailyDomainPopup = () => {
+  try {
+    return localStorage.getItem(DAILY_DOMAIN_POPUP_KEY) !== getTodayDateString()
+  } catch {
+    return true
+  }
+}
+
+const route = useRoute()
+
+const maybeShowDailyDomainPopup = () => {
+  if (route.name === 'home' && shouldShowDailyDomainPopup()) {
+    showDailyDomainPopup.value = true
+  }
+}
+
+watch(
+  () => route.name,
+  () => {
+    if (route.name === 'home') {
+      maybeShowDailyDomainPopup()
+    }
+  },
+)
+
 // 应用启动时同步登录过期监听
 onMounted(() => {
   const userStore = useUserStore()
@@ -96,6 +143,9 @@ onMounted(() => {
 
   console.log('应用启动，检查TOKEN状态...')
   syncTokenExpiryWatcher()
+
+  // 每天第一次进入弹出永久域名提示
+  maybeShowDailyDomainPopup()
 
   // 延迟打印当前登录状态，方便排查过期问题
   setTimeout(() => {
@@ -132,6 +182,11 @@ onBeforeUnmount(() => {
       @vue:mounted="onCustomerServiceModalMounted"
     />
     <CustomerServiceButton />
+    <InstallBanner />
+    <DailyDomainPopup
+      :show="showDailyDomainPopup"
+      @update:show="handleDailyDomainPopupClose"
+    />
   </div>
 </template>
 

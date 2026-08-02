@@ -9,6 +9,7 @@ import vueDevTools from 'vite-plugin-vue-devtools'
 import AutoImport from 'unplugin-auto-import/vite'
 import Components from 'unplugin-vue-components/vite'
 import { VantResolver } from '@vant/auto-import-resolver'
+import { VitePWA } from 'vite-plugin-pwa'
 
 // 某些网络环境下 Node 优先解析到不可用的 IPv6，导致代理 TLS 握手 ECONNRESET
 dns.setDefaultResultOrder('ipv4first')
@@ -27,6 +28,60 @@ export default defineConfig(({ mode }) => ({
       dts: 'src/components.d.ts',
     }),
     mode === 'development' && vueDevTools(),
+    VitePWA({
+      registerType: 'autoUpdate',
+      includeAssets: ['favicon.ico'],
+      devOptions: {
+        enabled: true,
+      },
+      manifest: {
+        name: '球球大作战',
+        short_name: '球球大作战',
+        description: '球球大作战 - 在线视频平台',
+        lang: 'zh-CN',
+        theme_color: '#1989fa',
+        background_color: '#ffffff',
+        display: 'standalone',
+        orientation: 'portrait',
+        scope: '/',
+        start_url: '/',
+        icons: [
+          {
+            src: 'icons/icon-192x192.png',
+            sizes: '192x192',
+            type: 'image/png',
+          },
+          {
+            src: 'icons/icon-512x512.png',
+            sizes: '512x512',
+            type: 'image/png',
+          },
+          {
+            src: 'icons/icon-512x512.png',
+            sizes: '512x512',
+            type: 'image/png',
+            purpose: 'maskable',
+          },
+        ],
+      },
+      workbox: {
+        globPatterns: ['**/*.{js,css,html,ico,png,svg,woff2}'],
+        runtimeCaching: [
+          {
+            urlPattern: /\/api\/.*/i,
+            handler: 'NetworkFirst',
+            options: {
+              cacheName: 'api-cache',
+              expiration: {
+                maxEntries: 200,
+                maxAgeSeconds: 60 * 60 * 24,
+              },
+              networkTimeoutSeconds: 10,
+            },
+          },
+        ],
+      },
+    }),
   ].filter(Boolean),
   resolve: {
     alias: {
@@ -112,7 +167,7 @@ export default defineConfig(({ mode }) => ({
       },
       // 配置跨域代理 - 用户接口（与 nginx-config.conf / proxy.php 保持一致）
       '/livevideo/': {
-        target: 'https://live.88tv.co/appapi/',
+        target: 'https://sese1188.cc/appapi/',
         changeOrigin: true,
         rewrite: (path) => path.replace(/^\/livevideo\//, '/'),
         secure: false,
@@ -124,7 +179,7 @@ export default defineConfig(({ mode }) => ({
         proxyTimeout: 30000,
         followRedirects: true,
         headers: {
-          Host: 'live.88tv.co',
+          Host: 'sese1188.cc',
           'User-Agent':
             'Mozilla/5.0 (iPhone; CPU iPhone OS 16_6 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.6 Mobile/15E148 Safari/604.1',
           Accept: 'application/json, text/plain, */*',
