@@ -66,6 +66,8 @@ const {
   videoEl,
   hasVideoError,
   videoErrorMessage,
+  isPlayerPage,
+  playerPageSrc,
   canShowDownload,
   cleanupVideoPlayer,
   stopPlayback,
@@ -285,6 +287,8 @@ onBeforeUnmount(() => {
         :is-need-pay="isNeedPay"
         :has-video-error="hasVideoError"
         :video-error-message="videoErrorMessage"
+        :is-player-page="isPlayerPage"
+        :player-page-src="playerPageSrc"
         :show-video-ad="showVideoAd"
         @play="playVideo"
         @retry="playVideo"

@@ -1,6 +1,6 @@
 import { computed, ref, type Ref } from 'vue'
 import type Hls from 'hls.js'
-import { BASE_URL } from '@/utils/config'
+import { isPlayerPageUrl, resolveVideoUrl } from '../utils'
 import type { VideoDetailRef } from '../types'
 
 export function useVideoPlayer(videoDetail: Ref<VideoDetailRef>, videoSrc: Ref<string>) {
@@ -16,8 +16,11 @@ export function useVideoPlayer(videoDetail: Ref<VideoDetailRef>, videoSrc: Ref<s
   let playbackSetupTimer: ReturnType<typeof setTimeout> | null = null
   let playbackSession = 0
 
+  const isPlayerPage = computed(() => isPlayerPageUrl(videoSrc.value))
+  const playerPageSrc = computed(() => resolveVideoUrl(videoSrc.value))
+
   const canShowDownload = computed(
-    () => isPlaying.value && !!videoSrc.value && !hasVideoError.value,
+    () => isPlaying.value && !!videoSrc.value && !hasVideoError.value && !isPlayerPage.value,
   )
 
   const releaseVideoResources = () => {
@@ -61,13 +64,10 @@ export function useVideoPlayer(videoDetail: Ref<VideoDetailRef>, videoSrc: Ref<s
     const media = videoEl.value
     if (!media || !isCurrentPlayback(session, media)) return
 
-    let videoUrl = src
-    if (!videoUrl.startsWith('http') && !videoUrl.startsWith('/')) {
-      videoUrl = `${BASE_URL}/${videoUrl}`
-    }
-    if (videoUrl.includes('localhost') && !src.includes('localhost')) {
-      videoUrl = `${BASE_URL}/${src}`
-    }
+    // 网页播放器页面由 iframe 承载，无需设置媒体源
+    if (isPlayerPageUrl(src)) return
+
+    const videoUrl = resolveVideoUrl(src)
 
     isVideoPlayed.value = false
 
@@ -210,6 +210,8 @@ export function useVideoPlayer(videoDetail: Ref<VideoDetailRef>, videoSrc: Ref<s
     hasVideoError,
     videoErrorMessage,
     isVideoPlayed,
+    isPlayerPage,
+    playerPageSrc,
     canShowDownload,
     cleanupVideoPlayer,
     stopPlayback,

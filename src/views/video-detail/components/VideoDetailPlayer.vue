@@ -12,6 +12,8 @@ defineProps<{
   isNeedPay: boolean
   hasVideoError: boolean
   videoErrorMessage: string
+  isPlayerPage: boolean
+  playerPageSrc: string
   showVideoAd: boolean
 }>()
 
@@ -53,6 +55,15 @@ defineExpose({ containerRef, videoRef })
         <div class="error-msg">{{ videoErrorMessage || '视频播放失败' }}</div>
         <div class="retry-btn" @click="emit('retry')">重试</div>
       </div>
+      <iframe
+        v-else-if="isPlayerPage && playerPageSrc"
+        :src="playerPageSrc"
+        class="video-player player-iframe"
+        frameborder="0"
+        allowfullscreen
+        allow="autoplay; encrypted-media; fullscreen"
+        @load="emit('videoPlay')"
+      ></iframe>
       <video
         v-else
         ref="videoRef"
@@ -162,6 +173,11 @@ defineExpose({ containerRef, videoRef })
   height: 100%;
   object-fit: contain;
   background-color: #000;
+}
+
+.player-iframe {
+  border: none;
+  display: block;
 }
 
 .main-video-cover {

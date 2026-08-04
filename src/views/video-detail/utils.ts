@@ -3,6 +3,40 @@ import { BASE_URL } from '@/utils/config'
 
 export const resolveCoverUrl = (url?: string) => getFullImageUrl(url, 'video')
 
+const DIRECT_MEDIA_EXTENSIONS = [
+  '.m3u8',
+  '.mp4',
+  '.ts',
+  '.flv',
+  '.mkv',
+  '.webm',
+  '.ogg',
+  '.mov',
+  '.avi',
+  '.wmv',
+  '.rmvb',
+  '.m4v',
+]
+
+// 判断地址是否为网页播放器页面（如 https://player.jiji1.tv/?url=xxx），
+// 需要 iframe 承载；否则视为可直接播放的媒体地址（m3u8/mp4 等）。
+export const isPlayerPageUrl = (url?: string): boolean => {
+  if (!url) return false
+  const clean = url.split('#')[0].split('?')[0].toLowerCase()
+  return !DIRECT_MEDIA_EXTENSIONS.some((ext) => clean.endsWith(ext))
+}
+
+export const resolveVideoUrl = (src: string): string => {
+  let url = src
+  if (!url.startsWith('http') && !url.startsWith('/')) {
+    url = `${BASE_URL}/${url}`
+  }
+  if (url.includes('localhost') && !src.includes('localhost')) {
+    url = `${BASE_URL}/${src}`
+  }
+  return url
+}
+
 export const processAdImageUrl = (imgPath: string) => {
   if (!imgPath) return ''
   if (imgPath.startsWith('http')) return imgPath
