@@ -28,7 +28,6 @@
   </div>
 
   <GuestTipModal v-model:visible="showGuestTip" />
-  <DomainPopup :show="showDomainPopup" @update:show="showDomainPopup = $event" />
 </template>
 
 <script setup lang="ts">
@@ -36,7 +35,7 @@ import { ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { useUserStore } from '@/stores/user'
 import GuestTipModal from '@/components/GuestTipModal.vue'
-import DomainPopup from '@/components/DomainPopup.vue'
+import { openDailyDomainPopup } from '@/composables/useDailyDomainPopup'
 
 const router = useRouter()
 const userStore = useUserStore()
@@ -61,14 +60,13 @@ const emit = defineEmits<Emits>()
 
 const searchKeyword = ref(props.keyword)
 const showGuestTip = ref(false)
-const showDomainPopup = ref(false)
 
 const openAppDownload = () => {
   window.open(APP_DOWNLOAD_URL, '_blank')
 }
 
 const handleDomainClick = () => {
-  showDomainPopup.value = true
+  openDailyDomainPopup()
 }
 
 const handleAppDownload = () => {

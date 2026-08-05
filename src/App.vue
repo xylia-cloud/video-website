@@ -8,6 +8,7 @@ import TopLoading from '@/components/TopLoading.vue'
 import CustomerServiceButton from '@/components/CustomerServiceButton.vue'
 import InstallBanner from '@/components/InstallBanner.vue'
 import DailyDomainPopup from '@/components/DailyDomainPopup.vue'
+import { useDailyDomainPopup } from '@/composables/useDailyDomainPopup'
 import {
   CUSTOMER_SERVICE_MODAL_EVENT,
   type CustomerServiceModalDetail,
@@ -29,7 +30,7 @@ const mountAuthModal = ref(false)
 const mountCustomerServiceModal = ref(false)
 const authModalReady = ref(false)
 const customerServiceModalReady = ref(false)
-const showDailyDomainPopup = ref(false)
+const { showDailyDomainPopup } = useDailyDomainPopup()
 
 let pendingAuthDetail: AuthModalDetail | undefined
 let pendingCustomerServiceDetail: CustomerServiceModalDetail | undefined

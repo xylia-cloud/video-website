@@ -34,7 +34,6 @@
 
     <!-- 跳转输入框 -->
     <div class="page-jump">
-      <span class="jump-label">跳转</span>
       <input
         v-model="jumpPageInput"
         type="text"
@@ -48,7 +47,8 @@
         @keydown.enter.prevent="handleJumpPage"
         placeholder=""
       />
-      <span class="jump-total">页</span>
+      <span class="jump-total">/{{ totalPages }}</span>
+      <button class="jump-btn" type="button" @click="handleJumpPage">确定</button>
     </div>
   </div>
 </template>
@@ -68,49 +68,33 @@ const emit = defineEmits<{
 
 const jumpPageInput = ref<number>(1)
 
-// 计算可见的页码列表（优化为更紧凑的显示）
+// 计算可见的页码列表（紧凑显示，最多5个）
 const visiblePages = computed(() => {
-  const pages: (number | string)[] = []
   const current = props.currentPage
   const total = props.totalPages
 
   if (total <= 5) {
     // 总页数少于等于5，显示所有页码
+    const pages: number[] = []
     for (let i = 1; i <= total; i++) {
       pages.push(i)
     }
-  } else {
-    // 总页数大于5，显示部分页码（更紧凑）
-    if (current <= 2) {
-      // 当前页在前2页
-      for (let i = 1; i <= 3; i++) {
-        pages.push(i)
-      }
-      if (total > 4) {
-        pages.push('...')
-        pages.push(total)
-      }
-    } else if (current >= total - 1) {
-      // 当前页在后2页
-      pages.push(1)
-      if (total > 4) {
-        pages.push('...')
-      }
-      for (let i = total - 2; i <= total; i++) {
-        pages.push(i)
-      }
-    } else {
-      // 当前页在中间
-      pages.push(1)
-      pages.push('...')
-      for (let i = current - 1; i <= current + 1; i++) {
-        pages.push(i)
-      }
-      pages.push('...')
-      pages.push(total)
-    }
+    return pages
   }
 
+  // 总页数大于5，仅显示当前页前后各1页 + 首页 + 尾页
+  const pages: (number | string)[] = []
+  pages.push(1)
+  if (current > 3) {
+    pages.push('...')
+  }
+  for (let i = Math.max(2, current - 1); i <= Math.min(total - 1, current + 1); i++) {
+    pages.push(i)
+  }
+  if (current < total - 2) {
+    pages.push('...')
+  }
+  pages.push(total)
   return pages
 })
 
@@ -235,11 +219,10 @@ watch(
   display: flex;
   align-items: center;
   gap: 4px;
-  margin-left: 6px;
+  margin-left: 4px;
   flex-shrink: 0;
 }
 
-.jump-label,
 .jump-total {
   font-size: 12px;
   color: #999;
@@ -247,7 +230,7 @@ watch(
 }
 
 .jump-input {
-  width: 40px;
+  width: 34px;
   height: 30px;
   background: rgba(255, 255, 255, 0.05);
   border: 1px solid rgba(255, 255, 255, 0.2);
@@ -256,12 +239,30 @@ watch(
   text-align: center;
   font-size: 12px;
   outline: none;
-  padding: 0 4px;
+  padding: 0 2px;
 }
 
 .jump-input:focus {
   border-color: #ff9500;
   background: rgba(255, 149, 0, 0.1);
+}
+
+.jump-btn {
+  height: 30px;
+  padding: 0 12px;
+  background: #ff9500;
+  border: none;
+  border-radius: 4px;
+  color: #fff;
+  font-size: 12px;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  flex-shrink: 0;
+  white-space: nowrap;
+}
+
+.jump-btn:active {
+  opacity: 0.8;
 }
 
 /* 移动端优化 */
@@ -285,17 +286,22 @@ watch(
 
   .page-jump {
     gap: 3px;
-    margin-left: 4px;
+    margin-left: 2px;
   }
 
-  .jump-label,
   .jump-total {
     font-size: 11px;
   }
 
   .jump-input {
-    width: 35px;
+    width: 30px;
     height: 28px;
+    font-size: 11px;
+  }
+
+  .jump-btn {
+    height: 28px;
+    padding: 0 8px;
     font-size: 11px;
   }
 }

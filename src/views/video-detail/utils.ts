@@ -20,8 +20,19 @@ const DIRECT_MEDIA_EXTENSIONS = [
 
 // 判断地址是否为网页播放器页面（如 https://player.jiji1.tv/?url=xxx），
 // 需要 iframe 承载；否则视为可直接播放的媒体地址（m3u8/mp4 等）。
+// 仅绝对 http(s) 外链且非同源地址才可能是网页播放器，避免相对路径/本站
+// 地址被误判后 iframe 嵌套加载项目自身页面。
 export const isPlayerPageUrl = (url?: string): boolean => {
   if (!url) return false
+  if (!/^https?:\/\//i.test(url)) return false
+  if (typeof window !== 'undefined') {
+    try {
+      const urlOrigin = new URL(url).origin
+      if (urlOrigin === window.location.origin) return false
+    } catch {
+      return false
+    }
+  }
   const clean = url.split('#')[0].split('?')[0].toLowerCase()
   return !DIRECT_MEDIA_EXTENSIONS.some((ext) => clean.endsWith(ext))
 }
